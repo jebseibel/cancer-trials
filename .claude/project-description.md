@@ -1,19 +1,20 @@
-# BasicSpring Project Description
+# Spring Multimodule Project Description
 
 ## Overview
-BasicSpring is a full-stack web application combining a Spring Boot REST API backend with a modern React frontend. The backend is built with Java, Gradle, and MySQL, providing comprehensive CRUD operations for managing customers, purchases, and users with JWT-based authentication.
+Spring Multimodule is a full-stack web application combining a Spring Boot REST API backend with a modern React frontend. The backend is built with Java, Gradle, and MySQL, providing comprehensive CRUD operations for managing customers, purchases, and users with JWT-based authentication.
 
 ## Purpose
-This project demonstrates a complete, production-ready web application architecture for managing business entities through RESTful APIs. It integrates a responsive frontend UI with a robust backend REST API, featuring Spring Security for authentication, Liquibase for database versioning, and support for AWS infrastructure deployment.
+This project demonstrates a multi-module Spring Boot architecture for managing business entities through RESTful APIs. It integrates a responsive frontend UI with a robust backend REST API, featuring Spring Security for authentication, Liquibase for database versioning, and support for AWS infrastructure deployment.
 
 ## Architecture
 
-### Unified Single-Module Structure
-The project uses a single Spring Boot application with integrated frontend:
+### Multi-Module Structure
+The project uses a Gradle multi-module build:
 
-- **Backend**: Monolithic Spring Boot application (com.seibel.basic)
-- **Frontend**: React/TypeScript application with Vite build tool
-- **Frontend Integration**: Built artifacts served as static assets from Spring Boot
+- **Root module**: Spring Boot application — web layer (controllers, security, config)
+- **:common** — Shared domain objects, enums, exceptions, utilities
+- **:database** — JPA entities, repositories, mappers, db services, Liquibase migrations
+- **Frontend**: React/TypeScript application with Vite build tool, served as static assets from Spring Boot
 
 ### Backend Layered Architecture
 Each entity follows a consistent 4-layer pattern:
@@ -25,12 +26,12 @@ Each entity follows a consistent 4-layer pattern:
 ### Backend Package Structure
 ```
 com.seibel.basic
-├── common/         # Shared domain objects, enums, exceptions, utilities
+├── common/         # Shared domain objects, enums, exceptions, utilities  (:common module)
+├── database/       # JPA entities, repositories, db services, Liquibase   (:database module)
 ├── config/         # Spring configuration
-├── database/       # JPA entities, repositories, database services
 ├── security/       # JWT utilities and authentication
 ├── service/        # Business services
-└── web/           # Controllers, DTOs, exception handling
+└── web/            # Controllers, DTOs, exception handling
 ```
 
 ### Frontend Structure
@@ -59,21 +60,20 @@ frontend/
 - **Swagger/OpenAPI**: API documentation and testing
 
 ### Frontend
-- **React 19.1.1**: UI framework with hooks
-- **TypeScript 5.9.3**: Type-safe JavaScript
-- **Vite 7.1.7**: Fast build tool and development server
-- **React Router 7.9.5**: Client-side routing
-- **Tailwind CSS 4.1.16**: Utility-first styling
-- **TanStack React Query 5.90.6**: Server state management
-- **Axios 1.13.1**: HTTP client
-- **React Hook Form 7.66.0**: Form state management
-- **Zod 4.1.12**: Schema validation
-- **Lucide React 0.552.0**: Icon library
-- **Recharts 3.3.0**: Data visualization
+- **React 19**: UI framework with hooks
+- **TypeScript**: Type-safe JavaScript
+- **Vite**: Fast build tool and development server
+- **React Router**: Client-side routing
+- **Tailwind CSS**: Utility-first styling
+- **TanStack React Query**: Server state management
+- **Axios**: HTTP client
+- **React Hook Form**: Form state management
+- **Zod**: Schema validation
+- **Recharts**: Data visualization
 
 ## Core Entities
 1. **Customer**: Code, name, contact information, email, phone
-2. **Purchase**: Customer reference, items, status (formerly Order)
+2. **Purchase**: Customer reference, items, status
 3. **User**: Username, email, role-based access
 
 ## Key Features
@@ -81,29 +81,14 @@ frontend/
 - **Soft Deletes**: Entities marked inactive with timestamps
 - **UUID-Based External IDs**: Extid prevents database ID exposure
 - **Pagination & Sorting**: Configurable page sizes and sort fields
-- **JWT Authentication**: Stateless token-based security with 24-hour expiration
-- **Responsive Frontend**: Mobile-first design with Tailwind CSS
-- **Real-time Data Sync**: React Query for efficient caching and refetching
-- **API Documentation**: Swagger UI for all REST endpoints
-- **Input Validation**: Request DTO validation with detailed error messages
-- **Exception Handling**: Typed HTTP responses with proper status codes
-- **Audit Trail**: Automatic createdAt, updatedAt, deletedAt timestamps
-- **Comprehensive Logging**: SLF4J with configurable levels
-
-## Development Constraints
-- Project is NOT in production
-- Database schema changes made directly in Liquibase files
-- No credentials committed to Git (use environment variables)
-- All database interactions through REST API (no direct database access)
-- Frontend uses REST API endpoints exclusively
+- **JWT Authentication**: Stateless token-based security
+- **String Cleanup**: Empty strings/whitespace automatically converted to NULL via Liquibase stored procedure and JPA entity listener
 
 ## Development Environment
 - **OS**: Ubuntu 24.04
 - **Backend**: Java 21, Spring Boot, managed by user
-- **Frontend**: Node.js with npm, started via `npm run dev`
-- **Database**: MySQL (local or AWS RDS) configured via environment variables
-- **Database Reset**: Docker webhook at `http://localhost:5678/webhook/clear-db`
-- **Testing**: Playwright E2E tests available
+- **Frontend**: `npm run dev` in `frontend/` directory
+- **Database Reset**: Docker n8n webhook at `http://localhost:5678/webhook/clear-db`
 
 ## API Endpoints
 
@@ -137,28 +122,10 @@ frontend/
 ### Local Development
 - Backend: Run Spring Boot application (port 8080)
 - Frontend: Run Vite dev server (port 5173)
-- Database: MySQL with automatic Liquibase migrations
+- Database: MySQL with automatic Liquibase migrations on startup
 
 ### Production Deployment
 - Build frontend: `npm run build` (Vite)
-- Gradle build: `gradle buildDeployment` (includes frontend)
+- Gradle build: `./gradlew buildDeployment` (includes frontend)
 - Outputs single JAR with embedded frontend
 - AWS RDS MySQL configuration via environment variables
-- Spring Boot serves frontend as static assets
-
-## Running the Application
-1. **Start Backend**: Run Spring Boot (user manages this)
-2. **Start Frontend**: `npm run dev` in frontend directory
-3. **Reset Database**: Call webhook `http://localhost:5678/webhook/clear-db`
-4. **Access Frontend**: Open browser to `http://localhost:5173`
-5. **API Docs**: View Swagger at backend URL + `/swagger-ui.html`
-
-## Design Principles
-- **Layered Architecture**: Clear separation of concerns across layers
-- **RESTful API**: Standard HTTP methods and status codes
-- **JWT Security**: Stateless authentication suitable for cloud deployment
-- **Type Safety**: TypeScript on frontend, Java with proper typing on backend
-- **Responsive Design**: Mobile-first CSS with Tailwind
-- **Error Handling**: Comprehensive exception handling with proper HTTP responses
-- **State Management**: React Query for server state, local state for UI
-- **Documentation**: Swagger API docs and inline code documentation
