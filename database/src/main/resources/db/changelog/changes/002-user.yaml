@@ -1,0 +1,21 @@
+databaseChangeLog:
+  - changeSet:
+      id: create_users_table
+      author: jeb
+      labels: authentication
+      changes:
+
+        # Users Table
+        - createTable:
+            tableName: user
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: username, type: varchar(50), constraints: { nullable: false, unique: true } }
+              - column: { name: password, type: varchar(255), constraints: { nullable: false } }
+              - column: { name: email, type: varchar(100) }
+              - column: { name: role, type: varchar(20), constraints: { nullable: false }, defaultValue: 'USER' }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }

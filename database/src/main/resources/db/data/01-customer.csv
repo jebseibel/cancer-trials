@@ -1,0 +1,11 @@
+code,name,contact_name,description,contact_email,contact_phone
+CUST001,Acme Corp,John Smith,Leading supplier of widgets,john.smith@acme.com,555-0001
+CUST002,Tech Innovations,Sarah Johnson,Software development firm,sarah.j@techinnovations.com,555-0002
+CUST003,Global Services,Mike Chen,International consulting,mike.chen@globalservices.com,555-0003
+CUST004,Bright Solutions,Lisa Anderson,Business process optimization,lisa.a@brightsolutions.com,555-0004
+CUST005,Future Systems,David Brown,Enterprise software integrator,david.b@futuresystems.com,555-0005
+CUST006,Prime Industries,Emma Wilson,Manufacturing excellence,emma.w@primeindustries.com,555-0006
+CUST007,Digital Ventures,James Martinez,Digital transformation partner,james.m@digitalventures.com,555-0007
+CUST008,Quality First,Rachel Lee,Quality assurance services,rachel.l@qualityfirst.com,555-0008
+CUST009,Summit Networks,Thomas Taylor,Network infrastructure,thomas.t@summitnetworks.com,555-0009
+CUST010,Nexus Consulting,Jennifer Garcia,Strategic consulting firm,jennifer.g@nexusconsulting.com,555-0010

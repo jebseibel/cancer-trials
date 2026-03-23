@@ -1,0 +1,11 @@
+customer,item,status
+CUST001,Widget Assembly Kit,PENDING
+CUST002,Software License Bundle,COMPLETED
+CUST003,Consulting Services Package,IN_PROGRESS
+CUST004,Business Analysis Report,PENDING
+CUST005,System Integration Services,COMPLETED
+CUST006,Manufacturing Equipment,IN_PROGRESS
+CUST007,Digital Transformation Plan,PENDING
+CUST008,QA Testing Suite,COMPLETED
+CUST009,Network Infrastructure Setup,IN_PROGRESS
+CUST010,Strategic Business Review,PENDING

@@ -1,0 +1,49 @@
+databaseChangeLog:
+  - changeSet:
+      id: load-init-data
+      author: jeb
+      labels: load_csv_data
+      changes:
+
+        # Load Customer data
+        - loadData:
+            tableName: customer
+            file: db/data/01-customer.csv
+            relativeToChangelogFile: false
+            encoding: UTF-8
+            separator: ','
+            quotchar: '"'
+            columns:
+              - column: { name: code, type: string }
+              - column: { name: name, type: string }
+              - column: { name: contact_name, type: string }
+              - column: { name: description, type: string }
+              - column: { name: contact_email, type: string }
+              - column: { name: contact_phone, type: string }
+
+        # Load User data
+        - loadData:
+            tableName: user
+            file: db/data/02-user.csv
+            relativeToChangelogFile: false
+            encoding: UTF-8
+            separator: ','
+            quotchar: '"'
+            columns:
+              - column: { name: username, type: string }
+              - column: { name: password, type: string }
+              - column: { name: email, type: string }
+              - column: { name: role, type: string }
+
+        # Load Purchase data
+        - loadData:
+            tableName: purchase
+            file: db/data/03-purchase.csv
+            relativeToChangelogFile: false
+            encoding: UTF-8
+            separator: ','
+            quotchar: '"'
+            columns:
+              - column: { name: customer, type: string }
+              - column: { name: item, type: string }
+              - column: { name: status, type: string }

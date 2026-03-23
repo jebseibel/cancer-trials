@@ -1,0 +1,11 @@
+username,password,email,role
+admin,$2b$12$onF.WVh721cGuDiSlYzAJOfbd3GFxU9QT/RqHZcv0FGjyRLn3tOM.,admin@basicspring.com,ADMIN
+jsmith,$2b$12$BkF0hlJD3Gw1RH1Ku9Q/gOisTxtZtazU.Yk6KL.3rIMCz64YFtLg.,jsmith@basicspring.com,USER
+slee,$2b$12$XJS2T6nK5GqA7vIyB7IaNu4/TsH3Lxc8ld5SWlcPh9kqzI/bOkKrO,slee@basicspring.com,USER
+mchen,$2b$12$1P5kx/to431bAtNhGAvP1uBg0f6jRL4OiWedV14DtzVY97HdWfNS2,mchen@basicspring.com,USER
+dmartin,$2b$12$3wjaJIrx8BrzxyhK2ZSICuTD/raZz2itbC2t8j5Ai0KC5NRZowZhS,dmartin@basicspring.com,MANAGER
+eknight,$2b$12$CU7QguJgiBUJ4BNIms6ii.A73IBrA1lYbBVJmB.aKSnv1aUeS2U2G,eknight@basicspring.com,USER
+rwilson,$2b$12$C8/y0mTid3pPC9wLANtZD.mtdysCxjUHUL/Bxl3k7CUaCfjwo8Pwm,rwilson@basicspring.com,USER
+jdavis,$2b$12$TOvOlYI6MXnjrNEi/gI19ugC0KsIMc5UsPOAEDqweCE.lYbqu6ut6,jdavis@basicspring.com,MANAGER
+agarcia,$2b$12$MdwY0I5yZYhPacQBNBGAUeAnmDRmrdhrkAy4iRbK.eYXcITg3FAhS,agarcia@basicspring.com,USER
+ttaylor,$2b$12$2jNl4W06zPUbqpm/T8kzJeHxHjiZvnZdiOmJdhg.VZ2oSRJb47/uO,ttaylor@basicspring.com,USER
