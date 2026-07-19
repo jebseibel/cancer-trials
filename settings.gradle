@@ -1,4 +1,5 @@
-rootProject.name = 'spring-multimodule'
+rootProject.name = 'jobs'
 
 include 'common'
 include 'database'
+include 'datafetcher'

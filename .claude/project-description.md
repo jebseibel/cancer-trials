@@ -25,7 +25,7 @@ Each entity follows a consistent 4-layer pattern:
 
 ### Backend Package Structure
 ```
-com.seibel.basic
+com.seibel.jobs
 ├── common/         # Shared domain objects, enums, exceptions, utilities  (:common module)
 ├── database/       # JPA entities, repositories, db services, Liquibase   (:database module)
 ├── config/         # Spring configuration

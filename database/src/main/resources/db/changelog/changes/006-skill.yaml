@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: create_skill_table
+      author: jeb
+      labels: create_job_search_tables
+      changes:
+
+        # Skill Table
+        - createTable:
+            tableName: skill
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: name, type: varchar(120), constraints: { nullable: false, unique: true } }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }

@@ -5,9 +5,9 @@ plugins {
     id 'org.liquibase.gradle' version '2.2.0'
 }
 
-group = 'com.seibel'
+group = 'com.seibel.jobs'
 version = '0.0.2-SNAPSHOT'
-description = 'cpss'
+description = 'jobs'
 
 java {
     toolchain {
