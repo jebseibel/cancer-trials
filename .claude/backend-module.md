@@ -15,7 +15,7 @@ The backend follows a 4-layer pattern:
 
 ### Package Structure
 ```
-com.seibel.jobs
+com.seibel.jobhunting
 ├── common/
 │   ├── domain/           # Business domain objects (Customer, Purchase, User)
 │   ├── enums/            # Enums (ActiveEnum, CompResult)

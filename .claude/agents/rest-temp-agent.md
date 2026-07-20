@@ -6,15 +6,15 @@ Domain objects in a common place, and Entity objects in the database area.
 
 When modifying a `*Db.java` entity file (example: `CustomerDb`), the following files must also be updated:
 
-1. `CustomerMapper.java` - `com.seibel.jobs.database.db.mapper`
-2. `CustomerRepository.java` - `com.seibel.jobs.database.db.repository`
-3. `CustomerDbService.java` - `com.seibel.jobs.database.db.service`
-4. `CustomerService.java` - `com.seibel.jobs.service`
-5. `RequestCustomerCreate.java` - `com.seibel.jobs.web.request`
-6. `RequestCustomerUpdate.java` - `com.seibel.jobs.web.request`
-7. `ResponseCustomer.java` - `com.seibel.jobs.web.response`
-8. `CustomerController.java` - `com.seibel.jobs.web.controller`
-9. `CustomerConverter.java` - `com.seibel.jobs.web.converter`
+1. `CustomerMapper.java` - `com.seibel.jobhunting.database.db.mapper`
+2. `CustomerRepository.java` - `com.seibel.jobhunting.database.db.repository`
+3. `CustomerDbService.java` - `com.seibel.jobhunting.database.db.service`
+4. `CustomerService.java` - `com.seibel.jobhunting.service`
+5. `RequestCustomerCreate.java` - `com.seibel.jobhunting.web.request`
+6. `RequestCustomerUpdate.java` - `com.seibel.jobhunting.web.request`
+7. `ResponseCustomer.java` - `com.seibel.jobhunting.web.response`
+8. `CustomerController.java` - `com.seibel.jobhunting.web.controller`
+9. `CustomerConverter.java` - `com.seibel.jobhunting.web.converter`
 10. `CustomerMapperTest.java` - `test/java/com/quokka/database/db/mapper`
 11. `CustomerRepositoryTest.java` - `test/java/com/quokka/database/db/repository`
 12. `CustomerDbServiceTest.java` - `test/java/com/quokka/database/db/service`
@@ -30,14 +30,14 @@ I repeat this pattern over and over. I have request objects/response objects, Do
 
 ## Generated Artifacts (per entity)
 
-### 1. **Domain Layer** (`com.seibel.jobs.common.domain`)
+### 1. **Domain Layer** (`com.seibel.jobhunting.common.domain`)
 - `{Entity}.java` - Business domain object
     - Extends `BaseDomain` (inherits: id, extid, createdAt, updatedAt, deletedAt, active)
     - Uses `@Data`, `@SuperBuilder`, `@NoArgsConstructor`, `@AllArgsConstructor`, `@EqualsAndHashCode(callSuper = true)`
         - Contains only business-specific fields
         - **Input source for generation**
 
-### 2. **Web Layer - Request DTOs** (`com.seibel.jobs.web.request`)
+### 2. **Web Layer - Request DTOs** (`com.seibel.jobhunting.web.request`)
 - `Request{Entity}Create.java` - Create operation DTO
     - Extends `BaseRequest`
         - Uses `@Data`, `@EqualsAndHashCode(callSuper = true)`
@@ -50,13 +50,13 @@ I repeat this pattern over and over. I have request objects/response objects, Do
         - All fields optional (nullable)
     - Only `@Size` validations (no `@NotEmpty`)
 
-### 3. **Web Layer - Response DTO** (`com.seibel.jobs.web.response`)
+### 3. **Web Layer - Response DTO** (`com.seibel.jobhunting.web.response`)
 - `Response{Entity}.java` - Outgoing data
     - Uses `@Data`, `@Builder`
         - Contains `extid` plus all business fields
     - No validation annotations
 
-### 4. **Entity Layer** (`com.seibel.jobs.database.database.db.entity`)
+### 4. **Entity Layer** (`com.seibel.jobhunting.database.database.db.entity`)
 - `{Entity}Db.java` - JPA entity
     - Extends `BaseDb` (inherits: id, extid, createdAt, updatedAt, deletedAt, active with JPA annotations)
     - Uses `@Data`, `@EqualsAndHashCode(callSuper = true)`, `@Entity`, `@Table(name = "{entity_lowercase}")`
@@ -67,7 +67,7 @@ I repeat this pattern over and over. I have request objects/response objects, Do
       - `nullable` flag  
       - `unique` flag (where applicable)
 
-### 5. **Mapper** (`com.seibel.jobs.database.db.mapper`)
+### 5. **Mapper** (`com.seibel.jobhunting.database.db.mapper`)
 - `{Entity}Mapper.java` - Object conversions
     - Uses `@Component`, `@NoArgsConstructor`
         - Creates own `ModelMapper` instance: `private final ModelMapper modelMapper = new ModelMapper();`
@@ -75,7 +75,7 @@ I repeat this pattern over and over. I have request objects/response objects, Do
     - Methods: `toModel()`, `toDb()`, `toModelList()`, `toDbList()`
         - Handles null checks in list methods (returns null if input null)
 
-### 6. **Repository** (`com.seibel.jobs.database.database.db.repository`)
+### 6. **Repository** (`com.seibel.jobhunting.database.database.db.repository`)
 - `{Entity}Repository.java` - Data access interface
     - Uses `@Repository`
         - Extends `ListCrudRepository<{Entity}Db, Long>`
@@ -85,7 +85,7 @@ I repeat this pattern over and over. I have request objects/response objects, Do
             - `boolean existsByExtid(String extid)`
             - Additional `findBy{UniqueField}()` methods for unique business fields
 
-### 7. **Database Service** (`com.seibel.jobs.database.database.db.service`)
+### 7. **Database Service** (`com.seibel.jobhunting.database.database.db.service`)
 - `{Entity}DbService.java` - Database operations layer
     - Uses `@Slf4j`, `@Service`
         - Extends `BaseDbService` (passes entity name "{Entity}Db" to constructor)
@@ -127,12 +127,12 @@ I repeat this pattern over and over. I have request objects/response objects, Do
         - `getFoundMessage(extid)`, `getFoundFailureMessage(extid)`, `getFoundMessageByType(type, count)`
         - `handleException(operation, extid, e)` for standardized exception handling
 
-### 8. **Business Service** (`com.seibel.jobs.service`)
+### 8. **Business Service** (`com.seibel.jobhunting.service`)
 - `{Entity}Service.java` - Business logic layer
     - Uses `@Slf4j`, `@Service`
     - Extends `BaseService` (sets `thisName` to "{Entity}" in constructor)
     - Constructor-injected DbService
-    - **Import required:** `import com.seibel.jobs.database.exceptions.DatabaseFailureException;`
+    - **Import required:** `import com.seibel.jobhunting.database.exceptions.DatabaseFailureException;`
     - **Pattern for all methods:**
         - Validate inputs using `requireNonNull()` / `requireNonBlank()`
         - Log operation with `log.info()`
@@ -147,11 +147,11 @@ I repeat this pattern over and over. I have request objects/response objects, Do
         - `findByActive(ActiveEnum activeEnum) throws DatabaseFailureException` - validates enum, returns List<Domain>
     - No try-catch blocks needed - exceptions propagate to controller
 
-### 9. **Controller** (`com.seibel.jobs.app.web.controller`)
+### 9. **Controller** (`com.seibel.jobhunting.app.web.controller`)
 - `{Entity}Controller.java` - REST API endpoints
     - Uses `@RestController`, `@RequestMapping("/api/{entity_lowercase}")`, `@Validated`
     - Constructor-injected business service and converter
-    - **Import required:** `import com.seibel.jobs.database.exceptions.DatabaseFailureException;`
+    - **Import required:** `import com.seibel.jobhunting.database.exceptions.DatabaseFailureException;`
     - **Endpoints (all declare `throws DatabaseFailureException`):**
         - `GET /` - getAll() throws DatabaseFailureException → List<Response{Entity}>
           - Direct service call, no additional error handling
@@ -181,7 +181,7 @@ I repeat this pattern over and over. I have request objects/response objects, Do
         - Only explicit error handling is null checks and false return values
         - Spring's exception handling converts DatabaseFailureException to HTTP 500
 
-### 10. **Converter** (`com.seibel.jobs.app.web.converter`)
+### 10. **Converter** (`com.seibel.jobhunting.app.web.converter`)
 - `{Entity}Converter.java` - DTO conversion logic (separate file from controller)
     - Uses `@Component`
     - Stateless — no dependencies injected
@@ -534,7 +534,7 @@ For each Domain class input, generate all 12 files plus builder methods:
 15. Liquibase changeset YAML
 
 ### Configuration Requirements
-- Package base path: `com.seibel.jobs`
+- Package base path: `com.seibel.jobhunting`
 - Entity naming convention
 - Field naming conventions (camelCase → snake_case)
 - Default field constraints (lengths, nullable, unique)
@@ -568,7 +568,7 @@ Entity-specific overrides to the standard generation pattern:
 ## Example Domain Input
 
 ```java  
-package com.seibel.jobs.common.domain;  
+package com.seibel.jobhunting.common.domain;  
   
 import lombok.AllArgsConstructor;  
 import lombok.Data;  

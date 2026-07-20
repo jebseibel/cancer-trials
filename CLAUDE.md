@@ -6,8 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Backend (Gradle, run from repo root):
 - Build: `./gradlew build`
-- Run a single test class: `./gradlew test --tests "com.seibel.jobs.database.db.service.CustomerDbServiceTest"`
-- Run a single test method: `./gradlew test --tests "com.seibel.jobs.database.db.service.CustomerDbServiceTest.methodName"`
+- Run a single test class: `./gradlew test --tests "com.seibel.jobhunting.database.db.service.CustomerDbServiceTest"`
+- Run a single test method: `./gradlew test --tests "com.seibel.jobhunting.database.db.service.CustomerDbServiceTest.methodName"`
 - Run tests for one module: `./gradlew :database:test`
 - Run the app: user starts/stops the backend manually — do not run or kill the Spring Boot process yourself.
 
@@ -26,11 +26,11 @@ Database:
 
 ## Architecture
 
-Gradle multi-module project (root module name: `jobs`), currently three modules wired in `settings.gradle`: root, `:common`, `:database`. (`:ai-provider`, `:docstorage`, `:fileloader` are planned/documented modules not yet present in `settings.gradle`.)
+Gradle multi-module project (root module name: `jobhunting`), currently four modules wired in `settings.gradle`: root, `:common`, `:database`, `:datafetcher`. (`:ai-provider`, `:docstorage`, `:fileloader` are planned/documented modules not yet present in `settings.gradle`.)
 
-Base Java package: `com.seibel.jobs` (main and test source sets).
+Base Java package: `com.seibel.jobhunting` (main and test source sets).
 
-- **Root module** (`src/main/java/com/seibel/jobs/`) — the Spring Boot app itself: `web/` (controllers, request/response DTOs, `GlobalExceptionHandler`), `service/` (business logic, extends `BaseService`), `security/` (`JwtUtil`, `JwtAuthenticationFilter`, `CustomUserDetailsService`), `config/` (`SecurityConfig`, `WebConfig`). Main class is `JobsApplication` — the class name is a naming leftover (see below) and hasn't been renamed to match the package.
+- **Root module** (`src/main/java/com/seibel/jobhunting/`) — the Spring Boot app itself: `web/` (controllers, request/response DTOs, `GlobalExceptionHandler`), `service/` (business logic, extends `BaseService`), `security/` (`JwtUtil`, `JwtAuthenticationFilter`, `CustomUserDetailsService`), `config/` (`SecurityConfig`, `WebConfig`). Main class is `JobhuntingApplication`.
 - **`:common`** — shared, framework-light code with no Spring dependency: domain objects (`Customer`, `Purchase`, `User`, `BaseDomain`), enums (`ActiveEnum`, `CompResult`), custom exceptions, `CodeGenerator` util.
 - **`:database`** — JPA layer: entities (`db/entity`, all extend `BaseDb`), repositories (`db/repository`, Spring Data `JpaRepository`), mappers (`db/mapper`, entity ↔ domain conversion), db services (`db/service`, extend `BaseDbService`), plus Liquibase changelogs under `database/src/main/resources/db/changelog/`. This module depends on `:common` (`api project(':common')`); it declares the Spring Boot plugin but does not apply it, since it's a library, not the bootable app.
 
@@ -44,11 +44,11 @@ Frontend (`frontend/`) is a separate Vite + React 19 + TypeScript + Tailwind app
 
 ## Naming inconsistencies (partially cleaned up)
 
-The project was copied from an older project named `cpss` (which itself had gone through `basic` → `springmulti` naming passes) and is being renamed to `jobs`. Java packages (`com.seibel.jobs`), `settings.gradle`'s root project name (`jobs`), and `build.gradle`'s `group` have been aligned. Remaining known leftovers, left alone deliberately:
-- `JobsApplication` (root main class) and `SEED_DATA`/sample test class names still say `Basic`/`Sample`, not renamed to match the package.
+The project was copied from an older project named `cpss` (which itself had gone through `basic` → `springmulti` → `jobs` naming passes) and has since been renamed to `jobhunting`. Java packages (`com.seibel.jobhunting`), `settings.gradle`'s root project name (`jobhunting`), `build.gradle`'s `group`, and the main class (`JobhuntingApplication`) have all been aligned. Remaining known leftovers, left alone deliberately:
+- `SEED_DATA`/sample test class names still say `Basic`/`Sample`, not renamed to match the package.
 - `.env` / Spring config use `RDS_*` variable names; some test files under `database/src/test` still reference `CPSS_USERNAME`/`CPSS_PASSWORD`. Left intentionally — DB/env naming is the user's to manage, never touch it.
 - `build.gradle`'s standalone `liquibase {}` Gradle plugin block still falls back to `localhost:3306/cpss` as the DB name when `RDS_HOSTNAME` is unset.
-- `application.yml`'s logging config references `com.seibel.jobs.loader.DataLoader`, a class that doesn't exist in the codebase — stale/aspirational config, not a bug to fix reactively.
+- `application.yml`'s logging config references `com.seibel.jobhunting.loader.DataLoader`, a class that doesn't exist in the codebase — stale/aspirational config, not a bug to fix reactively.
 - `.idea/modules/basicspring.main.iml` is an orphaned IDE file no longer referenced by `.idea/modules.xml`; IDE-managed, not hand-edited.
 
 Don't "fix" the DB/env-var items opportunistically — those are explicitly out of scope for code-level renaming.

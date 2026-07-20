@@ -25,5 +25,5 @@ spring:
 
 logging:
   level:
-    com.seibel.jobs.loader.DataLoader: INFO
+    com.seibel.jobhunting.loader.DataLoader: INFO
     org.springframework.security.config.annotation.authentication.configuration: ERROR

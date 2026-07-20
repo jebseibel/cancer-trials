@@ -40,7 +40,7 @@ Display values must use mixed case with spaces — never underscores or all-lowe
 The old enums (e.g. `RetCertUploadStatus.java`) use a single-value pattern. **Do not follow that pattern.** All new enums must use the full template below:
 
 ```java
-package com.seibel.jobs.common.enums;
+package com.seibel.jobhunting.common.enums;
 
 import lombok.Getter;
 
@@ -108,7 +108,7 @@ public enum ExampleStatus {
 
 ## Rules
 
-- All enum classes go in package `com.seibel.jobs.common.enums`
+- All enum classes go in package `com.seibel.jobhunting.common.enums`
 - Enum names start with a three-letter prefix describing the primary table (e.g., `Fac` = Facility, `Ret` = Retirement, `Crs` = CRS)
 - UPPERCASE constants
 - No `getValue()` method — use `name()` directly for the DB storage value
@@ -181,7 +181,7 @@ const statusMap = new Map(enumValues.map(e => [e.value, e.displayValue]));
 
 Before doing any work, state clearly:
 - The Enum class name (e.g., `FacTrackingSystem`)
-- The package: `com.seibel.jobs.common.enums`
+- The package: `com.seibel.jobhunting.common.enums`
 - The constants and their display values
 - The target field(s) being migrated
 
