@@ -1,6 +1,6 @@
 package com.seibel.cancer.database.converter;
 
-import com.seibel.cancer.common.domain.enums.ai.AiLifecycle;
+import com.seibel.cancer.common.enums.ai.AiLifecycle;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 

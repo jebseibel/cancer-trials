@@ -1,6 +1,6 @@
-package com.seibel.cancer.common.domain.domain.doc;
+package com.seibel.cancer.common.domain.doc;
 
-import com.seibel.cancer.common.domain.domain.BaseUniqueDomain;
+import com.seibel.cancer.common.domain.BaseUniqueDomain;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;

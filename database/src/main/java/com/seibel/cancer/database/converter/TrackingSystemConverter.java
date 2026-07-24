@@ -1,6 +1,6 @@
 package com.seibel.cancer.database.converter;
 
-import com.seibel.cancer.common.domain.enums.TrackingSystem;
+import com.seibel.cancer.common.enums.TrackingSystem;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 

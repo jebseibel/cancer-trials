@@ -1,8 +1,6 @@
-package com.seibel.cancer.common.domain.domain;
+package com.seibel.cancer.common.domain;
 
-import com.seibel.cancer.common.domain.BaseDomain;
-
-import com.seibel.cancer.common.domain.enums.ai.AiLifecycle;
+import com.seibel.cancer.common.enums.ai.AiLifecycle;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;

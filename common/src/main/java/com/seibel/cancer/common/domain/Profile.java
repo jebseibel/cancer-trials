@@ -1,6 +1,4 @@
-package com.seibel.cancer.common.domain.domain;
-
-import com.seibel.cancer.common.domain.BaseDomain;
+package com.seibel.cancer.common.domain;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

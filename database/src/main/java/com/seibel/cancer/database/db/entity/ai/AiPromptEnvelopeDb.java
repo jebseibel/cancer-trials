@@ -1,6 +1,6 @@
 package com.seibel.cancer.database.db.entity.ai;
 
-import com.seibel.cancer.common.domain.enums.ai.AiLifecycle;
+import com.seibel.cancer.common.enums.ai.AiLifecycle;
 import com.seibel.cancer.database.converter.AiLifecycleConverter;
 import com.seibel.cancer.database.db.entity.BaseUniqueDb;
 import jakarta.persistence.Column;

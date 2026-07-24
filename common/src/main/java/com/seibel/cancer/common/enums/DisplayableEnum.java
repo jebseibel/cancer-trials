@@ -1,4 +1,4 @@
-package com.seibel.cancer.common.domain.enums;
+package com.seibel.cancer.common.enums;
 
 /**
  * Interface for all domain enums that are displayable in the UI and API.

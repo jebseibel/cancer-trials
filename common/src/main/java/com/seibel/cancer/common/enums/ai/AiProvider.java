@@ -1,6 +1,6 @@
-package com.seibel.cancer.common.domain.enums.ai;
+package com.seibel.cancer.common.enums.ai;
 
-import com.seibel.cancer.common.domain.enums.InternalEnum;
+import com.seibel.cancer.common.enums.InternalEnum;
 import lombok.Getter;
 
 import java.util.Arrays;

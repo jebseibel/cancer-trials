@@ -1,6 +1,6 @@
 package com.seibel.cancer.aiprovider.service;
 
-import com.seibel.cancer.common.domain.domain.AiPrompt;
+import com.seibel.cancer.common.domain.AiPrompt;
 import com.seibel.cancer.database.db.service.AiPromptDbService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;

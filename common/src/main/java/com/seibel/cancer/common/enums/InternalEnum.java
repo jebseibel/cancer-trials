@@ -1,4 +1,4 @@
-package com.seibel.cancer.common.domain.enums;
+package com.seibel.cancer.common.enums;
 
 /**
  * Interface for internal processing enums not displayed in the UI.

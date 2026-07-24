@@ -1,4 +1,4 @@
-package com.seibel.cancer.common.domain.enums;
+package com.seibel.cancer.common.enums;
 
 import lombok.Getter;
 

@@ -1,8 +1,8 @@
 package com.seibel.cancer.database.db.service;
 
-import com.seibel.cancer.common.domain.domain.AiPromptGang;
+import com.seibel.cancer.common.domain.AiPromptGang;
 import com.seibel.cancer.common.enums.ActiveEnum;
-import com.seibel.cancer.common.domain.enums.ai.AiLifecycle;
+import com.seibel.cancer.common.enums.ai.AiLifecycle;
 import com.seibel.cancer.database.db.entity.ai.AiPromptGangDb;
 import com.seibel.cancer.database.db.mapper.AiPromptGangMapper;
 import com.seibel.cancer.database.db.repository.AiPromptGangRepository;

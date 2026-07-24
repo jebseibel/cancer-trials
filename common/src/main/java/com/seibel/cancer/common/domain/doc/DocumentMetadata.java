@@ -1,4 +1,4 @@
-package com.seibel.cancer.common.domain.domain.doc;
+package com.seibel.cancer.common.domain.doc;
 
 import com.seibel.cancer.common.domain.BaseDomain;
 import lombok.AllArgsConstructor;

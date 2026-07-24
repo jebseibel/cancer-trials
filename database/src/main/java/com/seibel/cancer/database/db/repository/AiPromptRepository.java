@@ -1,7 +1,7 @@
 package com.seibel.cancer.database.db.repository;
 
 import com.seibel.cancer.common.enums.ActiveEnum;
-import com.seibel.cancer.common.domain.enums.ai.AiLifecycle;
+import com.seibel.cancer.common.enums.ai.AiLifecycle;
 import com.seibel.cancer.database.db.entity.ai.AiPromptDb;
 import org.springframework.data.repository.ListCrudRepository;
 import org.springframework.stereotype.Repository;

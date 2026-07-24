@@ -1,6 +1,6 @@
 package com.seibel.cancer.database.db.mapper;
 
-import com.seibel.cancer.common.domain.domain.AiPromptEnvelope;
+import com.seibel.cancer.common.domain.AiPromptEnvelope;
 import com.seibel.cancer.database.db.entity.ai.AiPromptEnvelopeDb;
 import lombok.NoArgsConstructor;
 import org.modelmapper.ModelMapper;
