@@ -8,11 +8,11 @@ enum-migration-agent
 
 ## How to Launch
 
-> "Run the enum migration agent for TrackingSystem on FacilityOutput with values: NAR, MRETS, ERCOT, WREGIS"
+> "Run the enum migration agent for TrialStatus on TrialStatus.status with values: SAVED, INTERESTED, CONTACTED, RULED_OUT, ENROLLED"
 
 Required input:
-- **Enum name** — e.g., `FacTrackingSystem` (must start with a three-letter prefix for the primary table)
-- **Target table/field** — e.g., `FacilityOutput.trackingSystem`
+- **Enum name** — e.g., `TrialStatus`
+- **Target table/field** — e.g., `TrialStatus.status` (the `trial_status` table's own `status` column, per `TABLES.md`)
 - **Values** — list of UPPERCASE_CONSTANT → "DisplayValue" pairs
 
 ---
@@ -37,10 +37,10 @@ Display values must use mixed case with spaces — never underscores or all-lowe
 
 ## Reference Implementation
 
-The old enums (e.g. `RetCertUploadStatus.java`) use a single-value pattern. **Do not follow that pattern.** All new enums must use the full template below:
+This project's existing `ActiveEnum` uses a minimal single-value pattern (just an integer value plus `isActive()`/`isInactive()`). **Do not follow that pattern for new status/lookup enums.** All new enums beyond simple soft-delete flags must use the full template below:
 
 ```java
-package com.seibel.jobhunting.common.enums;
+package com.seibel.cancer.common.enums;
 
 import lombok.Getter;
 
@@ -108,8 +108,8 @@ public enum ExampleStatus {
 
 ## Rules
 
-- All enum classes go in package `com.seibel.jobhunting.common.enums`
-- Enum names start with a three-letter prefix describing the primary table (e.g., `Fac` = Facility, `Ret` = Retirement, `Crs` = CRS)
+- All enum classes go in package `com.seibel.cancer.common.enums`
+- Enum names describe what they represent, named after the field/concept (e.g. `TrialStatus`, `WorkMode`) — no fixed prefix convention required
 - UPPERCASE constants
 - No `getValue()` method — use `name()` directly for the DB storage value
 - `@Getter` on the class generates all field getters (Lombok)
@@ -128,11 +128,11 @@ Every enum constant must define ALL of the following fields:
 - `noDisplay` — boolean, when `true` hides the value from UI dropdowns and filter lists (e.g. `MISTAKE`, `TBD`)
 - `active` — boolean (default `true`), marks whether the value is still valid; set to `false` to retire a value without deleting it, preserving historical DB data integrity
 - `isDefault` — boolean, exactly one constant per enum must be `true`. Used by `fromString()` as the fallback when input is null/empty instead of hardcoding a specific constant
-- Plus any domain-specific fields (e.g. `promotable` on `RetCertEligibilityStatus`)
+- Plus any domain-specific fields the enum needs (e.g. a `promotable` flag on a status enum used in an approval workflow)
 
 ## EnumController
 
-- Lives in the root project: `src/main/java/com/viro/app/web/controller/EnumController.java`
+- Lives in the root project: `src/main/java/com/seibel/cancer/web/controller/EnumController.java`
 - Endpoint pattern: `GET /api/enums/{enum-name}` (e.g. `/api/enums/crs-status`, `/api/enums/eligibility-status`)
 - All endpoints are auth-required by default
 - Exceptions (public endpoints) are defined in `SecurityConfig.java` only — e.g. enums needed before login
@@ -144,7 +144,7 @@ Every enum constant must define ALL of the following fields:
 
 Whenever a Java enum is created or modified, `frontend/src/types/enums.ts` must be updated with the corresponding TypeScript union type in the same task — never leave them out of sync:
 ```typescript
-export type CrsStatusValue = 'PENDING_REVIEW' | 'ERROR' | 'RULE_ACCEPTED' | 'BULK_ACCEPTED' | 'RESOLVED' | 'LOADED';
+export type ExampleStatusValue = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'MISTAKE' | 'TBD';
 ```
 
 ---
@@ -155,7 +155,7 @@ These rules apply across multiple steps. Read them before starting.
 
 **API contract alignment:** If any backend controller returns a `Map` with hardcoded string keys (e.g., `getCounts()` returning `Map.of("pending_review", ...)`) and the frontend reads those keys (e.g., a TypeScript interface with `pending_review: number`), the keys on **both sides must be updated together**. Updating only one side will break the API contract.
 
-**API response objects:** Backend response classes (e.g. `ResponseCrsChange`) that expose an enum-backed field must include **two fields**:
+**API response objects:** Backend response classes (e.g. `Response{Entity}`) that expose an enum-backed field must include **two fields**:
 - `status` — the constant name (e.g. `"PENDING_REVIEW"`), used by the frontend for all logic: comparisons, filters, URL params, API calls
 - `statusDisplay` — the display value (e.g. `"Pending Review"`), used by the frontend purely for rendering labels to the user
 
@@ -180,8 +180,8 @@ const statusMap = new Map(enumValues.map(e => [e.value, e.displayValue]));
 ### Step 0: Confirm inputs with user
 
 Before doing any work, state clearly:
-- The Enum class name (e.g., `FacTrackingSystem`)
-- The package: `com.seibel.jobhunting.common.enums`
+- The Enum class name (e.g., `TrialStatus`)
+- The package: `com.seibel.cancer.common.enums`
 - The constants and their display values
 - The target field(s) being migrated
 
@@ -189,18 +189,17 @@ Wait for user confirmation before proceeding.
 
 ### Step 1: Create the Enum class
 
-Create the new Enum at `common/src/main/java/com/viro/common/enums/<EnumName>.java` following the **Reference Implementation** template above. Do not read or follow the old single-value enums (e.g. `RetCertUploadStatus.java`).
+Create the new Enum at `common/src/main/java/com/seibel/cancer/common/enums/<EnumName>.java` following the **Reference Implementation** template above. Do not follow this project's existing minimal `ActiveEnum` single-value pattern.
 
 ### Step 2: Find all hard-coded usages
 
 Search the entire codebase for the old hard-coded string values:
 
-1. **Grep** for each value string (e.g., `"NAR"`, `"MRETS"`) in `**/*.java` files
+1. **Grep** for each value string (e.g., `"PENDING_REVIEW"`, `"APPROVED"`) in `**/*.java` files
 2. **Grep** for each value string in `**/*.csv` files under Liquibase resources
 3. **Grep** for each value string in `**/*.yaml` and `**/*.xml` files under `database/src/main/resources/db/`
 4. **Grep** for each value string in `**/*.tsx` and `**/*.ts` files under `frontend/src`
-5. **Grep** for each value string in `api-validation/src/test/resources/snapshots/**/*.json`
-6. Record every file and line number found
+5. Record every file and line number found
 
 ---
 
@@ -263,7 +262,7 @@ Grep `**/*.java` test files (under `src/test/`) for old string values. Replace h
 
 ### Step 11: Add enum endpoint to EnumController
 
-Add a new `GET /api/enums/{enum-name}` endpoint to `src/main/java/com/viro/app/web/controller/EnumController.java`. Filter to only return constants where `active == true`. Include ALL fields (`value`, `displayValue`, `sortOrder`, `noDisplay`, and any domain-specific fields). Results must be sorted by `sortOrder` ascending.
+Add a new `GET /api/enums/{enum-name}` endpoint to `src/main/java/com/seibel/cancer/web/controller/EnumController.java`. Filter to only return constants where `active == true`. Include ALL fields (`value`, `displayValue`, `sortOrder`, `noDisplay`, and any domain-specific fields). Results must be sorted by `sortOrder` ascending.
 
 ### Step 12: Update backend response classes
 
@@ -309,19 +308,15 @@ const { data: enumValues } = useQuery({
 });
 ```
 
-### Step 17: Update snapshot test JSON files
-
-Glob `api-validation/src/test/resources/snapshots/**/*.json` and grep for old string values. If any snapshot contains old status values in captured API responses, update the `value` field to the constant name (e.g. `"PENDING_REVIEW"`) and add `displayValue` where applicable so snapshot verification does not fail.
-
 ---
 
 #### Phase 5: Verify & Report
 
-### Step 18: Verify no remaining hard-coded values
+### Step 17: Verify no remaining hard-coded values
 
-Run a final Grep for each old string value across `**/*.java`, `**/*.tsx`, `**/*.ts`, and `**/*.json` to confirm none remain (excluding the Enum class itself).
+Run a final Grep for each old string value across `**/*.java`, `**/*.tsx`, and `**/*.ts` to confirm none remain (excluding the Enum class itself).
 
-### Step 19: Report changes
+### Step 18: Report changes
 
 List all files modified, grouped by:
 - New file created (the Enum class)
@@ -335,7 +330,6 @@ List all files modified, grouped by:
 - Frontend: `frontend/src/types/enums.ts` updated (new TypeScript union type added)
 - Frontend: React Query hook created/updated
 - Frontend: TypeScript/TSX files updated
-- Snapshot JSON files updated
 
 ---
 
@@ -352,7 +346,7 @@ Do NOT use Bash for file searching. Use Glob and Grep exclusively.
 
 ## Intent
 
-The intention of this work is to standardize naming across the database records, liquibase files, load files, Green-e import, facility recon sync, frontend pages, frontend API key maps, dropdown listings, snapshot test files, log and exception messages, and OpenAPI annotations to one set of standards.
+The intention of this work is to standardize naming across the database records, Liquibase files, CSV load files, frontend pages, frontend API key maps, dropdown listings, log and exception messages, and OpenAPI annotations to one set of standards.
 
 ---
 
@@ -366,4 +360,4 @@ The following changes were considered and explicitly rejected:
 
 3. **Retrofit existing enums to new pattern** — Rejected. This agent only creates **new** enums. Upgrading existing enums (adding `displayValue`, `sortOrder`, `noDisplay`, `active`) is a separate task, not part of this agent's scope.
 
-4. **Fix existing fromString() silent defaults** — Rejected. Old enums that silently return a default (e.g. `RetCertRecordStatus` returning `LOADED`) are left as-is. The "throw on unknown" rule applies only to newly created enums. Old `fromString()` methods get fixed when those enums are eventually retrofitted.
+4. **Fix existing fromString() silent defaults** — Rejected. Old enums that silently return a default value for unrecognized input are left as-is. The "throw on unknown" rule applies only to newly created enums. Old `fromString()` methods get fixed when those enums are eventually retrofitted.

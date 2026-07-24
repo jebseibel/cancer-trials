@@ -61,4 +61,4 @@ Note: FE stands for Front End
 - Consider mobile-first and responsive design principles
 - Be mindful of browser compatibility requirements
 
-Note: While you're focused on frontend concerns, remember this project is a Spring Boot backend. Your frontend guidance should consider how it will integrate with REST APIs and the existing backend architecture.
+Note: While you're focused on frontend concerns, remember this project's backend is a Java Spring Boot multi-module app (Gradle). The frontend is a React + Vite + TypeScript + Tailwind app under `frontend/`, built independently in dev and bundled into `src/main/resources/static` for deployment via a Gradle task. Your frontend guidance should consider how it will integrate with the REST API and this build/deployment model.

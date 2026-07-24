@@ -7,15 +7,11 @@ project-documentation-agent
 # Project Documentation Agent
 
 <!--
-  Runtime estimate (full run, ~54 docs):
-  Low:  ~14 minutes (~4 docs/min)
-  High: ~36 minutes (~1.5 docs/min)
-
-  Slowest directories:  facility-recon, retire-cert-process, ts-info
-  Fastest directories:  api-testing, current-issues
-  Excluded directories: hosting, database/restapi-template.md
-
-  Assumptions: 2–6 source file lookups per doc, ~300–500 total tool calls for a full run.
+  Runtime estimate scales with however many .md files actually exist under .claude/
+  at run time (this agent discovers them via Glob rather than a fixed list).
+  Roughly: 2–6 source file lookups per doc, so a full run's tool-call count is
+  ~5x the doc count. A directory with many small docs runs faster per-doc than one
+  with few large, deeply cross-referenced docs.
 -->
 
 ## How to Launch
@@ -24,10 +20,10 @@ project-documentation-agent
 > "Run the project documentation agent"
 
 **Single directory run**:
-> "Run the project documentation agent on `.claude/_archive/fileloader`"
+> "Run the project documentation agent on `.claude/_archive/database`"
 
 **Single directory run (recursive)**:
-> "Run the project documentation agent on `.claude/_archive/fileloader/**`"
+> "Run the project documentation agent on `.claude/_archive/database/**`"
 
 ---
 
@@ -46,10 +42,10 @@ Walk every documentation file in `.claude/` (including all `_archive` subdirecto
 If no input directory is specified, process all `.md` files under `.claude/` recursively, including all `_archive` subdirectories and `.claude/agents/`.
 
 ### Input — single directory run
-If an input directory is provided (e.g., `.claude/_archive/fileloader`), process only the `.md` files in that directory. Do not recurse into subdirectories unless the input path ends with `/**`.
+If an input directory is provided (e.g., `.claude/_archive/database`), process only the `.md` files in that directory. Do not recurse into subdirectories unless the input path ends with `/**`.
 
 ### Files to NEVER modify
-- `.claude/_archive/database/restapi-template.md` — skip entirely, regardless of input
+- `.claude/database-restapi-template.md` — skip entirely, regardless of input (this is the canonical layered-architecture pattern reference; other agents point to it and it must stay stable)
 - All files under `.claude/_archive/hosting/` — skip entirely, regardless of input
 
 ---
@@ -74,7 +70,7 @@ If a claim no longer matches the code, correct it. If a section describes someth
 
 ## What NOT to do
 
-- Do NOT add code blocks or code samples to documents (except `restapi-template.md`, which is never touched)
+- Do NOT add code blocks or code samples to documents (except `database-restapi-template.md`, which is never touched)
 - Do NOT rewrite documents from scratch — make surgical corrections
 - Do NOT change the structure or purpose of a document
 - Do NOT add new sections not already present in the document
@@ -87,19 +83,19 @@ If a claim no longer matches the code, correct it. If a section describes someth
 ### Modules
 | Gradle path | Directory | Purpose |
 |---|---|---|
-| `:common` | `common/` | Shared utilities used by all modules |
-| `:database` | `database/` | JPA entities, repositories, Liquibase migrations |
-| `:ai-provider` | `ai-provider/` | AI provider integrations (Gemini, etc.) |
-| `:docstorage` | `docstorage/` | Document storage and retrieval |
-| `:fileloader` | `fileloader/` | File loading and processing |
-| `:datafetcher` | `datafetcher/` | External data fetching (CRS, EIA, tracking systems) |
-| `:api-validation` | `api-validation/` | REST Assured snapshot tests |
-| Root | `viro-server/` | Main Spring Boot application |
+| Root | (repo root) | Main Spring Boot application — web layer, security, config |
+| `:common` | `common/` | Shared, framework-light domain objects, enums, exceptions |
+| `:database` | `database/` | JPA entities, repositories, mappers, db services, Liquibase migrations |
+| `:datafetcher` | `datafetcher/` | External data fetching |
+| `:ai-provider` | `ai-provider/` | AI provider integrations (OpenAI/Anthropic/Gemini/OpenRouter via Spring AI) |
+
+Confirm this table against `settings.gradle` before relying on it — modules get added
+or removed over time and this list can go stale like any other doc.
 
 ### Tech stack
-- Java 21, Spring Boot 3.5.5, Gradle 8.14.3
-- Spring Data JPA, Liquibase, MySQL
-- AWS RDS (database), AWS Elastic Beanstalk (hosting)
+- Java 21, Spring Boot 3.5.x, Gradle
+- Spring Data JPA, Liquibase, MySQL (local, via Docker for dev)
+- Frontend: React + Vite + TypeScript + Tailwind, bundled into the Spring Boot jar for deployment
 
 ---
 
@@ -109,113 +105,22 @@ If a claim no longer matches the code, correct it. If a section describes someth
 Before doing any work, state clearly:
 - Whether this is a **full run** or a **single directory run**
 - The exact directory path(s) that will be processed (or "all of `.claude/`" for a full run)
-- That `restapi-template.md` will be skipped
+- That `database-restapi-template.md` will be skipped
 
 Wait for the user to confirm before proceeding.
 
 ### Step 1: Build a file list
 
-For a **full run**, use the pre-built file list below instead of Globbing. Always exclude `restapi-template.md` and all files under `hosting/`. This is your work queue.
+For a **full run**, Glob `.claude/**/*.md` to discover the current work queue — do not
+rely on a hardcoded list, since the doc set changes over time and a stale list will
+silently skip new docs or fail on deleted ones. Always exclude
+`database-restapi-template.md` and all files under `.claude/_archive/hosting/`.
 
-#### Full run — pre-built file list (as of 2026-03-10)
+For a **single directory run**, Glob `.md` files only in the specified input directory
+(add `/**` to the path if recursive was requested).
 
-**Root level** (`.claude/_archive/`):
-- `application-start-process.md`
-- `AUTHENTICATION-SETUP.md`
-- `docstorage-module.md`
-- `mcp-server-module.md`
-
-**ai-processing/**:
-- `ai-processing.md`
-- `ai-provider-module.md`
-- `gemini-config.md`
-- `retire-certs-types.md`
-
-**ai-prompt/**:
-- `ai-prompt-management.md`
-- `ai-prompt-wiring.md`
-
-**api-testing/**:
-- `api-test-implementation.md`
-- `api-test-repos.md`
-- `how-it-works.md`
-- `QUICKSTART.md`
-- `README.md`
-- `test_db_connect.md`
-- `test-values/validate-by-csv.md`
-- `test-values/validate-by-restapi.md`
-
-**crs-processing/**:
-- `crs-duplicates-process.md`
-
-**csv-load/**:
-- `csv-load-process.md`
-- `liquibase-csv-loading-pattern.md`
-- `plan-crs-load-tables.md`
-
-**current_issues/**:
-- `investigation-expiration-date-false-positive.md`
-- `NAR-Voluntary-Compliance-Status.md`
-
-**cust-transactions/**:
-- `customer-transactions-be.md`
-- `customer-transactions-fe.md`
-- `customer-transactions-process.md`
-
-**database/**:
-- `database-module.md`
-- ~~`restapi-template.md`~~ — **SKIP**
-
-**datafetcher/**:
-- `crs-facility-sync.md`
-- `crs-sync-design.md`
-- `datafetcher-module.md`
-- `ts-nar-import.md`
-
-**doc-audit/**:
-- *(skip — this is the output directory)*
-
-**facility-recon/**:
-- `facility-recon-change-process.md`
-- `facility-recon-mistake-process.md`
-- `facility-recon-new.md`
-- `facility-recon-rule-architecture.md`
-- `rules-change-code.md`
-- `rules-explained.md`
-
-**fileloader/**:
-- `fileloader-implementation-progress.md`
-- `fileloader-module.md`
-- `fileloader-test-plan.md`
-- `file-orchestration.md`
-
-**frontend/**:
-- `frontend-module.md`
-
-**hosting/** — **SKIP entirely**
-
-**retire-cert-process/**:
-- `promotion-process-line-by-line.md`
-- `retire-certs-be.md`
-- `retire-certs-fe.md`
-- `retire-certs-process.md`
-- `retire-to-transaction.md`
-- `retire-upload-statuses.md`
-
-**ts-info/**:
-- `ts-liquibase.md`
-- `ts-load-system.md`
-
-Also process these non-archive `.claude/` files:
-- `.claude/clazzname-pattern.md`
-- `.claude/agents/be-agent.md`
-- `.claude/agents/fe-agent.md`
-- `.claude/agents/loadcsv-agent.md`
-- `.claude/agents/rest-temp-agent.md`
-
-For a **single directory run**, Glob `.md` files only in the specified input directory (add `/**` to the path if recursive was requested).
-
-Always exclude `restapi-template.md` and all files under `hosting/`. This is your work queue.
+Always exclude `database-restapi-template.md` and all files under `hosting/`. This is
+your work queue.
 
 ### Step 2: For each document
 1. Read the document fully.
@@ -273,7 +178,7 @@ Do NOT use Bash for file searching. Use Glob and Grep exclusively.
 
 ## Rules
 
-- Never modify `restapi-template.md`
+- Never modify `database-restapi-template.md`
 - Never commit to Git
 - Never drop or alter the database
 - Always read the source before updating a doc — do not guess

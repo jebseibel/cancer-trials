@@ -6,7 +6,7 @@
 
 ## Overview
 
-This document describes how to implement the Liquibase CSV data loading pattern used in the Viro project. This pattern allows you to load reference data from CSV files into your database during application startup via Liquibase migrations.
+This document describes how to implement the Liquibase CSV data loading pattern for this project. This pattern allows you to load reference data from CSV files into your database during application startup via Liquibase migrations.
 
 ## Quick Start
 
@@ -145,7 +145,7 @@ databaseChangeLog:
 
 ## Base Columns (extid, created_at, updated_at, active)
 
-When using CSV loading with Viro's `BaseDb` pattern, you **don't need to include base columns in your CSV file or changeset**. They are automatically populated by database DEFAULT values defined in the table schema.
+When using CSV loading with this project's `BaseDb` pattern, you **don't need to include base columns in your CSV file or changeset**. They are automatically populated by database DEFAULT values defined in the table schema.
 
 ### How It Works
 
@@ -212,12 +212,15 @@ Notice: No `extid`, `created_at`, `updated_at`, `active`, or `id` columns in the
 - If your entity expects `nullable=false` but the CSV has empty values, the data will load but may not match entity constraints
 - To handle empty strings, either:
   1. **Option A:** Make columns nullable in your entity if empty strings are expected
-  2. **Option B:** Use Liquibase's `clean_empty_strings()` stored procedure after loading (Viro pattern)
+  2. **Option B:** Use a Liquibase stored procedure to clean empty strings after loading (see below)
   3. **Option C:** Pre-clean the CSV file to have only valid values
 
-### Viro Pattern: String Cleanup
+This project does not currently have a `clean_empty_strings()`-style stored procedure —
+option B is available if you choose to add one, not an existing convention to follow.
 
-If you want to follow Viro's approach, create a stored procedure that cleans empty strings:
+### Optional Pattern: Stored-Procedure String Cleanup
+
+If you want a reusable cleanup step, create a stored procedure that cleans empty strings:
 
 ```yaml
 - changeSet:
@@ -229,7 +232,6 @@ If you want to follow Viro's approach, create a stored procedure that cleans emp
             CREATE PROCEDURE clean_empty_strings(IN table_name VARCHAR(255))
             BEGIN
               -- Stored procedure logic to convert empty strings to NULL
-              -- See Viro's implementation in 0300-utility-procedures.yaml
             END
 ```
 
@@ -313,19 +315,19 @@ database/
 - If your entity has `nullable=false` but CSV has empty values, either:
   - Make the column nullable in your entity
   - Update CSV to not have empty values
-  - Add string cleanup logic (see String Cleanup section above)
+  - Add string cleanup logic (see Optional Pattern section above)
 
 ## Example in Context
 
-Here's how Viro does it:
+This project already uses this pattern — see `database/src/main/resources/db/changelog/changes/100-load-init-data.yaml`:
 
-**1. Table created in:** `001-init.yaml` (contains CREATE TABLE company)
+**1. Tables created in:** `001-customer.yaml`, `002-user.yaml`, `003-purchase.yaml` (one changeset per table)
 
-**2. CSV file:** `database/src/main/resources/db/data/company.csv` (48 companies)
+**2. CSV files:** `database/src/main/resources/db/data/01-customer.csv`, `02-user.csv`, `03-purchase.csv`
 
-**3. Changeset:** `database/src/main/resources/db/changelog/changes/101-import-init-data.yaml`
+**3. Changeset:** `database/src/main/resources/db/changelog/changes/100-load-init-data.yaml` (one `loadData` block per table)
 
-**4. Entity:** `database/src/main/java/com/viro/database/db/entity/CompanyDb.java`
+**4. Entity:** `database/src/main/java/com/seibel/cancer/database/db/entity/CustomerDb.java` (and `UserDb.java`, `PurchaseDb.java`)
 
 **5. When app starts:**
 - Liquibase reads master changelog
