@@ -16,7 +16,7 @@ This keeps each module focused and allows them to grow independently.
 
 ```
 datafetcher/
-├── src/main/java/com/viro/datafetcher/
+├── src/main/java/com/seibel/cancer/datafetcher/
 │   ├── config/
 │   │   ├── DataFetcherProperties.java      # Configuration properties
 │   │   ├── TsNarProperties.java            # NAR configuration properties
@@ -31,7 +31,7 @@ datafetcher/
 │       ├── GreenELoadingService.java       # Orchestration service
 │       ├── TsNarLoadingService.java        # NAR loading service
 │       └── TsMretsLoadingService.java      # M-RETS loading service
-├── src/test/java/com/viro/datafetcher/
+├── src/test/java/com/seibel/cancer/datafetcher/
 │   ├── importer/
 │   │   ├── GreenEApprovedHtmlImporterTest.java
 │   │   └── GreenEPendingHtmlImporterTest.java
@@ -188,7 +188,7 @@ compileOnly 'org.projectlombok:lombok:1.18.34'
 **DataFetcherProperties** (`application.yaml`):
 
 ```yaml
-viro:
+cancer:
   datafetcher:
     green-e:
       approved-enabled: true
@@ -211,10 +211,10 @@ The green-e load runs as part of: `POST /api/facility-recon/sync` or `POST /api/
 
 ### 2. Scheduled Job (Automatic)
 
-Located in main app: `src/main/java/com/viro/app/scheduler/GreenEImportScheduler.java`
+Located in main app: `src/main/java/com/seibel/cancer/scheduler/GreenEImportScheduler.java`
 
 ```java
-@Scheduled(cron = "${viro.datafetcher.green-e.schedule-cron:0 0 6 * * *}")
+@Scheduled(cron = "${cancer.datafetcher.green-e.schedule-cron:0 0 6 * * *}")
 public void scheduledGreenELoad() {
     greenELoadingService.loadGreenEData();
 }
@@ -335,7 +335,7 @@ public class NewSourceLoadingService {
 
 ```java
 @Data
-@ConfigurationProperties(prefix = "viro.datafetcher.new-source")
+@ConfigurationProperties(prefix = "cancer.datafetcher.new-source")
 public class NewSourceProperties {
     private String url;
     private boolean enabled = true;
@@ -397,7 +397,7 @@ Both modules:
 ## Integration with Other Modules
 
 ### Used By:
-- **Root (viro-server)** - REST endpoints, scheduler
+- **Root (main application)** - REST endpoints, scheduler
 
 ### Uses:
 - **:common** - ImportResult, ImportError, domain classes

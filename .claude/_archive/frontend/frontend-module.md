@@ -3,7 +3,7 @@
 ## What It Is
 
 The **frontend** module is a modern React-based web application that provides the user
-interface for the Viro renewable energy document management system. Built with React 19, TypeScript,
+interface for this application. Built with React 19, TypeScript,
 and Vite, it communicates with the Spring Boot backend REST API to provide a responsive,
 type-safe single-page application.
 
@@ -98,7 +98,7 @@ npm run test:ui       # browser UI
 
 ### About Modal
 - Info icon in nav bar (between Profiles and Logout)
-- Displays: Viro Admin title, build version (from build.gradle, strips `-SNAPSHOT`), developer credits
+- Displays: app title, build version (from build.gradle, strips `-SNAPSHOT`), developer credits
 
 ### Retirement Certificate Uploads
 - Recent uploads panel shows all 12 doc types (WREGIS, MRETS, NAR, ERCOT)

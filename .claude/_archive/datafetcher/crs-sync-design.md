@@ -228,16 +228,16 @@ public class GreenELoadingService {
 
 ```
 database/
-├── src/main/java/com/viro/database/db/entity/
+├── src/main/java/com/seibel/cancer/database/db/entity/
 │   └── ImportStatusTypeDb.java               # Status type entity
-├── src/main/java/com/viro/database/db/repository/
+├── src/main/java/com/seibel/cancer/database/db/repository/
 │   └── ImportStatusTypeRepository.java       # Repository
 └── src/main/resources/db/changelog/changes/
     └── YYYYMMDD-create-import-status-type.yaml  # Liquibase migration
 
 datafetcher/                                   # NEW MODULE
 ├── build.gradle
-└── src/main/java/com/viro/datafetcher/
+└── src/main/java/com/seibel/cancer/datafetcher/
     ├── importer/
     │   ├── AbstractHtmlTableImporter.java    # Base class for HTML scraping
     │   ├── GreenEApprovedHtmlImporter.java   # Approved facilities importer
@@ -247,7 +247,7 @@ datafetcher/                                   # NEW MODULE
     └── config/
         └── DataFetcherProperties.java        # Configuration
 
-src/main/java/com/viro/app/
+src/main/java/com/seibel/cancer/
 └── controller/
     └── ImportController.java                 # REST endpoint (or add to existing)
 ```
@@ -338,7 +338,7 @@ This means:
 Add to `application.yaml`:
 
 ```yaml
-viro:
+cancer:
   datafetcher:
     green-e:
       approved-url: https://www.green-e.org/sfdc/reports-data.php
@@ -408,74 +408,74 @@ All core implementation steps have been completed. The system is ready for testi
 - `settings.gradle` - Updated to include `datafetcher` module
 
 #### Step 2: ImportStatusTypeDb Entity ✅
-- `database/src/main/java/com/viro/database/db/entity/ImportStatusTypeDb.java`
-- `database/src/main/java/com/viro/database/db/repository/ImportStatusTypeRepository.java`
+- `database/src/main/java/com/seibel/cancer/database/db/entity/ImportStatusTypeDb.java`
+- `database/src/main/java/com/seibel/cancer/database/db/repository/ImportStatusTypeRepository.java`
 - `database/src/main/resources/db/changelog/changes/011-import-status-type.yaml`
   - Creates `import_status_type` table with NEW, PRC, SUP statuses
 
 #### Step 3: Abstract HTML Table Importer ✅
 - Refactored `ImportResult` and `ImportError` to `common` module for shared use
-- `datafetcher/src/main/java/com/viro/datafetcher/importer/AbstractHtmlTableImporter.java`
+- `datafetcher/src/main/java/com/seibel/cancer/datafetcher/importer/AbstractHtmlTableImporter.java`
   - Uses Jsoup for HTML fetching and parsing
   - Configurable table selector
   - Row filtering support via `shouldImportRow()`
   - Returns `ImportResult<T>` with success/error tracking
 
 #### Step 4: Green-e Specific Importers ✅
-- `datafetcher/src/main/java/com/viro/datafetcher/importer/GreenEApprovedHtmlImporter.java`
+- `datafetcher/src/main/java/com/seibel/cancer/datafetcher/importer/GreenEApprovedHtmlImporter.java`
   - Filters rows where Status = "Approved"
   - Maps all 15 HTML columns to `CrsApproved` domain
-- `datafetcher/src/main/java/com/viro/datafetcher/importer/GreenEPendingHtmlImporter.java`
+- `datafetcher/src/main/java/com/seibel/cancer/datafetcher/importer/GreenEPendingHtmlImporter.java`
   - Filters rows where Status = "Pending"
   - Maps 4 fields to `CrsPending` domain
 
 #### Step 5: Service Layer ✅
-- `datafetcher/src/main/java/com/viro/datafetcher/config/DataFetcherProperties.java`
+- `datafetcher/src/main/java/com/seibel/cancer/datafetcher/config/DataFetcherProperties.java`
   - Configuration for URLs and schedule settings
-- `datafetcher/src/main/java/com/viro/datafetcher/service/GreenELoadingService.java`
+- `datafetcher/src/main/java/com/seibel/cancer/datafetcher/service/GreenELoadingService.java`
   - Orchestrates both importers
   - Generates version in `YYYY-MM-DD-HH-MM` format
   - Returns `GreenELoadResult` with combined statistics
 
 #### Step 6: REST Endpoint + Scheduler ✅
 - `ImportController.java` (removed — green-e import is triggered via the facility sync endpoint and `FacilityReconService`)
-- `src/main/java/com/viro/app/scheduler/GreenEImportScheduler.java`
+- `src/main/java/com/seibel/cancer/scheduler/GreenEImportScheduler.java`
   - Daily scheduled job (default 6 AM)
-  - Configurable via `viro.datafetcher.green-e.schedule-cron`
-- `ViroAppApplication.java` updated with:
+  - Configurable via `cancer.datafetcher.green-e.schedule-cron`
+- `CancerApplication.java` updated with:
   - `@EnableScheduling`
-  - `com.viro.datafetcher` package scanning
+  - `com.seibel.cancer.datafetcher` package scanning
   - `DataFetcherProperties` configuration
 
 #### Step 7: Tests ✅
 **Unit Tests (11 tests):**
-- `datafetcher/src/test/java/com/viro/datafetcher/importer/GreenEApprovedHtmlImporterTest.java` (4 tests)
-- `datafetcher/src/test/java/com/viro/datafetcher/importer/GreenEPendingHtmlImporterTest.java` (3 tests)
-- `datafetcher/src/test/java/com/viro/datafetcher/service/GreenELoadingServiceTest.java` (4 tests)
+- `datafetcher/src/test/java/com/seibel/cancer/datafetcher/importer/GreenEApprovedHtmlImporterTest.java` (4 tests)
+- `datafetcher/src/test/java/com/seibel/cancer/datafetcher/importer/GreenEPendingHtmlImporterTest.java` (3 tests)
+- `datafetcher/src/test/java/com/seibel/cancer/datafetcher/service/GreenELoadingServiceTest.java` (4 tests)
 
 **Integration Tests (4 tests):**
-- `src/test/java/com/viro/app/web/controller/ImportControllerTest.java` (4 tests)
+- `src/test/java/com/seibel/cancer/web/controller/ImportControllerTest.java` (4 tests)
 
 ### Actual File Structure
 
 ```
 database/
-├── src/main/java/com/viro/database/db/entity/
+├── src/main/java/com/seibel/cancer/database/db/entity/
 │   └── ImportStatusTypeDb.java
-├── src/main/java/com/viro/database/db/repository/
+├── src/main/java/com/seibel/cancer/database/db/repository/
 │   └── ImportStatusTypeRepository.java
 └── src/main/resources/db/changelog/changes/
     └── 011-import-status-type.yaml
 
 common/
-└── src/main/java/com/viro/common/model/
+└── src/main/java/com/seibel/cancer/common/model/
     ├── ImportResult.java          # Moved from fileloader
     └── ImportError.java           # Moved from fileloader
 
 datafetcher/
 ├── build.gradle
 └── src/
-    ├── main/java/com/viro/datafetcher/
+    ├── main/java/com/seibel/cancer/datafetcher/
     │   ├── importer/
     │   │   ├── AbstractHtmlTableImporter.java
     │   │   ├── GreenEApprovedHtmlImporter.java
@@ -484,14 +484,14 @@ datafetcher/
     │   │   └── GreenELoadingService.java
     │   └── config/
     │       └── DataFetcherProperties.java
-    └── test/java/com/viro/datafetcher/
+    └── test/java/com/seibel/cancer/datafetcher/
         ├── importer/
         │   ├── GreenEApprovedHtmlImporterTest.java
         │   └── GreenEPendingHtmlImporterTest.java
         └── service/
             └── GreenELoadingServiceTest.java
 
-src/main/java/com/viro/app/
+src/main/java/com/seibel/cancer/
 └── scheduler/
     └── GreenEImportScheduler.java
 ```
@@ -501,7 +501,7 @@ src/main/java/com/viro/app/
 Add to `application.yaml`:
 
 ```yaml
-viro:
+cancer:
   datafetcher:
     green-e:
       approved-url: https://www.green-e.org/sfdc/reports-data.php
@@ -529,7 +529,7 @@ viro:
 ### Remaining Work
 
 1. **Run Liquibase migration** - Apply `011-import-status-type.yaml` to database
-2. **Add configuration** - Add `viro.datafetcher.green-e.*` properties to `application.yaml`
+2. **Add configuration** - Add `cancer.datafetcher.green-e.*` properties to `application.yaml`
 3. **Test against live URL** - Verify HTML parsing works with actual Green-e website
 4. **Implement notifications** - Alert on import failures (TODO in scheduler)
 5. **Implement status transitions** - PROCESSED/SUPERSEDED status updates (future)

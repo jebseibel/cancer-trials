@@ -4,18 +4,18 @@
 
 When modifying a `*Db.java` entity file (example: `CustomerDb`), the following files must also be updated:
 
-1. `CustomerMapper.java` - `com.seibel.jobhunting.database.db.mapper`
-2. `CustomerRepository.java` - `com.seibel.jobhunting.database.db.repository`
-3. `CustomerDbService.java` - `com.seibel.jobhunting.database.db.service`
-4. `CustomerService.java` - `com.seibel.jobhunting.service`
-5. `RequestCustomerCreate.java` - `com.seibel.jobhunting.web.request`
-6. `RequestCustomerUpdate.java` - `com.seibel.jobhunting.web.request`
-7. `ResponseCustomer.java` - `com.seibel.jobhunting.web.response`
-8. `CustomerController.java` (includes converter) - `com.seibel.jobhunting.web.controller`
-9. `CustomerMapperTest.java` - `test/java/com/seibel/jobhunting/database/db/mapper`
-10. `CustomerRepositoryTest.java` - `test/java/com/seibel/jobhunting/database/db/repository`
-11. `CustomerDbServiceTest.java` - `test/java/com/seibel/jobhunting/database/db/service`
-12. `DomainBuilderSystemDatabase.java` - `test/java/com/seibel/jobhunting/testutils` (append builder methods)
+1. `CustomerMapper.java` - `com.seibel.cancer.database.db.mapper`
+2. `CustomerRepository.java` - `com.seibel.cancer.database.db.repository`
+3. `CustomerDbService.java` - `com.seibel.cancer.database.db.service`
+4. `CustomerService.java` - `com.seibel.cancer.service`
+5. `RequestCustomerCreate.java` - `com.seibel.cancer.web.request`
+6. `RequestCustomerUpdate.java` - `com.seibel.cancer.web.request`
+7. `ResponseCustomer.java` - `com.seibel.cancer.web.response`
+8. `CustomerController.java` (includes converter) - `com.seibel.cancer.web.controller`
+9. `CustomerMapperTest.java` - `test/java/com/seibel/cancer/database/db/mapper`
+10. `CustomerRepositoryTest.java` - `test/java/com/seibel/cancer/database/db/repository`
+11. `CustomerDbServiceTest.java` - `test/java/com/seibel/cancer/database/db/service`
+12. `DomainBuilderSystemDatabase.java` - `test/java/com/seibel/cancer/testutils` (append builder methods)
 
 ---
 
@@ -32,14 +32,14 @@ omain objects in a common place, and Entity objects in the database area. I have
 
 ## Generated Artifacts (per entity)
 
-### 1. **Domain Layer** (`com.seibel.jobhunting.common.domain`)
+### 1. **Domain Layer** (`com.seibel.cancer.common.domain`)
 - `{Entity}.java` - Business domain object
     - Extends `BaseDomain` (inherits: id, extid, createdAt, updatedAt, deletedAt, active)
     - Uses `@Data`, `@SuperBuilder`, `@NoArgsConstructor`, `@AllArgsConstructor`, `@EqualsAndHashCode(callSuper = true)`
         - Contains only business-specific fields
         - **Input source for generation**
 
-### 2. **Web Layer - Request DTOs** (`com.seibel.jobhunting.web.request`)
+### 2. **Web Layer - Request DTOs** (`com.seibel.cancer.web.request`)
 - `Request{Entity}Create.java` - Create operation DTO
     - Extends `BaseRequest`
         - Uses `@Data`, `@EqualsAndHashCode(callSuper = true)`
@@ -52,13 +52,13 @@ omain objects in a common place, and Entity objects in the database area. I have
         - All fields optional (nullable)
     - Only `@Size` validations (no `@NotEmpty`)
 
-### 3. **Web Layer - Response DTO** (`com.seibel.jobhunting.web.response`)
+### 3. **Web Layer - Response DTO** (`com.seibel.cancer.web.response`)
 - `Response{Entity}.java` - Outgoing data
     - Uses `@Data`, `@Builder`
         - Contains `extid` plus all business fields
     - No validation annotations
 
-### 4. **Entity Layer** (`com.seibel.jobhunting.database.database.db.entity`)
+### 4. **Entity Layer** (`com.seibel.cancer.database.db.entity`)
 - `{Entity}Db.java` - JPA entity
     - Extends `BaseDb` (inherits: id, extid, createdAt, updatedAt, deletedAt, active with JPA annotations)
     - Uses `@Data`, `@EqualsAndHashCode(callSuper = true)`, `@Entity`, `@Table(name = "{entity_lowercase}")`
@@ -69,14 +69,14 @@ omain objects in a common place, and Entity objects in the database area. I have
       - `nullable` flag  
       - `unique` flag (where applicable)
 
-### 5. **Mapper** (`com.seibel.jobhunting.database.database.db.mapper`)
+### 5. **Mapper** (`com.seibel.cancer.database.db.mapper`)
 - `{Entity}Mapper.java` - Object conversions
     - Uses `@Component`, `@NoArgsConstructor`
         - Contains private `ModelMapper` instance
     - Methods: `toModel()`, `toDb()`, `toModelList()`, `toDbList()`
         - Handles null checks in list methods
 
-### 6. **Repository** (`com.seibel.jobhunting.database.database.db.repository`)
+### 6. **Repository** (`com.seibel.cancer.database.db.repository`)
 - `{Entity}Repository.java` - Data access interface
     - Uses `@Repository`
         - Extends `ListCrudRepository<{Entity}Db, Long>`
@@ -86,7 +86,7 @@ omain objects in a common place, and Entity objects in the database area. I have
             - `boolean existsByExtid(String extid)`
             - Additional `findBy{UniqueField}()` methods for unique business fields
 
-### 7. **Database Service** (`com.seibel.jobhunting.database.database.db.service`)
+### 7. **Database Service** (`com.seibel.cancer.database.db.service`)
 - `{Entity}DbService.java` - Database operations layer
     - Uses `@Slf4j`, `@Service`
         - Extends `BaseDbService` (passes entity name "{Entity}Db" to constructor)
@@ -128,12 +128,12 @@ omain objects in a common place, and Entity objects in the database area. I have
         - `getFoundMessage(extid)`, `getFoundFailureMessage(extid)`, `getFoundMessageByType(type, count)`
         - `handleException(operation, extid, e)` for standardized exception handling
 
-### 8. **Business Service** (`com.seibel.jobhunting.service`)
+### 8. **Business Service** (`com.seibel.cancer.service`)
 - `{Entity}Service.java` - Business logic layer
     - Uses `@Slf4j`, `@Service`
     - Extends `BaseService` (sets `thisName` to "{Entity}" in constructor)
     - Constructor-injected DbService
-    - **Import required:** `import com.seibel.jobhunting.database.exceptions.DatabaseFailureException;`
+    - **Import required:** `import com.seibel.cancer.database.exceptions.DatabaseFailureException;`
     - **Pattern for all methods:**
         - Validate inputs using `requireNonNull()` / `requireNonBlank()`
         - Log operation with `log.info()`
@@ -148,14 +148,14 @@ omain objects in a common place, and Entity objects in the database area. I have
         - `findByActive(ActiveEnum activeEnum) throws DatabaseFailureException` - validates enum, returns List<Domain>
     - No try-catch blocks needed - exceptions propagate to controller
 
-### 9. **Controller & Converter** (`com.seibel.jobhunting.web.controller`)
+### 9. **Controller & Converter** (`com.seibel.cancer.web.controller`)
 - `{Entity}Controller.java` - REST API endpoints and DTO conversion (both classes in same file)
 
 #### Public Controller Class
 - `{Entity}Controller` - REST API endpoints
     - Uses `@RestController`, `@RequestMapping("/api/{entity_lowercase}")`, `@Validated`
     - Constructor-injected business service and converter
-    - **Import required:** `import com.seibel.jobhunting.database.exceptions.DatabaseFailureException;`
+    - **Import required:** `import com.seibel.cancer.database.exceptions.DatabaseFailureException;`
     - **Endpoints (all declare `throws DatabaseFailureException`):**
         - `GET /` - getAll() throws DatabaseFailureException → List<Response{Entity}>
           - Direct service call, no additional error handling
@@ -204,7 +204,7 @@ omain objects in a common place, and Entity objects in the database area. I have
 
 ## Test Files (per entity)
 
-### 10. **Mapper Tests** (`test/.../database.database.db.mapper`)
+### 10. **Mapper Tests** (`test/.../database.db.mapper`)
 - `{Entity}MapperTest.java` - Spring Boot integration tests for mapper conversions
     - Uses `@SpringBootTest(classes = DatabaseTestApplication.class)`
     - Uses `@ActiveProfiles("test-database")`
@@ -218,7 +218,7 @@ omain objects in a common place, and Entity objects in the database area. I have
     - Uses `assertEquals()` assertions
     - **Uses DomainBuilderSystemDatabase helper to create test objects**
 
-### 11. **Repository Tests** (`test/.../database.database.db.repository`)
+### 11. **Repository Tests** (`test/.../database.db.repository`)
 - `{Entity}RepositoryTest.java` - Integration tests for repository
     - Uses `@SpringBootTest(classes = DatabaseTestApplication.class)`
     - Uses `@ActiveProfiles("test-database")`
@@ -236,7 +236,7 @@ omain objects in a common place, and Entity objects in the database area. I have
     - Uses `assertAll()`, `assertEquals()`, `assertNotNull()`, `assertTrue()`, `assertFalse()` assertions
     - **Uses DomainBuilderSystemDatabase helper to create test objects**
 
-### 12. **Database Service Tests** (`test/.../database.database.db.service`)
+### 12. **Database Service Tests** (`test/.../database.db.service`)
 - `{Entity}DbServiceTest.java` - Integration tests for database service
     - Uses `@SpringBootTest(classes = DatabaseTestApplication.class)`
     - Uses `@ActiveProfiles("test-database")`
@@ -490,7 +490,7 @@ For each Domain class input, generate all 12 files plus builder methods:
 13. **DomainBuilderSystemDatabase methods** (append to existing shared class)
 
 ### Configuration Requirements
-- Package base path: `com.seibel.jobhunting`
+- Package base path: `com.seibel.cancer`
 - Entity naming convention
 - Field naming conventions (camelCase → snake_case)
 - Default field constraints (lengths, nullable, unique)
@@ -513,7 +513,7 @@ For each Domain class input, generate all 12 files plus builder methods:
 ## Example Domain Input
 
 ```java
-package com.seibel.jobhunting.common.domain;
+package com.seibel.cancer.common.domain;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

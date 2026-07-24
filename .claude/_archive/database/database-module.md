@@ -2,7 +2,7 @@
 
 ## What It Is
 
-The **database** module is the persistence layer that provides JPA entities, repositories, database services, and Liquibase migrations for the entire jobhunting application. It manages all database interactions with AWS RDS MySQL (locally, a plain MySQL instance).
+The **database** module is the persistence layer that provides JPA entities, repositories, database services, and Liquibase migrations for the entire cancer application. It manages all database interactions with MySQL (local MySQL instance, not AWS RDS).
 
 **Rules**
 Table ID fields (primary fields) must never leave the database module in any form

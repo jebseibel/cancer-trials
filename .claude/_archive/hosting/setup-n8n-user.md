@@ -1,4 +1,4 @@
-DROP USER 'basic_user'@'localhost';
-CREATE USER 'basic_user'@'%' IDENTIFIED BY 'PASSWORD';
-GRANT ALL PRIVILEGES ON basic.* TO 'basic_user'@'%';
+DROP USER 'cancer_user'@'localhost';
+CREATE USER 'cancer_user'@'%' IDENTIFIED BY 'PASSWORD';
+GRANT ALL PRIVILEGES ON cancer.* TO 'cancer_user'@'%';
 FLUSH PRIVILEGES;

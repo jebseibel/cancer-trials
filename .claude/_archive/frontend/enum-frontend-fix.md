@@ -132,7 +132,7 @@ Replace every occurrence of display values with constant names:
 
 | File | What Changed |
 |------|-------------|
-| `src/main/java/com/viro/app/web/controller/CrsChangeController.java` | `getCounts()` map keys → constant names |
+| `src/main/java/com/seibel/cancer/web/controller/CrsChangeController.java` | `getCounts()` map keys → constant names |
 | `frontend/src/services/api.ts` | `CRSChangeCounts` keys; added `EnumValue`; added `enumApi` |
 | `frontend/src/pages/CRSChange.tsx` | `StatusFilter` type; default filter; enum query hook; all status comparisons and labels |
 

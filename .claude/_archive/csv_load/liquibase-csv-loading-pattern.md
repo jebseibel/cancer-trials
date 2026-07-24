@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes how to implement the Liquibase CSV data loading pattern used in the Basicspring project. This pattern allows you to load reference data from CSV files into your database during application startup via Liquibase migrations.
+This document describes how to implement the Liquibase CSV data loading pattern for this project. This pattern allows you to load reference data from CSV files into your database during application startup via Liquibase migrations.
 
 ## Quick Start
 
@@ -141,7 +141,7 @@ databaseChangeLog:
 
 ## Base Columns (extid, created_at, updated_at, active)
 
-When using CSV loading with Basicspring's `BaseDb` pattern, you **don't need to include base columns in your CSV file or changeset**. They are automatically populated by database DEFAULT values defined in the table schema.
+When using CSV loading with this project's `BaseDb` pattern, you **don't need to include base columns in your CSV file or changeset**. They are automatically populated by database DEFAULT values defined in the table schema.
 
 ### How It Works
 
@@ -208,12 +208,12 @@ Notice: No `extid`, `created_at`, `updated_at`, `active`, or `id` columns in the
 - If your entity expects `nullable=false` but the CSV has empty values, the data will load but may not match entity constraints
 - To handle empty strings, either:
   1. **Option A:** Make columns nullable in your entity if empty strings are expected
-  2. **Option B:** Use Liquibase's `clean_empty_strings()` stored procedure after loading (Basicspring pattern)
+  2. **Option B:** Use a Liquibase stored procedure to clean empty strings after loading (see below)
   3. **Option C:** Pre-clean the CSV file to have only valid values
 
-### Basicspring Pattern: String Cleanup
+### Optional Pattern: Stored-Procedure String Cleanup
 
-If you want to follow Basicspring's approach, create a stored procedure that cleans empty strings:
+If you want a reusable cleanup step, create a stored procedure that cleans empty strings:
 
 ```yaml
 - changeSet:
@@ -225,7 +225,7 @@ If you want to follow Basicspring's approach, create a stored procedure that cle
             CREATE PROCEDURE clean_empty_strings(IN table_name VARCHAR(255))
             BEGIN
               -- Stored procedure logic to convert empty strings to NULL
-              -- See Basicspring's implementation in 099-utility-procedures.yaml
+              -- (no equivalent procedure currently exists in this project)
             END
 ```
 
@@ -313,7 +313,7 @@ database/
 
 ## Example in Context
 
-Here's how Basicspring does it:
+Here's how this project does it:
 
 **1. Table created in:** `001-init.yaml` (contains CREATE TABLE company)
 
@@ -321,7 +321,7 @@ Here's how Basicspring does it:
 
 **3. Changeset:** `database/src/main/resources/db/changelog/changes/101-import-init-data.yaml`
 
-**4. Entity:** `database/src/main/java/com/basicspring/database/db/entity/CompanyDb.java`
+**4. Entity:** `database/src/main/java/com/seibel/cancer/database/db/entity/CustomerDb.java`
 
 **5. When app starts:**
 - Liquibase reads master changelog

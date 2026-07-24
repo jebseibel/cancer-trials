@@ -110,9 +110,9 @@ mysql
 ```
 
 ```sql
-CREATE DATABASE jobhunting CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'jobhunting_user'@'localhost' IDENTIFIED BY 'YOUR_SECURE_PASSWORD';
-GRANT ALL PRIVILEGES ON jobhunting.* TO 'jobhunting_user'@'localhost';
+CREATE DATABASE cancer CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'cancer_user'@'localhost' IDENTIFIED BY 'YOUR_SECURE_PASSWORD';
+GRANT ALL PRIVILEGES ON cancer.* TO 'cancer_user'@'localhost';
 FLUSH PRIVILEGES;
 EXIT;
 ```
@@ -150,9 +150,9 @@ curl http://localhost
 ## Step 8: Create Directories
 
 ```bash
-mkdir -p /opt/jobhunting
-mkdir -p /var/www/jobhunting
-mkdir -p /var/log/jobhunting
+mkdir -p /opt/cancer
+mkdir -p /var/www/cancer
+mkdir -p /var/log/cancer
 ```
 
 ---
@@ -160,18 +160,18 @@ mkdir -p /var/log/jobhunting
 ## Step 9: Create Environment File
 
 ```bash
-cat << 'EOF' > /opt/jobhunting/.env
+cat << 'EOF' > /opt/cancer/.env
 RDS_HOSTNAME=localhost
 RDS_PORT=3306
-RDS_DB_NAME=jobhunting
-RDS_USERNAME=jobhunting_user
+RDS_DB_NAME=cancer
+RDS_USERNAME=cancer_user
 RDS_PASSWORD=YOUR_SECURE_PASSWORD
 SPRING_PROFILES_ACTIVE=qa
 SERVER_PORT=8080
 EOF
 
 # Secure the file
-chmod 600 /opt/jobhunting/.env
+chmod 600 /opt/cancer/.env
 ```
 
 ---
@@ -179,28 +179,28 @@ chmod 600 /opt/jobhunting/.env
 ## Step 10: Create Systemd Service
 
 ```bash
-cat << 'EOF' > /etc/systemd/system/jobhunting.service
+cat << 'EOF' > /etc/systemd/system/cancer.service
 [Unit]
-Description=Basic Server Application
+Description=Cancer Application
 After=network.target mysql.service
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/jobhunting
-EnvironmentFile=/opt/jobhunting/.env
-ExecStart=/usr/bin/java -Xms256m -Xmx512m -jar /opt/jobhunting/jobhunting-server.jar
+WorkingDirectory=/opt/cancer
+EnvironmentFile=/opt/cancer/.env
+ExecStart=/usr/bin/java -Xms256m -Xmx512m -jar /opt/cancer/cancer-server.jar
 Restart=always
 RestartSec=10
-StandardOutput=append:/var/log/jobhunting/app.log
-StandardError=append:/var/log/jobhunting/error.log
+StandardOutput=append:/var/log/cancer/app.log
+StandardError=append:/var/log/cancer/error.log
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable jobhunting
+systemctl enable cancer
 ```
 
 ---
@@ -208,12 +208,12 @@ systemctl enable jobhunting
 ## Step 11: Configure Nginx
 
 ```bash
-cat << 'EOF' > /etc/nginx/sites-available/jobhunting
+cat << 'EOF' > /etc/nginx/sites-available/cancer
 server {
     listen 80;
     server_name YOUR_DOMAIN_OR_IP;
 
-    root /var/www/jobhunting;
+    root /var/www/cancer;
     index index.html;
 
     # Frontend - React SPA
@@ -244,7 +244,7 @@ server {
 EOF
 
 # Enable site
-ln -sf /etc/nginx/sites-available/jobhunting /etc/nginx/sites-enabled/
+ln -sf /etc/nginx/sites-available/cancer /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 
 # Test and reload
@@ -260,10 +260,10 @@ On your development machine:
 ### Backend JAR
 
 ```bash
-cd /home/jeb/projects/jobhunting/jobhunting-server
+cd /home/jeb/projects/personal/cancer
 ./gradlew clean build -x test
 
-# Output: build/libs/jobhunting-server-*.jar
+# Output: build/libs/cancer-server-*.jar
 ```
 
 ### Frontend
@@ -284,10 +284,10 @@ From local machine:
 
 ```bash
 # Transfer JAR
-scp build/libs/jobhunting-server-*-SNAPSHOT.jar root@YOUR_VPS_IP:/opt/jobhunting/jobhunting-server.jar
+scp build/libs/cancer-server-*-SNAPSHOT.jar root@YOUR_VPS_IP:/opt/cancer/cancer-server.jar
 
 # Transfer frontend
-scp -r frontend/dist/* root@YOUR_VPS_IP:/var/www/jobhunting/
+scp -r frontend/dist/* root@YOUR_VPS_IP:/var/www/cancer/
 ```
 
 ---
@@ -297,16 +297,16 @@ scp -r frontend/dist/* root@YOUR_VPS_IP:/var/www/jobhunting/
 On VPS:
 
 ```bash
-systemctl start jobhunting
+systemctl start cancer
 
 # Verify
-systemctl status jobhunting
+systemctl status cancer
 
 # Check logs
-tail -f /var/log/jobhunting/app.log
+tail -f /var/log/cancer/app.log
 ```
 
-Wait for "Started Basic
+Wait for "Started Cancer
 # Check backend health
 curl http://localhost:8080/actuator/health
 
@@ -366,7 +366,7 @@ For ongoing operations (deployments, troubleshooting, etc.), see **`qa-hosting.m
 Before going live:
 
 - [ ] Changed default MySQL root password
-- [ ] Set strong password in `/opt/jobhunting/.env`
+- [ ] Set strong password in `/opt/cancer/.env`
 - [ ] Configured UFW firewall
 - [ ] File permissions on `.env` set to 600
 - [ ] MySQL port (3306) not exposed to internet
