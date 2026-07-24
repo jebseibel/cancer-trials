@@ -3,4 +3,4 @@ rootProject.name = 'cancer'
 include 'common'
 include 'database'
 include 'datafetcher'
-include 'ai-provider'
+// include 'ai-provider'  // shelved until AI keys/config are ready
