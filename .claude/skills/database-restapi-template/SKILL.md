@@ -1,9 +1,13 @@
+---
+name: database-restapi-template
+description: Generate the complete layered REST API architecture (domain, request/response DTOs, entity, mapper, repository, db service, business service, controller+converter, tests, Liquibase changeset, test-builder methods) for a single Java domain object in this project's Gradle multi-module Spring Boot layout. Use whenever asked to scaffold, generate, or wire up a new entity end-to-end, or when told "follow the restapi template" for an entity.
+---
+
+# Database REST API Template
 
 ## Project Goal
-I am writing lots and lots of the same kind of code in my Java, Spring, Gradle projects. 
-
-I repeat this pattern over and over. I have request objects/response objects, D
-omain objects in a common place, and Entity objects in the database area. I have IntelliJ Ultimate installed with gradle.
+I am writing lots and lots of the same kind of code in my Java, Spring, Gradle projects.
+I repeat this pattern over and over. I have request objects/response objects, Domain objects in a common place, and Entity objects in the database area. I have IntelliJ Ultimate installed with gradle.
 
 ## Generation Scope
 - **Input**: Single Java Domain object (simple POJO extending BaseDomain)
@@ -38,25 +42,25 @@ omain objects in a common place, and Entity objects in the database area. I have
         - Contains `extid` plus all business fields
     - No validation annotations
 
-### 4. **Entity Layer** (`com.seibel.cancer.database.database.db.entity`)
+### 4. **Entity Layer** (`com.seibel.cancer.database.db.entity`)
 - `{Entity}Db.java` - JPA entity
     - Extends `BaseDb` (inherits: id, extid, createdAt, updatedAt, deletedAt, active with JPA annotations)
     - Uses `@Data`, `@EqualsAndHashCode(callSuper = true)`, `@Entity`, `@Table(name = "{entity_lowercase}")`
         - Has `serialVersionUID` constant
-    - All business fields have `@Column` annotations with:  
-      - `name` in snake_case  
-      - `length` constraint  
-      - `nullable` flag  
+    - All business fields have `@Column` annotations with:
+      - `name` in snake_case
+      - `length` constraint
+      - `nullable` flag
       - `unique` flag (where applicable)
 
-### 5. **Mapper** (`com.seibel.cancer.database.database.db.mapper`)
+### 5. **Mapper** (`com.seibel.cancer.database.db.mapper`)
 - `{Entity}Mapper.java` - Object conversions
     - Uses `@Component`, `@NoArgsConstructor`
         - Contains private `ModelMapper` instance
     - Methods: `toModel()`, `toDb()`, `toModelList()`, `toDbList()`
         - Handles null checks in list methods
 
-### 6. **Repository** (`com.seibel.cancer.database.database.db.repository`)
+### 6. **Repository** (`com.seibel.cancer.database.db.repository`)
 - `{Entity}Repository.java` - Data access interface
     - Uses `@Repository`
         - Extends `ListCrudRepository<{Entity}Db, Long>`
@@ -66,7 +70,7 @@ omain objects in a common place, and Entity objects in the database area. I have
             - `boolean existsByExtid(String extid)`
             - Additional `findBy{UniqueField}()` methods for unique business fields
 
-### 7. **Database Service** (`com.seibel.cancer.database.database.db.service`)
+### 7. **Database Service** (`com.seibel.cancer.database.db.service`)
 - `{Entity}DbService.java` - Database operations layer
     - Uses `@Slf4j`, `@Service`
         - Extends `BaseDbService` (passes entity name "{Entity}Db" to constructor)
@@ -184,7 +188,7 @@ omain objects in a common place, and Entity objects in the database area. I have
 
 ## Test Files (per entity)
 
-### 10. **Mapper Tests** (`test/.../database.database.db.mapper`)
+### 10. **Mapper Tests** (`test/.../database.db.mapper`)
 - `{Entity}MapperTest.java` - Spring Boot integration tests for mapper conversions
     - Uses `@SpringBootTest(classes = DatabaseTestApplication.class)`
     - Uses `@ActiveProfiles("test-database")`
@@ -198,7 +202,7 @@ omain objects in a common place, and Entity objects in the database area. I have
     - Uses `assertEquals()` assertions
     - **Uses DomainBuilderSystemDatabase helper to create test objects**
 
-### 11. **Repository Tests** (`test/.../database.database.db.repository`)
+### 11. **Repository Tests** (`test/.../database.db.repository`)
 - `{Entity}RepositoryTest.java` - Integration tests for repository
     - Uses `@SpringBootTest(classes = DatabaseTestApplication.class)`
     - Uses `@ActiveProfiles("test-database")`
@@ -216,7 +220,7 @@ omain objects in a common place, and Entity objects in the database area. I have
     - Uses `assertAll()`, `assertEquals()`, `assertNotNull()`, `assertTrue()`, `assertFalse()` assertions
     - **Uses DomainBuilderSystemDatabase helper to create test objects**
 
-### 12. **Database Service Tests** (`test/.../database.database.db.service`)
+### 12. **Database Service Tests** (`test/.../database.db.service`)
 - `{Entity}DbServiceTest.java` - Integration tests for database service
     - Uses `@SpringBootTest(classes = DatabaseTestApplication.class)`
     - Uses `@ActiveProfiles("test-database")`
@@ -249,32 +253,32 @@ omain objects in a common place, and Entity objects in the database area. I have
 - **Not generated per entity** - this is a shared utility class
 
 **Constants for field sizes:**
-```java  
-// Standard field sizes  
-public static final int SIZE_CODE = 8;  
-public static final int SIZE_NAME = 32;  
-public static final int SIZE_DESC = 255;  
-public static final int SIZE_UNIQUE = 64;  
-public static final int SIZE_LABEL = 32;  
-public static final int SIZE_VERSION = 16;  
-public static final int SIZE_STATUS = 32;  
-public static final int SIZE_RANDOM = 10;  
-  
-// Base prefixes  
-public static final String BASE_CODE = "Cod_";  
-public static final String BASE_NAME = "Nam_";  
-public static final String BASE_DESC = "Des_";  
-public static final String BASE_UNIQUE = "Unq_";  
-public static final String BASE_LABEL = "Lbl_";  
-public static final String BASE_VERSION = "Ver_";  
-public static final String BASE_STATUS = "Sta_";  
-  
-// Minimum suffix lengths (for randomization)  
-public static final int SUFFIX_MIN_CODE = 4;  
-public static final int SUFFIX_MIN_NAME = 4;  
-public static final int SUFFIX_MIN_DESC = 4;  
-// ... etc for other types  
-```  
+```java
+// Standard field sizes
+public static final int SIZE_CODE = 8;
+public static final int SIZE_NAME = 32;
+public static final int SIZE_DESC = 255;
+public static final int SIZE_UNIQUE = 64;
+public static final int SIZE_LABEL = 32;
+public static final int SIZE_VERSION = 16;
+public static final int SIZE_STATUS = 32;
+public static final int SIZE_RANDOM = 10;
+
+// Base prefixes
+public static final String BASE_CODE = "Cod_";
+public static final String BASE_NAME = "Nam_";
+public static final String BASE_DESC = "Des_";
+public static final String BASE_UNIQUE = "Unq_";
+public static final String BASE_LABEL = "Lbl_";
+public static final String BASE_VERSION = "Ver_";
+public static final String BASE_STATUS = "Sta_";
+
+// Minimum suffix lengths (for randomization)
+public static final int SUFFIX_MIN_CODE = 4;
+public static final int SUFFIX_MIN_NAME = 4;
+public static final int SUFFIX_MIN_DESC = 4;
+// ... etc for other types
+```
 
 **Key Methods (pattern repeated for each field type):**
 - `getCodeRandom()` - generates random code with default prefix
@@ -297,10 +301,10 @@ public static final int SUFFIX_MIN_DESC = 4;
 - **Purpose:** Abstract base class that extends DomainBuilderUtils and adds BaseDb initialization
 - **Not generated per entity** - this is a shared base class
 
-```java  
-public abstract class DomainBuilderBase extends DomainBuilderUtils {  
-    protected static void setBaseSyncFields(BaseDb item) {        item.setCreatedAt(LocalDateTime.now());        item.setUpdatedAt(LocalDateTime.now());        item.setActive(ActiveEnum.ACTIVE);        item.setDeletedAt(null);    }}  
-```  
+```java
+public abstract class DomainBuilderBase extends DomainBuilderUtils {
+    protected static void setBaseSyncFields(BaseDb item) {        item.setCreatedAt(LocalDateTime.now());        item.setUpdatedAt(LocalDateTime.now());        item.setActive(ActiveEnum.ACTIVE);        item.setDeletedAt(null);    }}
+```
 
 **Features:**
 - Provides consistent initialization for all BaseDb entities
@@ -315,28 +319,28 @@ public abstract class DomainBuilderBase extends DomainBuilderUtils {
 
 **Per-entity methods pattern (using Company as example):**
 
-```java  
-// Get Domain object with default values  
-public static Company getCompany()  
-  
-// Get Domain object from existing Db entity  
-public static Company getCompany(CompanyDb item)  
-  
-// Get Db entity with all defaults  
-public static CompanyDb getCompanyDb()  
-  
-// Get Db entity with partial customization  
-public static CompanyDb getCompanyDb(String code, String name)  
-  
-// Get Db entity with full customization  
-public static CompanyDb getCompanyDb(String code, String name, String description, String extid)  
-```  
+```java
+// Get Domain object with default values
+public static Company getCompany()
+
+// Get Domain object from existing Db entity
+public static Company getCompany(CompanyDb item)
+
+// Get Db entity with all defaults
+public static CompanyDb getCompanyDb()
+
+// Get Db entity with partial customization
+public static CompanyDb getCompanyDb(String code, String name)
+
+// Get Db entity with full customization
+public static CompanyDb getCompanyDb(String code, String name, String description, String extid)
+```
 
 **Implementation pattern for the full customization method:**
-```java  
-public static CompanyDb getCompanyDb(String code, String name, String description, String extid) {  
-    CompanyDb item = new CompanyDb();    item.setExtid(extid != null ? extid : UUID.randomUUID().toString());    item.setCode(code != null ? code : getCodeRandom("CO_"));    item.setName(name != null ? name : getNameRandom("Company_"));    item.setDescription(description != null ? description : getDescriptionRandom("Company Description "));    setBaseSyncFields(item);    return item;}  
-```  
+```java
+public static CompanyDb getCompanyDb(String code, String name, String description, String extid) {
+    CompanyDb item = new CompanyDb();    item.setExtid(extid != null ? extid : UUID.randomUUID().toString());    item.setCode(code != null ? code : getCodeRandom("CO_"));    item.setName(name != null ? name : getNameRandom("Company_"));    item.setDescription(description != null ? description : getDescriptionRandom("Company Description "));    setBaseSyncFields(item);    return item;}
+```
 
 **Features:**
 - Multiple overloaded methods per entity for flexibility
@@ -433,14 +437,6 @@ All extend `Exception` with simple constructors:
 - ⚠️  Simple entities only (no relationships initially)
 - ⚠️  Database constraints defined in JPA annotations
 
-## Implementation Approach
-- **Technology**: Gradle custom task or buildSrc plugin
-- **Generation**: Command/task per entity
-- **Input**: Domain object class file
-- **Framework**: Spring Boot + Gradle
-- **Template Engine**: Consider using FreeMarker or Velocity for code generation
-- **Parsing**: Use Java reflection or AST parsing to extract field information from Domain class
-
 ## Generation Strategy
 
 ### Input Processing
@@ -477,40 +473,38 @@ For each Domain class input, generate all 12 files plus builder methods:
 - REST endpoint path patterns
 - Entity-specific prefixes for test data generation
 
----  
-
-## Next Steps
-1. ✅ Review sample objects to understand exact patterns - **COMPLETE**
-2. Define input format (Domain object structure) - **IN PROGRESS**
-3. Choose template engine (FreeMarker, Velocity, or custom)
-4. Implement field metadata extraction
-5. Create templates for each of the 12 file types + builder methods
-6. Implement Gradle task/plugin
-7. Add configuration options
-8. Test with sample entities
-9. Document usage instructions
-
 ## Example Domain Input
 
-```java  
-package com.seibel.cancer.common.domain;  
-  
-import lombok.AllArgsConstructor;  
-import lombok.Data;  
-import lombok.EqualsAndHashCode;  
-import lombok.NoArgsConstructor;  
-import lombok.experimental.SuperBuilder;  
-  
-@Data  
-@SuperBuilder  
-@NoArgsConstructor  
-@AllArgsConstructor  
-@EqualsAndHashCode(callSuper = true)  
-public class Company extends BaseDomain {  
-    private String code;      // length=8, nullable=false, unique=true    private String name;      // length=32, nullable=false, unique=true    private String description; // length=255, nullable=false, unique=false}  
-```  
+```java
+package com.seibel.cancer.common.domain;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
+
+@Data
+@SuperBuilder
+@NoArgsConstructor
+@AllArgsConstructor
+@EqualsAndHashCode(callSuper = true)
+public class Company extends BaseDomain {
+    private String code;      // length=8, nullable=false, unique=true
+    private String name;      // length=32, nullable=false, unique=true
+    private String description; // length=255, nullable=false, unique=false
+}
+```
 
 **Note:** Field constraints (length, nullable, unique) need to be either:
 - Defined in annotations on Domain class
 - Configured in a separate mapping file
 - Inferred from field types and naming conventions
+
+## When invoked
+
+When the user asks to scaffold/generate an entity following this template:
+1. Confirm the Domain class input (path or content) before generating anything.
+2. Generate all 13 artifacts listed above, in the layer order given, using the exact
+   package paths, annotations, and method signatures specified.
+3. Report back the full list of files created/modified when done.
