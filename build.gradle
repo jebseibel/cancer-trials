@@ -5,9 +5,9 @@ plugins {
     id 'org.liquibase.gradle' version '2.2.0'
 }
 
-group = 'com.seibel.jobhunting'
+group = 'com.seibel.cancer'
 version = '0.0.2-SNAPSHOT'
-description = 'jobhunting'
+description = 'cancer'
 
 java {
     toolchain {

@@ -110,9 +110,9 @@ mysql
 ```
 
 ```sql
-CREATE DATABASE basic CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'basic_user'@'localhost' IDENTIFIED BY 'YOUR_SECURE_PASSWORD';
-GRANT ALL PRIVILEGES ON basic.* TO 'basic_user'@'localhost';
+CREATE DATABASE jobhunting CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'jobhunting_user'@'localhost' IDENTIFIED BY 'YOUR_SECURE_PASSWORD';
+GRANT ALL PRIVILEGES ON jobhunting.* TO 'jobhunting_user'@'localhost';
 FLUSH PRIVILEGES;
 EXIT;
 ```
@@ -150,9 +150,9 @@ curl http://localhost
 ## Step 8: Create Directories
 
 ```bash
-mkdir -p /opt/basic
-mkdir -p /var/www/basic
-mkdir -p /var/log/basic
+mkdir -p /opt/jobhunting
+mkdir -p /var/www/jobhunting
+mkdir -p /var/log/jobhunting
 ```
 
 ---
@@ -160,18 +160,18 @@ mkdir -p /var/log/basic
 ## Step 9: Create Environment File
 
 ```bash
-cat << 'EOF' > /opt/basic/.env
+cat << 'EOF' > /opt/jobhunting/.env
 RDS_HOSTNAME=localhost
 RDS_PORT=3306
-RDS_DB_NAME=basic
-RDS_USERNAME=basic_user
+RDS_DB_NAME=jobhunting
+RDS_USERNAME=jobhunting_user
 RDS_PASSWORD=YOUR_SECURE_PASSWORD
 SPRING_PROFILES_ACTIVE=qa
 SERVER_PORT=8080
 EOF
 
 # Secure the file
-chmod 600 /opt/basic/.env
+chmod 600 /opt/jobhunting/.env
 ```
 
 ---
@@ -179,7 +179,7 @@ chmod 600 /opt/basic/.env
 ## Step 10: Create Systemd Service
 
 ```bash
-cat << 'EOF' > /etc/systemd/system/basic.service
+cat << 'EOF' > /etc/systemd/system/jobhunting.service
 [Unit]
 Description=Basic Server Application
 After=network.target mysql.service
@@ -187,20 +187,20 @@ After=network.target mysql.service
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/basic
-EnvironmentFile=/opt/basic/.env
-ExecStart=/usr/bin/java -Xms256m -Xmx512m -jar /opt/basic/basic-server.jar
+WorkingDirectory=/opt/jobhunting
+EnvironmentFile=/opt/jobhunting/.env
+ExecStart=/usr/bin/java -Xms256m -Xmx512m -jar /opt/jobhunting/jobhunting-server.jar
 Restart=always
 RestartSec=10
-StandardOutput=append:/var/log/basic/app.log
-StandardError=append:/var/log/basic/error.log
+StandardOutput=append:/var/log/jobhunting/app.log
+StandardError=append:/var/log/jobhunting/error.log
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable basic
+systemctl enable jobhunting
 ```
 
 ---
@@ -208,12 +208,12 @@ systemctl enable basic
 ## Step 11: Configure Nginx
 
 ```bash
-cat << 'EOF' > /etc/nginx/sites-available/basic
+cat << 'EOF' > /etc/nginx/sites-available/jobhunting
 server {
     listen 80;
     server_name YOUR_DOMAIN_OR_IP;
 
-    root /var/www/basic;
+    root /var/www/jobhunting;
     index index.html;
 
     # Frontend - React SPA
@@ -244,7 +244,7 @@ server {
 EOF
 
 # Enable site
-ln -sf /etc/nginx/sites-available/basic /etc/nginx/sites-enabled/
+ln -sf /etc/nginx/sites-available/jobhunting /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 
 # Test and reload
@@ -260,10 +260,10 @@ On your development machine:
 ### Backend JAR
 
 ```bash
-cd /home/jeb/projects/basic/basic-server
+cd /home/jeb/projects/jobhunting/jobhunting-server
 ./gradlew clean build -x test
 
-# Output: build/libs/basic-server-*.jar
+# Output: build/libs/jobhunting-server-*.jar
 ```
 
 ### Frontend
@@ -284,10 +284,10 @@ From local machine:
 
 ```bash
 # Transfer JAR
-scp build/libs/basic-server-*-SNAPSHOT.jar root@YOUR_VPS_IP:/opt/basic/basic-server.jar
+scp build/libs/jobhunting-server-*-SNAPSHOT.jar root@YOUR_VPS_IP:/opt/jobhunting/jobhunting-server.jar
 
 # Transfer frontend
-scp -r frontend/dist/* root@YOUR_VPS_IP:/var/www/basic/
+scp -r frontend/dist/* root@YOUR_VPS_IP:/var/www/jobhunting/
 ```
 
 ---
@@ -297,13 +297,13 @@ scp -r frontend/dist/* root@YOUR_VPS_IP:/var/www/basic/
 On VPS:
 
 ```bash
-systemctl start basic
+systemctl start jobhunting
 
 # Verify
-systemctl status basic
+systemctl status jobhunting
 
 # Check logs
-tail -f /var/log/basic/app.log
+tail -f /var/log/jobhunting/app.log
 ```
 
 Wait for "Started Basic
@@ -366,7 +366,7 @@ For ongoing operations (deployments, troubleshooting, etc.), see **`qa-hosting.m
 Before going live:
 
 - [ ] Changed default MySQL root password
-- [ ] Set strong password in `/opt/basic/.env`
+- [ ] Set strong password in `/opt/jobhunting/.env`
 - [ ] Configured UFW firewall
 - [ ] File permissions on `.env` set to 600
 - [ ] MySQL port (3306) not exposed to internet

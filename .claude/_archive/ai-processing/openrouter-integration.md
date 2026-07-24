@@ -11,12 +11,12 @@ OpenRouter's base URL. No new Spring AI dependency is needed — it reuses `spri
 
 ### New Enums (common module)
 
-**`AiProvider`** — `common/src/main/java/com/viro/common/enums/ai/AiProvider.java`
+**`AiProvider`** — `common/src/main/java/com/seibel/jobhunting/common/enums/ai/AiProvider.java`
 - Values: `OPENAI`, `ANTHROPIC`, `GEMINI`, `OPENROUTER`
 - Implements `InternalEnum`
 - Methods: `activeValues()`, `getDefault()`, `fromString()`
 
-**`AiModel`** — `common/src/main/java/com/viro/common/enums/ai/AiModel.java`
+**`AiModel`** — `common/src/main/java/com/seibel/jobhunting/common/enums/ai/AiModel.java`
 - Implements `DisplayableEnum`
 - Each constant carries: `provider` (AiProvider), `modelId` (the actual API string), `displayValue`
 - Models: `GPT_41_MINI`, `GPT_41`, `CLAUDE_SONNET`, `CLAUDE_OPUS`, `CLAUDE_HAIKU`,
@@ -63,7 +63,7 @@ OpenRouter's base URL. No new Spring AI dependency is needed — it reuses `spri
 
 ### application.yaml
 
-Added under `viro.ai:`:
+Added under `jobhunting.ai:`:
 ```yaml
 openrouter:
   enabled: true

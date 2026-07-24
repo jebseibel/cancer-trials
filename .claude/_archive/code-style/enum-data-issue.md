@@ -35,7 +35,7 @@ reconciliation.
 
 ## Fix Status
 
-Fixed in `FacilityReconObjectBuilder` (`src/main/java/com/viro/app/service/recon/FacilityReconObjectBuilder.java`):
+Fixed in `FacilityReconObjectBuilder` (`src/main/java/com/seibel/jobhunting/app/service/recon/FacilityReconObjectBuilder.java`):
 
 **`buildFacilityFromPending()`:**
 - `.crsTrackingAttestationStatus(status)` — receives the CRS status string correctly

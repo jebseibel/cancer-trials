@@ -77,7 +77,7 @@ Note: the module should not talk to the fileloader module directly.
 
 ```
 ai-provider/
-├── src/main/java/com/viro/app/aiprovider/
+├── src/main/java/com/seibel/jobhunting/app/aiprovider/
 │   ├── config/
 │   │   ├── AiConfiguration.java            # Main configuration
 │   │   ├── AiConfigProperties.java         # Configuration properties (includes OpenRouterConfig inner class)
@@ -114,7 +114,7 @@ ai-provider/
 │   │   └── CostCalculator.java             # Cost tracking
 └── build.gradle                             # Dependencies
 
-common/src/main/java/com/viro/common/enums/ai/
+common/src/main/java/com/seibel/jobhunting/common/enums/ai/
 │   ├── AiProvider.java                     # Enum: OPENAI, ANTHROPIC, GEMINI, OPENROUTER. Implements InternalEnum.
 │   │                                       #   activeValues(), getDefault(), fromString()
 │   └── AiModel.java                        # Enum: GPT_41_MINI, GPT_41, CLAUDE_SONNET, CLAUDE_OPUS, CLAUDE_HAIKU,
@@ -365,7 +365,7 @@ KEY:
 
 ### application.yaml (single config file)
 
-All AI configuration lives in the main `src/main/resources/application.yaml`. There is no separate `application-ai.yml`. Both `viro.ai.*` (bound to `AiConfigProperties`) and `spring.ai.*` (Spring AI autoconfiguration) are in this one file.
+All AI configuration lives in the main `src/main/resources/application.yaml`. There is no separate `application-ai.yml`. Both `jobhunting.ai.*` (bound to `AiConfigProperties`) and `spring.ai.*` (Spring AI autoconfiguration) are in this one file.
 
 ### API Keys
 
@@ -389,11 +389,11 @@ Providers can route to different models depending on the task type. OpenAI uses 
 | Gemini     | `gemini-2.5-flash`           | `gemini-2.5-flash`           |
 | OpenRouter | `google/gemini-2.5-flash`    | `google/gemini-2.5-flash`    |
 
-### Provider Configuration (bound to `AiConfigProperties` via `viro.ai:` prefix)
+### Provider Configuration (bound to `AiConfigProperties` via `jobhunting.ai:` prefix)
 
-**Provider Configuration (bound to `AiConfigProperties` via `viro.ai:` prefix):**
+**Provider Configuration (bound to `AiConfigProperties` via `jobhunting.ai:` prefix):**
 ```yaml
-viro:
+jobhunting:
   ai:
     default-provider: openai
 
@@ -473,14 +473,14 @@ spring:
     google:
       genai:
         api-key: ${GEMINI_API_KEY}
-        project-id: viro-server-484815
+        project-id: <YOUR_GCP_PROJECT_ID>
 ```
 
 ### Gemini Setup Notes
 
 **Spring AI Version:** `spring-ai-starter-model-google-genai` was introduced in Spring AI **1.1.0** — it does NOT exist in 1.0.0. Both root `build.gradle` and `ai-provider/build.gradle` must use BOM version **1.1.2** or later and must be in sync. If root is on an older version the starter will not resolve even if the submodule is correct.
 
-**Auth method:** Plain GCP API key (Generative Language API), not Vertex AI / service account. GCP Project ID: `viro-server-484815`.
+**Auth method:** Plain GCP API key (Generative Language API), not Vertex AI / service account. GCP Project ID: `<YOUR_GCP_PROJECT_ID>`.
 
 **Correct Spring AI autoconfiguration namespace** is `spring.ai.google.genai.*` — NOT `spring.ai.vertex.ai.gemini.*` (that is the old Vertex AI path, now ignored):
 
@@ -490,7 +490,7 @@ spring:
     google:
       genai:
         api-key: ${GEMINI_API_KEY:}
-        project-id: viro-server-484815
+        project-id: <YOUR_GCP_PROJECT_ID>
 ```
 
 **Bean imports in `AiClientConfig`:**
@@ -511,7 +511,7 @@ Gemini beans take `@Nullable GoogleGenAiChatModel` — if the model is null (key
 
 **Rate Limits:**
 ```yaml
-viro:
+jobhunting:
   ai:
     openai:
       rate-limit:
@@ -528,7 +528,7 @@ viro:
 
 **Cost Management:**
 ```yaml
-viro:
+jobhunting:
   ai:
     cost:
       tracking-enabled: true
@@ -540,7 +540,7 @@ viro:
 
 **Safety & Compliance:**
 ```yaml
-viro:
+jobhunting:
   ai:
     safety:
       content-filtering: true

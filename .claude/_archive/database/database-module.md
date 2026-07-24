@@ -2,7 +2,7 @@
 
 ## What It Is
 
-The **database** module is the persistence layer that provides JPA entities, repositories, database services, and Liquibase migrations for the entire Viro application. It manages all database interactions with AWS RDS MySQL.
+The **database** module is the persistence layer that provides JPA entities, repositories, database services, and Liquibase migrations for the entire jobhunting application. It manages all database interactions with AWS RDS MySQL (locally, a plain MySQL instance).
 
 **Rules**
 Table ID fields (primary fields) must never leave the database module in any form
@@ -122,6 +122,25 @@ implementation 'org.liquibase:liquibase-core'
 // Utilities
 compileOnly 'org.projectlombok:lombok'
 ```
+
+## Current Tables
+
+Live changesets in `database/src/main/resources/db/changelog/changes/`, in run order. All extend the standard base fields (id, extid, created_at, updated_at, deleted_at, active) — see `.claude/table-definitions.md` for full column-level detail on the job-search tables.
+
+- customer
+- user
+- purchase
+- company
+- job_posting
+- skill
+- application
+- contact
+- friend
+- job_posting_skill (join: job_posting ↔ skill)
+- user_skill (join: user ↔ skill)
+- friend_skill (join: friend ↔ skill)
+- friend_company (join: friend ↔ company)
+- friend_job_posting (join: friend ↔ job_posting)
 
 ## Key Features
 

@@ -4,18 +4,18 @@
 
 When modifying a `*Db.java` entity file (example: `CustomerDb`), the following files must also be updated:
 
-1. `CustomerMapper.java` - `com.viro.database.db.mapper`
-2. `CustomerRepository.java` - `com.viro.database.db.repository`
-3. `CustomerDbService.java` - `com.viro.database.db.service`
-4. `CustomerService.java` - `com.viro.service`
-5. `RequestCustomerCreate.java` - `com.viro.web.request`
-6. `RequestCustomerUpdate.java` - `com.viro.web.request`
-7. `ResponseCustomer.java` - `com.viro.web.response`
-8. `CustomerController.java` (includes converter) - `com.viro.web.controller`
-9. `CustomerMapperTest.java` - `test/java/com/viro/database/db/mapper`
-10. `CustomerRepositoryTest.java` - `test/java/com/viro/database/db/repository`
-11. `CustomerDbServiceTest.java` - `test/java/com/viro/database/db/service`
-12. `DomainBuilderSystemDatabase.java` - `test/java/com/viro/testutils` (append builder methods)
+1. `CustomerMapper.java` - `com.seibel.jobhunting.database.db.mapper`
+2. `CustomerRepository.java` - `com.seibel.jobhunting.database.db.repository`
+3. `CustomerDbService.java` - `com.seibel.jobhunting.database.db.service`
+4. `CustomerService.java` - `com.seibel.jobhunting.service`
+5. `RequestCustomerCreate.java` - `com.seibel.jobhunting.web.request`
+6. `RequestCustomerUpdate.java` - `com.seibel.jobhunting.web.request`
+7. `ResponseCustomer.java` - `com.seibel.jobhunting.web.response`
+8. `CustomerController.java` (includes converter) - `com.seibel.jobhunting.web.controller`
+9. `CustomerMapperTest.java` - `test/java/com/seibel/jobhunting/database/db/mapper`
+10. `CustomerRepositoryTest.java` - `test/java/com/seibel/jobhunting/database/db/repository`
+11. `CustomerDbServiceTest.java` - `test/java/com/seibel/jobhunting/database/db/service`
+12. `DomainBuilderSystemDatabase.java` - `test/java/com/seibel/jobhunting/testutils` (append builder methods)
 
 ---
 
@@ -32,14 +32,14 @@ omain objects in a common place, and Entity objects in the database area. I have
 
 ## Generated Artifacts (per entity)
 
-### 1. **Domain Layer** (`com.seibel.scheduler.common.domain`)
+### 1. **Domain Layer** (`com.seibel.jobhunting.common.domain`)
 - `{Entity}.java` - Business domain object
     - Extends `BaseDomain` (inherits: id, extid, createdAt, updatedAt, deletedAt, active)
     - Uses `@Data`, `@SuperBuilder`, `@NoArgsConstructor`, `@AllArgsConstructor`, `@EqualsAndHashCode(callSuper = true)`
         - Contains only business-specific fields
         - **Input source for generation**
 
-### 2. **Web Layer - Request DTOs** (`com.seibel.scheduler.web.request`)
+### 2. **Web Layer - Request DTOs** (`com.seibel.jobhunting.web.request`)
 - `Request{Entity}Create.java` - Create operation DTO
     - Extends `BaseRequest`
         - Uses `@Data`, `@EqualsAndHashCode(callSuper = true)`
@@ -52,13 +52,13 @@ omain objects in a common place, and Entity objects in the database area. I have
         - All fields optional (nullable)
     - Only `@Size` validations (no `@NotEmpty`)
 
-### 3. **Web Layer - Response DTO** (`com.seibel.scheduler.web.response`)
+### 3. **Web Layer - Response DTO** (`com.seibel.jobhunting.web.response`)
 - `Response{Entity}.java` - Outgoing data
     - Uses `@Data`, `@Builder`
         - Contains `extid` plus all business fields
     - No validation annotations
 
-### 4. **Entity Layer** (`com.seibel.scheduler.database.database.db.entity`)
+### 4. **Entity Layer** (`com.seibel.jobhunting.database.database.db.entity`)
 - `{Entity}Db.java` - JPA entity
     - Extends `BaseDb` (inherits: id, extid, createdAt, updatedAt, deletedAt, active with JPA annotations)
     - Uses `@Data`, `@EqualsAndHashCode(callSuper = true)`, `@Entity`, `@Table(name = "{entity_lowercase}")`
@@ -69,14 +69,14 @@ omain objects in a common place, and Entity objects in the database area. I have
       - `nullable` flag  
       - `unique` flag (where applicable)
 
-### 5. **Mapper** (`com.seibel.scheduler.database.database.db.mapper`)
+### 5. **Mapper** (`com.seibel.jobhunting.database.database.db.mapper`)
 - `{Entity}Mapper.java` - Object conversions
     - Uses `@Component`, `@NoArgsConstructor`
         - Contains private `ModelMapper` instance
     - Methods: `toModel()`, `toDb()`, `toModelList()`, `toDbList()`
         - Handles null checks in list methods
 
-### 6. **Repository** (`com.seibel.scheduler.database.database.db.repository`)
+### 6. **Repository** (`com.seibel.jobhunting.database.database.db.repository`)
 - `{Entity}Repository.java` - Data access interface
     - Uses `@Repository`
         - Extends `ListCrudRepository<{Entity}Db, Long>`
@@ -86,7 +86,7 @@ omain objects in a common place, and Entity objects in the database area. I have
             - `boolean existsByExtid(String extid)`
             - Additional `findBy{UniqueField}()` methods for unique business fields
 
-### 7. **Database Service** (`com.seibel.scheduler.database.database.db.service`)
+### 7. **Database Service** (`com.seibel.jobhunting.database.database.db.service`)
 - `{Entity}DbService.java` - Database operations layer
     - Uses `@Slf4j`, `@Service`
         - Extends `BaseDbService` (passes entity name "{Entity}Db" to constructor)
@@ -128,12 +128,12 @@ omain objects in a common place, and Entity objects in the database area. I have
         - `getFoundMessage(extid)`, `getFoundFailureMessage(extid)`, `getFoundMessageByType(type, count)`
         - `handleException(operation, extid, e)` for standardized exception handling
 
-### 8. **Business Service** (`com.seibel.scheduler.service`)
+### 8. **Business Service** (`com.seibel.jobhunting.service`)
 - `{Entity}Service.java` - Business logic layer
     - Uses `@Slf4j`, `@Service`
     - Extends `BaseService` (sets `thisName` to "{Entity}" in constructor)
     - Constructor-injected DbService
-    - **Import required:** `import com.viro.database.exceptions.DatabaseFailureException;`
+    - **Import required:** `import com.seibel.jobhunting.database.exceptions.DatabaseFailureException;`
     - **Pattern for all methods:**
         - Validate inputs using `requireNonNull()` / `requireNonBlank()`
         - Log operation with `log.info()`
@@ -148,14 +148,14 @@ omain objects in a common place, and Entity objects in the database area. I have
         - `findByActive(ActiveEnum activeEnum) throws DatabaseFailureException` - validates enum, returns List<Domain>
     - No try-catch blocks needed - exceptions propagate to controller
 
-### 9. **Controller & Converter** (`com.seibel.scheduler.web.controller`)
+### 9. **Controller & Converter** (`com.seibel.jobhunting.web.controller`)
 - `{Entity}Controller.java` - REST API endpoints and DTO conversion (both classes in same file)
 
 #### Public Controller Class
 - `{Entity}Controller` - REST API endpoints
     - Uses `@RestController`, `@RequestMapping("/api/{entity_lowercase}")`, `@Validated`
     - Constructor-injected business service and converter
-    - **Import required:** `import com.viro.database.exceptions.DatabaseFailureException;`
+    - **Import required:** `import com.seibel.jobhunting.database.exceptions.DatabaseFailureException;`
     - **Endpoints (all declare `throws DatabaseFailureException`):**
         - `GET /` - getAll() throws DatabaseFailureException → List<Response{Entity}>
           - Direct service call, no additional error handling
@@ -490,7 +490,7 @@ For each Domain class input, generate all 12 files plus builder methods:
 13. **DomainBuilderSystemDatabase methods** (append to existing shared class)
 
 ### Configuration Requirements
-- Package base path: `com.seibel.basicspring`
+- Package base path: `com.seibel.jobhunting`
 - Entity naming convention
 - Field naming conventions (camelCase → snake_case)
 - Default field constraints (lengths, nullable, unique)
@@ -513,7 +513,7 @@ For each Domain class input, generate all 12 files plus builder methods:
 ## Example Domain Input
 
 ```java
-package com.seibel.scheduler.common.domain;
+package com.seibel.jobhunting.common.domain;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -1,4 +1,4 @@
-rootProject.name = 'jobhunting'
+rootProject.name = 'cancer'
 
 include 'common'
 include 'database'

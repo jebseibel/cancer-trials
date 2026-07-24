@@ -43,7 +43,7 @@ The core entity — a single job listing found from any source.
 | salary_max | integer | Nullable |
 | salary_currency | varchar | Nullable, e.g. "USD" |
 | source | enum | LINKEDIN / INDEED / COMPANY_SITE / REFERRAL / MANUAL / OTHER |
-| source_url | varchar, unique | Natural dedup key — re-imports from the same URL update rather than duplicate |
+| source_url | varchar(768), unique | Natural dedup key — re-imports from the same URL update rather than duplicate. Capped at 768 chars (not 1024) since a unique index on utf8mb4 varchar(1024) exceeds MySQL's 3072-byte max key length |
 | posted_at | datetime | Nullable — date the job was originally posted, if known |
 | status | enum | NEW / INTERESTED / NOT_INTERESTED / ARCHIVED — triage status; whether you've applied is tracked separately in `application` |
 | notes | text | Nullable — free-form personal notes |
