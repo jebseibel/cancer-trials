@@ -12,7 +12,7 @@ enum-migration-agent
 
 Required input:
 - **Enum name** — e.g., `TrialStatus`
-- **Target table/field** — e.g., `TrialStatus.status` (the `trial_status` table's own `status` column, per `TABLES.md`)
+- **Target table/field** — e.g., `TrialStatus.status` (the `trial_status` table's own `status` column, per `clinical-trials-tables.md`)
 - **Values** — list of UPPERCASE_CONSTANT → "DisplayValue" pairs
 
 ---
