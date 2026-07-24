@@ -10,8 +10,8 @@ For the lifecycle rules, see `enum-lifecycle-rules.md`.
 Used exclusively for the `active` column on `BaseDb`. Stores `1`/`0`.
 Handled by a custom JPA converter — no manual conversion needed in service code.
 
-- Enum: `common/src/main/java/com/seibel/jobhunting/common/enums/ActiveEnum.java`
-- Converter: `database/src/main/java/com/seibel/jobhunting/database/converter/ActiveEnumConverter.java`
+- Enum: `common/src/main/java/com/seibel/cancer/common/enums/ActiveEnum.java`
+- Converter: `database/src/main/java/com/seibel/cancer/database/converter/ActiveEnumConverter.java`
 
 ---
 
@@ -27,8 +27,8 @@ Entity fields are plain `String`. No JPA converter. Conversion is manual at the 
 - FE resolves `displayValue` for rendering via `GET /api/enums/{name}`
 
 Reference implementations:
-- `src/main/java/com/seibel/jobhunting/app/web/controller/FacilityOutputController.java` — `toResponse()`, `create()`, `update()`
-- `common/src/main/java/com/seibel/jobhunting/common/enums/FacStatus.java` — `valueOf()`
+- `src/main/java/com/seibel/cancer/web/controller/FacilityOutputController.java` — `toResponse()`, `create()`, `update()`
+- `common/src/main/java/com/seibel/cancer/common/enums/FacStatus.java` — `valueOf()`
 
 ### Load tables vs production tables
 
@@ -36,7 +36,7 @@ Load tables (`facility_load`, `crs_approved`, `crs_pending`) store values exactl
 they may not be valid enum `name()` values. Use a try/catch fallback in `toResponse()` for these.
 Production tables (`facility_output`, etc.) always contain valid `name()` values.
 
-Reference: `src/main/java/com/seibel/jobhunting/app/web/controller/FacilityLoadController.java` — `toDisplayValue()` helper
+Reference: `src/main/java/com/seibel/cancer/web/controller/FacilityLoadController.java` — `toDisplayValue()` helper
 
 ---
 

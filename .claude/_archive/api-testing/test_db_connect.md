@@ -10,8 +10,8 @@ How this project sets and propagates database environment variables through Spri
 |----------|---------|---------|
 | `RDS_HOSTNAME` | MySQL host | `localhost` |
 | `RDS_PORT` | MySQL port | `3306` |
-| `RDS_DB_NAME` | Database name | `viro` |
-| `RDS_USERNAME` | MySQL username | `viro_user` |
+| `RDS_DB_NAME` | Database name | `cancer` |
+| `RDS_USERNAME` | MySQL username | `cancer_user` |
 | `RDS_PASSWORD` | MySQL password | *(your password)* |
 
 ---
@@ -24,8 +24,8 @@ A `.env` file in the project root defines all environment variables:
 ```
 RDS_HOSTNAME=localhost
 RDS_PORT=3306
-RDS_DB_NAME=viro
-RDS_USERNAME=viro_user
+RDS_DB_NAME=cancer
+RDS_USERNAME=cancer_user
 RDS_PASSWORD=your_password_here
 ```
 
@@ -168,7 +168,7 @@ To add database test support to a new module:
 ```yaml
 spring:
   application:
-    name: viro-{module}-test
+    name: cancer-{module}-test
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${RDS_HOSTNAME}:${RDS_PORT}/${RDS_DB_NAME}

@@ -43,7 +43,7 @@ This will:
 
 ```
 api-validation/
-├── src/main/java/com/viro/apivalidation/
+├── src/main/java/com/seibel/cancer/apivalidation/
 │   ├── snapshot/
 │   │   ├── SnapshotManager.java       # File I/O for snapshot JSON
 │   │   ├── SnapshotAssertion.java     # JSON comparison with field exclusions
@@ -59,7 +59,7 @@ api-validation/
 │   └── fixture/
 │       ├── TestDataSeeder.java        # Creates deterministic test data
 │       └── DatabaseCleaner.java       # Resets DB to known state
-├── src/test/java/com/viro/apivalidation/
+├── src/test/java/com/seibel/cancer/apivalidation/
 │   ├── BaseApiTest.java               # Base class with shared setup
 │   ├── FacilityOutputApiTest.java     # Tests for /api/facilities endpoints
 │   ├── CompanyApiTest.java            # Tests for /api/accounts endpoints

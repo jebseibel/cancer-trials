@@ -3,7 +3,7 @@
 ## Overview
 
 This document defines the layered architecture and code style rules for all REST API endpoints
-in the jobhunting main module. Every feature area follows the same pattern:
+in the main application module. Every feature area follows the same pattern:
 
 ```
 Controller → Service → (Database module)
@@ -52,8 +52,8 @@ Their data comes entirely from Java enum constants in `:common`.
 
 ### EnumService
 
-**Location:** `src/main/java/com/seibel/jobhunting/app/service/EnumService.java`
-**Package:** `com.seibel.jobhunting.app.service`
+**Location:** `src/main/java/com/seibel/cancer/service/EnumService.java`
+**Package:** `com.seibel.cancer.service`
 
 Responsibilities:
 - Filtering (`isActive()`)
@@ -137,7 +137,7 @@ public class EnumController {
 }
 ```
 
-**Status:** Implemented. `EnumService` exists at `src/main/java/com/seibel/jobhunting/app/service/EnumService.java`. `EnumController` delegates all logic to `EnumService`.
+**Status:** Implemented. `EnumService` exists at `src/main/java/com/seibel/cancer/service/EnumService.java`. `EnumController` delegates all logic to `EnumService`.
 
 ---
 

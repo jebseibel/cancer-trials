@@ -78,7 +78,7 @@ snapshotAssertion.assertEquals(expectedSnapshot, response, Set.of("createdAt", "
 
 ```
 :api-validation
-├── src/main/java/com/viro/apivalidation/
+├── src/main/java/com/seibel/cancer/apivalidation/
 │   ├── snapshot/                    ← Core framework
 │   │   ├── SnapshotManager.java
 │   │   ├── SnapshotAssertion.java
@@ -86,7 +86,7 @@ snapshotAssertion.assertEquals(expectedSnapshot, response, Set.of("createdAt", "
 │   └── fixture/                     ← Test support
 │       ├── DatabaseCleaner.java
 │       └── TestDataSeeder.java
-└── src/test/java/com/viro/apivalidation/
+└── src/test/java/com/seibel/cancer/apivalidation/
     ├── BaseApiTest.java             ← Common test setup
     └── *ApiTest.java                ← Endpoint-specific tests (15 classes)
 ```

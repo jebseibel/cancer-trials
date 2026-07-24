@@ -11,12 +11,12 @@ see `enum-to-db-mapping-patterns.md`.
 
 ### Type 1: ActiveEnum (Integer-backed)
 Used exclusively for the `active` column on `BaseDb`. Stores `1`/`0`.
-`common/src/main/java/com/seibel/jobhunting/common/enums/ActiveEnum.java`
+`common/src/main/java/com/seibel/cancer/common/enums/ActiveEnum.java`
 
 ### Type 2: DisplayableEnum (Domain enums)
 All domain enums implement `DisplayableEnum`. Current domain enums:
 
-Example: `FacStatus` — see `common/src/main/java/com/seibel/jobhunting/common/enums/crsfac/FacStatus.java`
+Example: `FacStatus` — see `common/src/main/java/com/seibel/cancer/common/enums/crsfac/FacStatus.java`
 
 
 #### FacStatus vs CrsTrackingAttestationStatus — Do Not Confuse
@@ -29,8 +29,8 @@ Two separate enums, two separate columns, two completely different concerns:
 | `CrsTrackingAttestationStatus` | `facility_output.crs_tracking_attestation_status` | The facility's standing with the CRS registry |
 
 See the class Javadocs for the full value lists:
-- `common/src/main/java/com/seibel/jobhunting/common/enums/crsfac/FacStatus.java`
-- `common/src/main/java/com/seibel/jobhunting/common/enums/crsfac/CrsTrackingAttestationStatus.java`
+- `common/src/main/java/com/seibel/cancer/common/enums/crsfac/FacStatus.java`
+- `common/src/main/java/com/seibel/cancer/common/enums/crsfac/CrsTrackingAttestationStatus.java`
 
 Mixing these two enums causes runtime `IllegalArgumentException` in `toResponse()`.
 

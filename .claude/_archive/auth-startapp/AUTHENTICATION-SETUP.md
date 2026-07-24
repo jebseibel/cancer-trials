@@ -118,16 +118,16 @@ CREATE TABLE users (
 
 ### Backend
 - `build.gradle` - Added dependencies
-- `database/src/main/java/com/viro/database/db/entity/UserDb.java`
-- `database/src/main/java/com/viro/database/db/repository/UserRepository.java`
-- `src/main/java/com/viro/app/security/JwtUtil.java`
-- `src/main/java/com/viro/app/security/UserDetailsServiceImpl.java`
-- `src/main/java/com/viro/app/security/JwtAuthenticationFilter.java`
-- `src/main/java/com/viro/app/config/SecurityConfig.java`
-- `src/main/java/com/viro/app/web/request/RequestLogin.java`
-- `src/main/java/com/viro/app/web/request/RequestRegister.java`
-- `src/main/java/com/viro/app/web/response/ResponseAuth.java`
-- `src/main/java/com/viro/app/web/controller/AuthController.java`
+- `database/src/main/java/com/seibel/cancer/database/db/entity/UserDb.java`
+- `database/src/main/java/com/seibel/cancer/database/db/repository/UserRepository.java`
+- `src/main/java/com/seibel/cancer/security/JwtUtil.java`
+- `src/main/java/com/seibel/cancer/security/UserDetailsServiceImpl.java`
+- `src/main/java/com/seibel/cancer/security/JwtAuthenticationFilter.java`
+- `src/main/java/com/seibel/cancer/config/SecurityConfig.java`
+- `src/main/java/com/seibel/cancer/web/request/RequestLogin.java`
+- `src/main/java/com/seibel/cancer/web/request/RequestRegister.java`
+- `src/main/java/com/seibel/cancer/web/response/ResponseAuth.java`
+- `src/main/java/com/seibel/cancer/web/controller/AuthController.java`
 - `database/src/main/resources/db/changelog/changes/110-create-default-user.yaml`
 
 ### Frontend

@@ -19,7 +19,7 @@ Add a `csvvalidation` package to `api-validation` alongside the existing `snapsh
 
 ## New Files (10 total)
 
-### Core Classes — `api-validation/src/main/java/com/viro/apivalidation/csvvalidation/`
+### Core Classes — `api-validation/src/main/java/com/seibel/cancer/apivalidation/csvvalidation/`
 
 | File | Purpose |
 |------|---------|

@@ -55,11 +55,11 @@ testAiApi.analyzeDocument(file, instruction, modelId)
 ```
 
 ### Backend
-- Controller: `ai-provider/src/main/java/com/viro/app/aiprovider/controller/AiController.java`
-- Model service: `ai-provider/src/main/java/com/viro/app/aiprovider/service/OpenRouterModelService.java`
+- Controller: `ai-provider/src/main/java/com/seibel/cancer/aiprovider/controller/AiController.java`
+- Model service: `ai-provider/src/main/java/com/seibel/cancer/aiprovider/service/OpenRouterModelService.java`
   - Models fetched from `https://openrouter.ai/api/v1/models` at startup and cached
   - `input_modalities` mapped from `architecture.input_modalities` on the OpenRouter response
-- Model DTO: `ai-provider/src/main/java/com/viro/app/aiprovider/dto/OpenRouterModel.java`
+- Model DTO: `ai-provider/src/main/java/com/seibel/cancer/aiprovider/dto/OpenRouterModel.java`
   - Fields: `id`, `name`, `description`, `contextLength`, `pricing`, `supportsVision`, `inputModalities`
 
 ## OpenRouter Notes

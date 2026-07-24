@@ -77,7 +77,7 @@ Note: the module should not talk to the fileloader module directly.
 
 ```
 ai-provider/
-├── src/main/java/com/seibel/jobhunting/app/aiprovider/
+├── src/main/java/com/seibel/cancer/aiprovider/
 │   ├── config/
 │   │   ├── AiConfiguration.java            # Main configuration
 │   │   ├── AiConfigProperties.java         # Configuration properties (includes OpenRouterConfig inner class)
@@ -114,7 +114,7 @@ ai-provider/
 │   │   └── CostCalculator.java             # Cost tracking
 └── build.gradle                             # Dependencies
 
-common/src/main/java/com/seibel/jobhunting/common/enums/ai/
+common/src/main/java/com/seibel/cancer/common/enums/ai/
 │   ├── AiProvider.java                     # Enum: OPENAI, ANTHROPIC, GEMINI, OPENROUTER. Implements InternalEnum.
 │   │                                       #   activeValues(), getDefault(), fromString()
 │   └── AiModel.java                        # Enum: GPT_41_MINI, GPT_41, CLAUDE_SONNET, CLAUDE_OPUS, CLAUDE_HAIKU,
@@ -365,7 +365,7 @@ KEY:
 
 ### application.yaml (single config file)
 
-All AI configuration lives in the main `src/main/resources/application.yaml`. There is no separate `application-ai.yml`. Both `jobhunting.ai.*` (bound to `AiConfigProperties`) and `spring.ai.*` (Spring AI autoconfiguration) are in this one file.
+All AI configuration lives in the main `src/main/resources/application.yaml`. There is no separate `application-ai.yml`. Both `cancer.ai.*` (bound to `AiConfigProperties`) and `spring.ai.*` (Spring AI autoconfiguration) are in this one file.
 
 ### API Keys
 
@@ -389,11 +389,11 @@ Providers can route to different models depending on the task type. OpenAI uses 
 | Gemini     | `gemini-2.5-flash`           | `gemini-2.5-flash`           |
 | OpenRouter | `google/gemini-2.5-flash`    | `google/gemini-2.5-flash`    |
 
-### Provider Configuration (bound to `AiConfigProperties` via `jobhunting.ai:` prefix)
+### Provider Configuration (bound to `AiConfigProperties` via `cancer.ai:` prefix)
 
-**Provider Configuration (bound to `AiConfigProperties` via `jobhunting.ai:` prefix):**
+**Provider Configuration (bound to `AiConfigProperties` via `cancer.ai:` prefix):**
 ```yaml
-jobhunting:
+cancer:
   ai:
     default-provider: openai
 
@@ -511,7 +511,7 @@ Gemini beans take `@Nullable GoogleGenAiChatModel` — if the model is null (key
 
 **Rate Limits:**
 ```yaml
-jobhunting:
+cancer:
   ai:
     openai:
       rate-limit:
@@ -528,7 +528,7 @@ jobhunting:
 
 **Cost Management:**
 ```yaml
-jobhunting:
+cancer:
   ai:
     cost:
       tracking-enabled: true
@@ -540,7 +540,7 @@ jobhunting:
 
 **Safety & Compliance:**
 ```yaml
-jobhunting:
+cancer:
   ai:
     safety:
       content-filtering: true

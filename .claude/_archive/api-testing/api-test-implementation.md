@@ -187,10 +187,10 @@ The module is designed to test against a real running backend:
 
 - `api-validation/build.gradle`
 - `api-validation/README.md`
-- `api-validation/src/main/java/com/viro/apivalidation/snapshot/*.java` (3 files)
-- `api-validation/src/main/java/com/viro/apivalidation/fixture/*.java` (2 files)
-- `api-validation/src/main/java/com/viro/apivalidation/csvvalidation/*.java` (6 files: CsvDataValidator, CsvEntityConfig, CsvValidationConfig, FieldMapper, PaginatedApiFetcher, FieldMismatch, ValidationResult)
-- `api-validation/src/test/java/com/viro/apivalidation/*.java` (15 test files)
+- `api-validation/src/main/java/com/seibel/cancer/apivalidation/snapshot/*.java` (3 files)
+- `api-validation/src/main/java/com/seibel/cancer/apivalidation/fixture/*.java` (2 files)
+- `api-validation/src/main/java/com/seibel/cancer/apivalidation/csvvalidation/*.java` (6 files: CsvDataValidator, CsvEntityConfig, CsvValidationConfig, FieldMapper, PaginatedApiFetcher, FieldMismatch, ValidationResult)
+- `api-validation/src/test/java/com/seibel/cancer/apivalidation/*.java` (15 test files)
 - `api-validation/src/test/resources/snapshot-config.yaml`
 - `api-validation/src/test/resources/snapshots/` (directory)
 

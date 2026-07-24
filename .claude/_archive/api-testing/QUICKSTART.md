@@ -4,11 +4,11 @@
 
 ```bash
 # Terminal 1: Start the backend
-cd /home/jeb/projects/viro/viro-server
+cd /home/jeb/projects/personal/cancer
 ./gradlew bootRun
 
 # Terminal 2: Capture snapshots
-cd /home/jeb/projects/viro/viro-server
+cd /home/jeb/projects/personal/cancer
 ./gradlew :api-validation:captureSnapshots
 ```
 
