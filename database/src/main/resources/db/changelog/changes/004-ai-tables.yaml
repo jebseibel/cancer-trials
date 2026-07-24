@@ -1,0 +1,124 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-ai-tables
+      author: viro-admin
+      labels: create_ai_tables
+      changes:
+
+        # AI Soul Table
+        - createTable:
+            tableName: ai_soul
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: unique_id, type: varchar(64) }
+              - column: { name: version, type: varchar(16) }
+              - column: { name: name, type: varchar(100), constraints: { nullable: false } }
+              - column: { name: purpose, type: longtext, constraints: { nullable: false } }
+              - column: { name: core_values, type: longtext }
+              - column: { name: decision_principles, type: longtext }
+              - column: { name: guardrails, type: longtext }
+              - column: { name: lifecycle, type: varchar(32) }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }
+
+        # AI Prompt Gang Table
+        - createTable:
+            tableName: ai_prompt_gang
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: unique_id, type: varchar(64) }
+              - column: { name: version, type: varchar(16) }
+              - column: { name: name, type: varchar(120), constraints: { nullable: false } }
+              - column: { name: description, type: varchar(255) }
+              - column: { name: persona, type: longtext }
+              - column: { name: gang, type: varchar(64) }
+              - column: { name: subgang, type: varchar(128) }
+              - column: { name: prompt_sequence, type: longtext }
+              - column: { name: prohibitions, type: longtext }
+              - column: { name: memory_depth, type: int }
+              - column: { name: decision_principles, type: longtext }
+              - column: { name: tone, type: varchar(120) }
+              - column: { name: lifecycle, type: varchar(32) }
+              - column: { name: soul_id, type: bigint }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }
+
+        - addForeignKeyConstraint:
+            baseTableName: ai_prompt_gang
+            baseColumnNames: soul_id
+            referencedTableName: ai_soul
+            referencedColumnNames: id
+            constraintName: fk_ai_prompt_gang_soul
+
+        # AI Prompt Envelope Table
+        - createTable:
+            tableName: ai_prompt_envelope
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: unique_id, type: varchar(64) }
+              - column: { name: version, type: varchar(16) }
+              - column: { name: name, type: varchar(120), constraints: { nullable: false } }
+              - column: { name: description, type: varchar(255) }
+              - column: { name: result_type, type: varchar(64) }
+              - column: { name: sub_persona, type: longtext }
+              - column: { name: goal, type: longtext }
+              - column: { name: lifecycle, type: varchar(32) }
+              - column: { name: temperature, type: double }
+              - column: { name: max_retries, type: int }
+              - column: { name: timeout_seconds, type: int }
+              - column: { name: category, type: varchar(64) }
+              - column: { name: sub_category, type: varchar(128) }
+              - column: { name: tool_exclusions, type: varchar(512) }
+              - column: { name: decision_principles, type: longtext }
+              - column: { name: gang_id, type: bigint }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }
+
+        - addForeignKeyConstraint:
+            baseTableName: ai_prompt_envelope
+            baseColumnNames: gang_id
+            referencedTableName: ai_prompt_gang
+            referencedColumnNames: id
+            constraintName: fk_ai_prompt_envelope_gang
+
+        # AI Prompt Table
+        - createTable:
+            tableName: ai_prompt
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: unique_id, type: varchar(64) }
+              - column: { name: name, type: varchar(120), constraints: { nullable: false } }
+              - column: { name: description, type: varchar(255) }
+              - column: { name: tracking_system, type: varchar(32) }
+              - column: { name: provider, type: varchar(32), constraints: { nullable: false } }
+              - column: { name: model, type: varchar(128) }
+              - column: { name: lifecycle, type: varchar(32) }
+              - column: { name: version, type: varchar(16) }
+              - column: { name: content, type: longtext, constraints: { nullable: false } }
+              - column: { name: json_variables, type: longtext }
+              - column: { name: json_variables_test, type: varchar(256) }
+              - column: { name: result_format, type: longtext }
+              - column: { name: example_input, type: longtext }
+              - column: { name: example_output, type: longtext }
+              - column: { name: envelope_id, type: bigint }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }
+
+        - addForeignKeyConstraint:
+            baseTableName: ai_prompt
+            baseColumnNames: envelope_id
+            referencedTableName: ai_prompt_envelope
+            referencedColumnNames: id
+            constraintName: fk_ai_prompt_envelope
