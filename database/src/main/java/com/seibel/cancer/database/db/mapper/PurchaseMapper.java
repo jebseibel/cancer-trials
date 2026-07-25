@@ -23,12 +23,12 @@ public class PurchaseMapper {
     }
 
     public List<Purchase> toModelList(List<PurchaseDb> items) {
-        if (items == null) return null;
+        if (items == null) return List.of();
         return items.stream().map(this::toModel).toList();
     }
 
     public List<PurchaseDb> toDbList(List<Purchase> items) {
-        if (items == null) return null;
+        if (items == null) return List.of();
         return items.stream().map(this::toDb).toList();
     }
 }

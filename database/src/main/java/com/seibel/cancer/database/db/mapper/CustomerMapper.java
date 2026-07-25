@@ -23,12 +23,12 @@ public class CustomerMapper {
     }
 
     public List<Customer> toModelList(List<CustomerDb> items) {
-        if (items == null) return null;
+        if (items == null) return List.of();
         return items.stream().map(this::toModel).toList();
     }
 
     public List<CustomerDb> toDbList(List<Customer> items) {
-        if (items == null) return null;
+        if (items == null) return List.of();
         return items.stream().map(this::toDb).toList();
     }
 }

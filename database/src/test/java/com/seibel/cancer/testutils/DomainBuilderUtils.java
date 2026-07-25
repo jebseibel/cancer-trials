@@ -4,7 +4,11 @@ import com.seibel.cancer.common.enums.ActiveEnum;
 import com.seibel.cancer.database.db.entity.BaseDb;
 import org.apache.commons.lang3.RandomStringUtils;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class DomainBuilderUtils {
 
@@ -242,5 +246,21 @@ public class DomainBuilderUtils {
         String exchange = RandomStringUtils.randomNumeric(3);
         String subscriber = RandomStringUtils.randomNumeric(4);
         return "(" + areaCode + ") " + exchange + "-" + subscriber;
+    }
+
+    // ===== Date =====
+    public static LocalDate getDateRandom() {
+        return LocalDate.now().minusDays(ThreadLocalRandom.current().nextInt(0, 365));
+    }
+
+    // ===== Boolean =====
+    public static Boolean getBooleanRandom() {
+        return ThreadLocalRandom.current().nextBoolean();
+    }
+
+    // ===== Decimal =====
+    public static BigDecimal getDecimalRandom() {
+        double value = ThreadLocalRandom.current().nextDouble(0, 10000);
+        return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP);
     }
 }

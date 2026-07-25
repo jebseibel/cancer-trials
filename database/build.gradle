@@ -34,6 +34,7 @@ dependencies {
     annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'me.paulschwarz:spring-dotenv:4.0.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testCompileOnly "org.projectlombok:lombok:${lombokVersion}"
     testAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
@@ -41,4 +42,5 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    workingDir = rootProject.projectDir
 }

@@ -2,12 +2,15 @@ package com.seibel.cancer.testutils;
 
 import com.seibel.cancer.common.domain.Customer;
 import com.seibel.cancer.common.domain.Purchase;
+import com.seibel.cancer.common.domain.Trial;
 import com.seibel.cancer.common.domain.User;
 import com.seibel.cancer.database.db.entity.CustomerDb;
 import com.seibel.cancer.database.db.entity.PurchaseDb;
+import com.seibel.cancer.database.db.entity.TrialDb;
 import com.seibel.cancer.database.db.entity.UserDb;
 import com.seibel.cancer.database.db.mapper.CustomerMapper;
 import com.seibel.cancer.database.db.mapper.PurchaseMapper;
+import com.seibel.cancer.database.db.mapper.TrialMapper;
 import com.seibel.cancer.database.db.mapper.UserMapper;
 
 import java.util.UUID;
@@ -76,6 +79,52 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
         item.setCustomer(customer != null ? customer : getCodeRandom("PUR_"));
         item.setItems(items != null ? items : getNameRandom("Items_"));
         item.setStatus(status != null ? status : getNameRandom("Status_"));
+        setBaseSyncFields(item);
+        return item;
+    }
+
+    // ///////////////////////////////////////////////////////////////////
+    // Trial
+    public static Trial getTrial() {
+        TrialDb item = getTrialDb();
+        return new TrialMapper().toModel(item);
+    }
+
+    public static Trial getTrial(TrialDb item) {
+        return new TrialMapper().toModel(item);
+    }
+
+    public static TrialDb getTrialDb() {
+        return getTrialDb(null, null, null, null);
+    }
+
+    public static TrialDb getTrialDb(String nctId, String briefTitle) {
+        return getTrialDb(nctId, briefTitle, null, null);
+    }
+
+    public static TrialDb getTrialDb(String nctId, String briefTitle, String overallStatus, String extid) {
+        TrialDb item = new TrialDb();
+        item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
+        item.setNctId(nctId != null ? nctId : getCodeRandom("NCT"));
+        item.setBriefTitle(briefTitle != null ? briefTitle : getNameRandom("Trial_"));
+        item.setOfficialTitle(getNameRandom("OfficialTrial_"));
+        item.setOverallStatus(overallStatus != null ? overallStatus : getStatusRandom("Sta_"));
+        item.setStudyType(getStatusRandom("Type_"));
+        item.setBriefSummary(getDescriptionRandom("Summary "));
+        item.setDetailedDescription(getDescriptionRandom("Description "));
+        item.setStartDate(getDateRandom());
+        item.setPrimaryCompletionDate(getDateRandom());
+        item.setCompletionDate(getDateRandom());
+        item.setLastUpdatePostedDate(getDateRandom());
+        item.setEnrollmentCount(100);
+        item.setEnrollmentType(getStatusRandom("Enr_"));
+        item.setHealthyVolunteers(getBooleanRandom());
+        item.setSex("ALL");
+        item.setMinimumAge("18 Years");
+        item.setMaximumAge("65 Years");
+        item.setEligibilityCriteria(getDescriptionRandom("Eligibility "));
+        item.setIsPaidStudy(getBooleanRandom());
+        item.setPaidAmount(getDecimalRandom());
         setBaseSyncFields(item);
         return item;
     }

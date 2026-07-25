@@ -1,0 +1,37 @@
+databaseChangeLog:
+  - changeSet:
+      id: create_trial_table
+      author: jeb
+      labels: trials
+      changes:
+
+        # Trial Table
+        - createTable:
+            tableName: trial
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: nct_id, type: varchar(16), constraints: { unique: true } }
+              - column: { name: brief_title, type: varchar(500), constraints: { nullable: false } }
+              - column: { name: official_title, type: varchar(500) }
+              - column: { name: overall_status, type: varchar(32) }
+              - column: { name: study_type, type: varchar(32) }
+              - column: { name: brief_summary, type: text }
+              - column: { name: detailed_description, type: text }
+              - column: { name: start_date, type: date }
+              - column: { name: primary_completion_date, type: date }
+              - column: { name: completion_date, type: date }
+              - column: { name: last_update_posted_date, type: date }
+              - column: { name: enrollment_count, type: int }
+              - column: { name: enrollment_type, type: varchar(16) }
+              - column: { name: healthy_volunteers, type: tinyint(1) }
+              - column: { name: sex, type: varchar(8) }
+              - column: { name: minimum_age, type: varchar(32) }
+              - column: { name: maximum_age, type: varchar(32) }
+              - column: { name: eligibility_criteria, type: text }
+              - column: { name: is_paid_study, type: tinyint(1) }
+              - column: { name: paid_amount, type: decimal(10,2) }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }

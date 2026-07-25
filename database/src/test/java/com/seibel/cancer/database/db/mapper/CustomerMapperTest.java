@@ -104,7 +104,8 @@ class CustomerMapperTest {
         List<Customer> domainList = mapper.toModelList(null);
 
         // Assert
-        assertNull(domainList);
+        assertNotNull(domainList);
+        assertEquals(0, domainList.size());
     }
 
     @Test
@@ -143,6 +144,7 @@ class CustomerMapperTest {
         List<CustomerDb> dbList = mapper.toDbList(null);
 
         // Assert
-        assertNull(dbList);
+        assertNotNull(dbList);
+        assertEquals(0, dbList.size());
     }
 }

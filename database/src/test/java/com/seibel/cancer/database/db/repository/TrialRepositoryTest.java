@@ -1,7 +1,7 @@
 package com.seibel.cancer.database.db.repository;
 
 import com.seibel.cancer.common.enums.ActiveEnum;
-import com.seibel.cancer.database.db.entity.CustomerDb;
+import com.seibel.cancer.database.db.entity.TrialDb;
 import com.seibel.cancer.testutils.DomainBuilderDatabase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,10 +21,10 @@ import static org.junit.jupiter.api.Assertions.*;
 @DataJpaTest
 @ActiveProfiles("test-database")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class CustomerRepositoryTest {
+class TrialRepositoryTest {
 
     @Autowired
-    private CustomerRepository repository;
+    private TrialRepository repository;
 
     @BeforeEach
     void setUp() {
@@ -32,24 +32,47 @@ class CustomerRepositoryTest {
     }
 
     @Test
-    void findByExtid_shouldReturnCustomer_whenExists() {
+    void findByExtid_shouldReturnTrial_whenExists() {
         // Arrange
-        CustomerDb customer = DomainBuilderDatabase.getCustomerDb();
-        repository.save(customer);
+        TrialDb trial = DomainBuilderDatabase.getTrialDb();
+        repository.save(trial);
 
         // Act
-        Optional<CustomerDb> result = repository.findByExtid(customer.getExtid());
+        Optional<TrialDb> result = repository.findByExtid(trial.getExtid());
 
         // Assert
         assertTrue(result.isPresent());
-        assertEquals(customer.getExtid(), result.get().getExtid());
-        assertEquals(customer.getCode(), result.get().getCode());
+        assertEquals(trial.getExtid(), result.get().getExtid());
+        assertEquals(trial.getBriefTitle(), result.get().getBriefTitle());
     }
 
     @Test
     void findByExtid_shouldReturnEmpty_whenNotExists() {
         // Act
-        Optional<CustomerDb> result = repository.findByExtid("nonexistent-extid");
+        Optional<TrialDb> result = repository.findByExtid("nonexistent-extid");
+
+        // Assert
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void findByNctId_shouldReturnTrial_whenExists() {
+        // Arrange
+        TrialDb trial = DomainBuilderDatabase.getTrialDb("NCT12345678", null);
+        repository.save(trial);
+
+        // Act
+        Optional<TrialDb> result = repository.findByNctId("NCT12345678");
+
+        // Assert
+        assertTrue(result.isPresent());
+        assertEquals(trial.getExtid(), result.get().getExtid());
+    }
+
+    @Test
+    void findByNctId_shouldReturnEmpty_whenNotExists() {
+        // Act
+        Optional<TrialDb> result = repository.findByNctId("NCT00000000");
 
         // Assert
         assertTrue(result.isEmpty());
@@ -58,11 +81,11 @@ class CustomerRepositoryTest {
     @Test
     void findByActive_shouldReturnActiveOnly() {
         // Arrange
-        CustomerDb active1 = DomainBuilderDatabase.getCustomerDb();
+        TrialDb active1 = DomainBuilderDatabase.getTrialDb();
         active1.setActive(ActiveEnum.ACTIVE);
-        CustomerDb active2 = DomainBuilderDatabase.getCustomerDb();
+        TrialDb active2 = DomainBuilderDatabase.getTrialDb();
         active2.setActive(ActiveEnum.ACTIVE);
-        CustomerDb inactive = DomainBuilderDatabase.getCustomerDb();
+        TrialDb inactive = DomainBuilderDatabase.getTrialDb();
         inactive.setActive(ActiveEnum.INACTIVE);
 
         repository.save(active1);
@@ -71,19 +94,19 @@ class CustomerRepositoryTest {
 
         // Act
         Pageable pageable = PageRequest.of(0, 10);
-        Page<CustomerDb> result = repository.findByActive(ActiveEnum.ACTIVE, pageable);
+        Page<TrialDb> result = repository.findByActive(ActiveEnum.ACTIVE, pageable);
 
         // Assert
         assertEquals(2, result.getContent().size());
-        assertTrue(result.getContent().stream().allMatch(c -> c.getActive() == ActiveEnum.ACTIVE));
+        assertTrue(result.getContent().stream().allMatch(o -> o.getActive() == ActiveEnum.ACTIVE));
     }
 
     @Test
     void findByActive_shouldReturnInactiveOnly() {
         // Arrange
-        CustomerDb active = DomainBuilderDatabase.getCustomerDb();
+        TrialDb active = DomainBuilderDatabase.getTrialDb();
         active.setActive(ActiveEnum.ACTIVE);
-        CustomerDb inactive = DomainBuilderDatabase.getCustomerDb();
+        TrialDb inactive = DomainBuilderDatabase.getTrialDb();
         inactive.setActive(ActiveEnum.INACTIVE);
 
         repository.save(active);
@@ -91,7 +114,7 @@ class CustomerRepositoryTest {
 
         // Act
         Pageable pageable = PageRequest.of(0, 10);
-        Page<CustomerDb> result = repository.findByActive(ActiveEnum.INACTIVE, pageable);
+        Page<TrialDb> result = repository.findByActive(ActiveEnum.INACTIVE, pageable);
 
         // Assert
         assertEquals(1, result.getContent().size());
@@ -101,11 +124,11 @@ class CustomerRepositoryTest {
     @Test
     void existsByExtid_shouldReturnTrue_whenExists() {
         // Arrange
-        CustomerDb customer = DomainBuilderDatabase.getCustomerDb();
-        repository.save(customer);
+        TrialDb trial = DomainBuilderDatabase.getTrialDb();
+        repository.save(trial);
 
         // Act
-        boolean result = repository.existsByExtid(customer.getExtid());
+        boolean result = repository.existsByExtid(trial.getExtid());
 
         // Assert
         assertTrue(result);
@@ -121,58 +144,44 @@ class CustomerRepositoryTest {
     }
 
     @Test
-    void findByName_shouldReturnCustomer_whenExists() {
+    void save_shouldPersistTrial() {
         // Arrange
-        CustomerDb customer = DomainBuilderDatabase.getCustomerDb();
-        repository.save(customer);
+        TrialDb trial = DomainBuilderDatabase.getTrialDb();
 
         // Act
-        Optional<CustomerDb> result = repository.findByName(customer.getName());
-
-        // Assert
-        assertTrue(result.isPresent());
-        assertEquals(customer.getName(), result.get().getName());
-    }
-
-    @Test
-    void save_shouldPersistCustomer() {
-        // Arrange
-        CustomerDb customer = DomainBuilderDatabase.getCustomerDb();
-
-        // Act
-        CustomerDb saved = repository.save(customer);
+        TrialDb saved = repository.save(trial);
 
         // Assert
         assertNotNull(saved.getId());
-        assertEquals(customer.getExtid(), saved.getExtid());
+        assertEquals(trial.getExtid(), saved.getExtid());
     }
 
     @Test
-    void findAll_shouldReturnAllCustomers() {
+    void findAll_shouldReturnAllTrials() {
         // Arrange
-        CustomerDb customer1 = DomainBuilderDatabase.getCustomerDb();
-        CustomerDb customer2 = DomainBuilderDatabase.getCustomerDb();
-        repository.save(customer1);
-        repository.save(customer2);
+        TrialDb trial1 = DomainBuilderDatabase.getTrialDb();
+        TrialDb trial2 = DomainBuilderDatabase.getTrialDb();
+        repository.save(trial1);
+        repository.save(trial2);
 
         // Act
-        List<CustomerDb> result = (List<CustomerDb>) repository.findAll();
+        List<TrialDb> result = (List<TrialDb>) repository.findAll();
 
         // Assert
         assertEquals(2, result.size());
     }
 
     @Test
-    void deleteById_shouldRemoveCustomer() {
+    void deleteById_shouldRemoveTrial() {
         // Arrange
-        CustomerDb customer = DomainBuilderDatabase.getCustomerDb();
-        CustomerDb saved = repository.save(customer);
+        TrialDb trial = DomainBuilderDatabase.getTrialDb();
+        TrialDb saved = repository.save(trial);
 
         // Act
         repository.deleteById(saved.getId());
 
         // Assert
-        Optional<CustomerDb> result = repository.findById(saved.getId());
+        Optional<TrialDb> result = repository.findById(saved.getId());
         assertTrue(result.isEmpty());
     }
 }
