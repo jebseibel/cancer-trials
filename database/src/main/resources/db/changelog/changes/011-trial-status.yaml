@@ -1,0 +1,22 @@
+databaseChangeLog:
+  - changeSet:
+      id: create_trial_status_table
+      author: jeb
+      labels: trial-statuses
+      changes:
+
+        # Trial Status Table
+        - createTable:
+            tableName: trial_status
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: trial_id, type: bigint, constraints: { nullable: false } }
+              - column: { name: app_user_id, type: bigint, constraints: { nullable: false } }
+              - column: { name: status, type: varchar(16), constraints: { nullable: false } }
+              - column: { name: notes, type: text }
+              - column: { name: status_changed_at, type: datetime }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }

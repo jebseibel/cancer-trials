@@ -1,0 +1,23 @@
+databaseChangeLog:
+  - changeSet:
+      id: create_staging_raw_trial_table
+      author: jeb
+      labels: staging_raw_trials
+      changes:
+
+        # StagingRawTrial Table
+        - createTable:
+            tableName: staging_raw_trial
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: trial_source_id, type: bigint, constraints: { nullable: false } }
+              - column: { name: source_trial_id, type: varchar(255), constraints: { nullable: false } }
+              - column: { name: raw_payload, type: longtext }
+              - column: { name: fetched_at, type: datetime, constraints: { nullable: false } }
+              - column: { name: normalized_at, type: datetime }
+              - column: { name: normalization_error, type: text }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }

@@ -1,0 +1,22 @@
+databaseChangeLog:
+  - changeSet:
+      id: create_outcome_table
+      author: jeb
+      labels: outcomes
+      changes:
+
+        # Outcome Table
+        - createTable:
+            tableName: outcome
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: trial_id, type: bigint, constraints: { nullable: false } }
+              - column: { name: outcome_type, type: varchar(16), constraints: { nullable: false } }
+              - column: { name: measure, type: varchar(500), constraints: { nullable: false } }
+              - column: { name: description, type: text }
+              - column: { name: time_frame, type: varchar(255) }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }
