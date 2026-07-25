@@ -105,6 +105,7 @@ class TrialConverter {
                 .eligibilityCriteria(request.getEligibilityCriteria())
                 .isPaidStudy(request.getIsPaidStudy())
                 .paidAmount(request.getPaidAmount())
+                .primaryTrialSourceId(request.getPrimaryTrialSourceId())
                 .build();
     }
 
@@ -130,6 +131,7 @@ class TrialConverter {
                 .eligibilityCriteria(request.getEligibilityCriteria())
                 .isPaidStudy(request.getIsPaidStudy())
                 .paidAmount(request.getPaidAmount())
+                .primaryTrialSourceId(request.getPrimaryTrialSourceId())
                 .build();
     }
 
@@ -156,6 +158,7 @@ class TrialConverter {
                 .eligibilityCriteria(item.getEligibilityCriteria())
                 .isPaidStudy(item.getIsPaidStudy())
                 .paidAmount(item.getPaidAmount())
+                .primaryTrialSourceId(item.getPrimaryTrialSourceId())
                 .build();
     }
 
@@ -183,7 +186,8 @@ class TrialConverter {
                 request.getMaximumAge() == null &&
                 request.getEligibilityCriteria() == null &&
                 request.getIsPaidStudy() == null &&
-                request.getPaidAmount() == null) {
+                request.getPaidAmount() == null &&
+                request.getPrimaryTrialSourceId() == null) {
             throw new ValidationException("At least one field must be provided for update.");
         }
     }

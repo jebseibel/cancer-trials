@@ -30,4 +30,5 @@ public class ResponseTrial {
     private String eligibilityCriteria;
     private Boolean isPaidStudy;
     private BigDecimal paidAmount;
+    private Long primaryTrialSourceId;
 }

@@ -253,6 +253,12 @@ public class DomainBuilderUtils {
         return LocalDate.now().minusDays(ThreadLocalRandom.current().nextInt(0, 365));
     }
 
+    // ===== DateTime =====
+    public static LocalDateTime getDateTimeRandom() {
+        return LocalDateTime.now().minusDays(ThreadLocalRandom.current().nextInt(0, 365))
+                .minusMinutes(ThreadLocalRandom.current().nextInt(0, 1440));
+    }
+
     // ===== Boolean =====
     public static Boolean getBooleanRandom() {
         return ThreadLocalRandom.current().nextBoolean();

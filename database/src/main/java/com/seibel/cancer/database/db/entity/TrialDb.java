@@ -76,4 +76,7 @@ public class TrialDb extends BaseDb {
 
     @Column(name = "paid_amount", precision = 10, scale = 2)
     private BigDecimal paidAmount;
+
+    @Column(name = "primary_trial_source_id", nullable = false)
+    private Long primaryTrialSourceId;
 }

@@ -1,6 +1,7 @@
 package com.seibel.cancer.web.request;
 
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -61,4 +62,7 @@ public class RequestTrialCreate extends BaseRequest {
     private Boolean isPaidStudy;
 
     private BigDecimal paidAmount;
+
+    @NotNull(message = "The primaryTrialSourceId is required.")
+    private Long primaryTrialSourceId;
 }

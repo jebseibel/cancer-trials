@@ -77,6 +77,7 @@ public class TrialDbService extends BaseDbService {
             if (item.getEligibilityCriteria() != null) record.setEligibilityCriteria(item.getEligibilityCriteria());
             if (item.getIsPaidStudy() != null) record.setIsPaidStudy(item.getIsPaidStudy());
             if (item.getPaidAmount() != null) record.setPaidAmount(item.getPaidAmount());
+            if (item.getPrimaryTrialSourceId() != null) record.setPrimaryTrialSourceId(item.getPrimaryTrialSourceId());
             record.setUpdatedAt(LocalDateTime.now());
 
             TrialDb saved = repository.save(record);

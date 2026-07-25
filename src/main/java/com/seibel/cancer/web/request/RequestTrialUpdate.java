@@ -59,4 +59,6 @@ public class RequestTrialUpdate extends BaseRequest {
     private Boolean isPaidStudy;
 
     private BigDecimal paidAmount;
+
+    private Long primaryTrialSourceId;
 }

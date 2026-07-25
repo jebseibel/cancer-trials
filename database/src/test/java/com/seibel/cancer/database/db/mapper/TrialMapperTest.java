@@ -52,6 +52,7 @@ class TrialMapperTest {
         assertEquals(db.getEligibilityCriteria(), domain.getEligibilityCriteria());
         assertEquals(db.getIsPaidStudy(), domain.getIsPaidStudy());
         assertEquals(db.getPaidAmount(), domain.getPaidAmount());
+        assertEquals(db.getPrimaryTrialSourceId(), domain.getPrimaryTrialSourceId());
         assertEquals(db.getCreatedAt(), domain.getCreatedAt());
         assertEquals(db.getUpdatedAt(), domain.getUpdatedAt());
         assertEquals(db.getDeletedAt(), domain.getDeletedAt());
@@ -89,6 +90,7 @@ class TrialMapperTest {
         assertEquals(domain.getEligibilityCriteria(), db.getEligibilityCriteria());
         assertEquals(domain.getIsPaidStudy(), db.getIsPaidStudy());
         assertEquals(domain.getPaidAmount(), db.getPaidAmount());
+        assertEquals(domain.getPrimaryTrialSourceId(), db.getPrimaryTrialSourceId());
         assertEquals(domain.getCreatedAt(), db.getCreatedAt());
         assertEquals(domain.getUpdatedAt(), db.getUpdatedAt());
         assertEquals(domain.getDeletedAt(), db.getDeletedAt());
