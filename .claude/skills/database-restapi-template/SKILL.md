@@ -195,9 +195,14 @@ in existing changesets (e.g. `003-purchase.yaml`): `extid` gets
 `defaultValueComputed: "(UUID())"`, `created_at` gets
 `defaultValueComputed: CURRENT_TIMESTAMP`, `active` gets `defaultValueNumeric: 1`.
 
-If the Domain has fields explicitly noted as foreign keys (e.g. from a table-spec doc),
-skip those columns entirely here — FK wiring is a separate, manual step, not part of
-this skill's generation.
+If the Domain has fields that are foreign keys (e.g. `trialId`, `appUserId` — plain
+`Long`/`bigint` fields named after the table they point to, per this project's
+convention), **include them as ordinary columns in the changeset** (`bigint`,
+`nullable` matching the source table spec), exactly like any other business field.
+Only the JPA *relationship* (`@ManyToOne` etc.) is skipped — the column itself is not.
+Do not omit these columns; every other layer (Domain, Entity, DTOs, Service,
+Controller) already carries the field, so the changeset must too or the schema won't
+match the entity.
 
 ## Key Technical Details
 
@@ -260,7 +265,9 @@ this skill's generation.
 - ✅ Pagination support (`Page<T>`/`Pageable`) with page-size cap + sort-field whitelist
 - ✅ Direct Controller→Service communication (no intermediate web service layer)
 - ✅ Separation of concerns: Controller (REST) + Converter (DTO mapping) in same file
-- ⚠️ No JPA relationships (`@ManyToOne` etc.) generated — FK columns are skipped, wired manually later
+- ⚠️ No JPA relationships (`@ManyToOne` etc.) generated — FK fields are plain `Long`/`bigint`
+  columns (named `{targetTable}Id`), present in every layer including the Liquibase
+  changeset; only the relationship annotation is deferred, not the column
 - ⚠️ Database constraints defined in JPA `@Column` annotations, mirrored in the Liquibase changeset
 
 ## Generation Strategy
