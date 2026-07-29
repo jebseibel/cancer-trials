@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 @Data
 public class RequestLocationUpdate extends BaseRequest {
 
-    private Long trialId;
+    private String trialExtid;
 
     @Size(max = 255, message = "The facility must be at most 255 characters.")
     private String facility;

@@ -8,7 +8,7 @@ import lombok.EqualsAndHashCode;
 @Data
 public class RequestOutcomeUpdate extends BaseRequest {
 
-    private Long trialId;
+    private String trialExtid;
 
     @Size(max = 16, message = "The outcomeType must be at most 16 characters.")
     private String outcomeType;

@@ -21,10 +21,12 @@ export default function Login() {
             if (isLogin) {
                 const response = await authApi.login({ username, password });
                 authHelpers.saveToken(response.data.token);
+                authHelpers.saveUsername(response.data.username);
                 navigate('/');
             } else {
                 const response = await authApi.register({ username, password, email });
                 authHelpers.saveToken(response.data.token);
+                authHelpers.saveUsername(response.data.username);
                 navigate('/');
             }
         } catch (err: any) {

@@ -7,7 +7,7 @@ import lombok.Data;
 @Builder
 public class ResponseArmGroup {
     private String extid;
-    private Long trialId;
+    private String trialExtid;
     private String label;
     private String type;
     private String description;

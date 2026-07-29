@@ -2,7 +2,9 @@ package com.seibel.cancer.web.controller;
 
 import com.seibel.cancer.common.domain.ArmGroup;
 import com.seibel.cancer.common.enums.ActiveEnum;
+import com.seibel.cancer.common.exceptions.ResourceNotFoundException;
 import com.seibel.cancer.common.exceptions.ValidationException;
+import com.seibel.cancer.database.db.repository.TrialRepository;
 import com.seibel.cancer.service.ArmGroupService;
 import com.seibel.cancer.web.request.RequestArmGroupCreate;
 import com.seibel.cancer.web.request.RequestArmGroupUpdate;
@@ -16,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,7 +33,7 @@ import java.util.List;
 public class ArmGroupController {
 
     private final ArmGroupService armGroupService;
-    private final ArmGroupConverter converter = new ArmGroupConverter();
+    private final ArmGroupConverter converter;
 
     @GetMapping
     @Operation(summary = "List armGroups (paginated)")
@@ -39,6 +42,13 @@ public class ArmGroupController {
             @RequestParam(required = false) ActiveEnum active
     ) {
         return armGroupService.findAll(pageable, active).map(converter::toResponse);
+    }
+
+    @GetMapping("/by-trial/{trialExtid}")
+    @Operation(summary = "List all armGroups for a trial (unpaginated)")
+    public List<ResponseArmGroup> getByTrialExtid(@PathVariable String trialExtid) {
+        Long trialId = converter.resolveTrialId(trialExtid);
+        return converter.toResponse(armGroupService.findByTrialId(trialId));
     }
 
     @GetMapping("/{extid}")
@@ -81,11 +91,28 @@ public class ArmGroupController {
     }
 }
 
+@Component
+@RequiredArgsConstructor
 class ArmGroupConverter {
+
+    private final TrialRepository trialRepository;
+
+    Long resolveTrialId(String trialExtid) {
+        return trialRepository.findByExtid(trialExtid)
+                .orElseThrow(() -> new ResourceNotFoundException("Trial", trialExtid))
+                .getId();
+    }
+
+    private String resolveTrialExtid(Long trialId) {
+        if (trialId == null) return null;
+        return trialRepository.findById(trialId)
+                .map(t -> t.getExtid())
+                .orElse(null);
+    }
 
     ArmGroup toDomain(RequestArmGroupCreate request) {
         return ArmGroup.builder()
-                .trialId(request.getTrialId())
+                .trialId(resolveTrialId(request.getTrialExtid()))
                 .label(request.getLabel())
                 .type(request.getType())
                 .description(request.getDescription())
@@ -94,7 +121,7 @@ class ArmGroupConverter {
 
     ArmGroup toDomain(RequestArmGroupUpdate request) {
         return ArmGroup.builder()
-                .trialId(request.getTrialId())
+                .trialId(request.getTrialExtid() != null ? resolveTrialId(request.getTrialExtid()) : null)
                 .label(request.getLabel())
                 .type(request.getType())
                 .description(request.getDescription())
@@ -104,7 +131,7 @@ class ArmGroupConverter {
     ResponseArmGroup toResponse(ArmGroup item) {
         return ResponseArmGroup.builder()
                 .extid(item.getExtid())
-                .trialId(item.getTrialId())
+                .trialExtid(resolveTrialExtid(item.getTrialId()))
                 .label(item.getLabel())
                 .type(item.getType())
                 .description(item.getDescription())
@@ -116,7 +143,7 @@ class ArmGroupConverter {
     }
 
     void validateUpdateRequest(RequestArmGroupUpdate request) {
-        if (request.getTrialId() == null &&
+        if (request.getTrialExtid() == null &&
                 request.getLabel() == null &&
                 request.getType() == null &&
                 request.getDescription() == null) {

@@ -104,6 +104,18 @@ public class OutcomeService extends BaseService {
         }
     }
 
+    public List<Outcome> findByTrialId(Long trialId) {
+        requireNonNull(trialId, "trialId");
+        log.info("findByTrialId(): trialId={}", trialId);
+
+        try {
+            return dbService.findByTrialId(trialId);
+        } catch (Exception e) {
+            log.error("Failed to retrieve outcomes by trialId: {}", trialId, e);
+            throw new ServiceException("Unable to retrieve outcomes", e);
+        }
+    }
+
     public Page<Outcome> findAll(Pageable pageable, ActiveEnum activeEnum) {
         Pageable safe = enforceCapsAndWhitelist(pageable);
         log.info("findAll(pageable): page={}, size={}, sort={}", safe.getPageNumber(), safe.getPageSize(), safe.getSort());

@@ -8,7 +8,7 @@ import lombok.EqualsAndHashCode;
 @Data
 public class RequestOverallOfficialUpdate extends BaseRequest {
 
-    private Long trialId;
+    private String trialExtid;
 
     @Size(max = 255, message = "The name must be at most 255 characters.")
     private String name;

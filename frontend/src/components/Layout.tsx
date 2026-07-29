@@ -1,5 +1,5 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom';
-import { Home, Building2, ShoppingCart, UserCog, LogOut } from 'lucide-react';
+import { Home, Search, Bookmark, LogOut, FlaskConical } from 'lucide-react';
 import { authHelpers } from '../services/api';
 
 export default function Layout() {
@@ -7,6 +7,7 @@ export default function Layout() {
 
     const handleLogout = () => {
         authHelpers.removeToken();
+        authHelpers.removeUsername();
         navigate('/login');
     };
 
@@ -18,8 +19,8 @@ export default function Layout() {
                     <div className="flex justify-between h-16">
                         <div className="flex">
                             <Link to="/" className="flex items-center px-2 text-gray-900">
-                                <Home className="h-8 w-8 text-blue-600" />
-                                <span className="ml-2 text-xl font-bold">BCS</span>
+                                <FlaskConical className="h-8 w-8 text-green-600" />
+                                <span className="ml-2 text-xl font-bold">Clinical Trials Finder</span>
                             </Link>
                             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
                                 <Link
@@ -30,25 +31,18 @@ export default function Layout() {
                                     Dashboard
                                 </Link>
                                 <Link
-                                    to="/customers"
+                                    to="/trials"
                                     className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 border-b-2 border-transparent hover:border-gray-300"
                                 >
-                                    <Building2 className="h-4 w-4 mr-2" />
-                                    Customers
+                                    <Search className="h-4 w-4 mr-2" />
+                                    Trial Search
                                 </Link>
                                 <Link
-                                    to="/purchases"
+                                    to="/saved-trials"
                                     className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 border-b-2 border-transparent hover:border-gray-300"
                                 >
-                                    <ShoppingCart className="h-4 w-4 mr-2" />
-                                    Purchases
-                                </Link>
-                                <Link
-                                    to="/users"
-                                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 border-b-2 border-transparent hover:border-gray-300"
-                                >
-                                    <UserCog className="h-4 w-4 mr-2" />
-                                    Users
+                                    <Bookmark className="h-4 w-4 mr-2" />
+                                    Saved Trials
                                 </Link>
                             </div>
                         </div>

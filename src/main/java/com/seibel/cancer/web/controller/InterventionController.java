@@ -2,7 +2,9 @@ package com.seibel.cancer.web.controller;
 
 import com.seibel.cancer.common.domain.Intervention;
 import com.seibel.cancer.common.enums.ActiveEnum;
+import com.seibel.cancer.common.exceptions.ResourceNotFoundException;
 import com.seibel.cancer.common.exceptions.ValidationException;
+import com.seibel.cancer.database.db.repository.TrialRepository;
 import com.seibel.cancer.service.InterventionService;
 import com.seibel.cancer.web.request.RequestInterventionCreate;
 import com.seibel.cancer.web.request.RequestInterventionUpdate;
@@ -16,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,7 +33,7 @@ import java.util.List;
 public class InterventionController {
 
     private final InterventionService interventionService;
-    private final InterventionConverter converter = new InterventionConverter();
+    private final InterventionConverter converter;
 
     @GetMapping
     @Operation(summary = "List interventions (paginated)")
@@ -39,6 +42,13 @@ public class InterventionController {
             @RequestParam(required = false) ActiveEnum active
     ) {
         return interventionService.findAll(pageable, active).map(converter::toResponse);
+    }
+
+    @GetMapping("/by-trial/{trialExtid}")
+    @Operation(summary = "List all interventions for a trial (unpaginated)")
+    public List<ResponseIntervention> getByTrialExtid(@PathVariable String trialExtid) {
+        Long trialId = converter.resolveTrialId(trialExtid);
+        return converter.toResponse(interventionService.findByTrialId(trialId));
     }
 
     @GetMapping("/{extid}")
@@ -81,11 +91,28 @@ public class InterventionController {
     }
 }
 
+@Component
+@RequiredArgsConstructor
 class InterventionConverter {
+
+    private final TrialRepository trialRepository;
+
+    Long resolveTrialId(String trialExtid) {
+        return trialRepository.findByExtid(trialExtid)
+                .orElseThrow(() -> new ResourceNotFoundException("Trial", trialExtid))
+                .getId();
+    }
+
+    private String resolveTrialExtid(Long trialId) {
+        if (trialId == null) return null;
+        return trialRepository.findById(trialId)
+                .map(t -> t.getExtid())
+                .orElse(null);
+    }
 
     Intervention toDomain(RequestInterventionCreate request) {
         return Intervention.builder()
-                .trialId(request.getTrialId())
+                .trialId(resolveTrialId(request.getTrialExtid()))
                 .type(request.getType())
                 .name(request.getName())
                 .description(request.getDescription())
@@ -94,7 +121,7 @@ class InterventionConverter {
 
     Intervention toDomain(RequestInterventionUpdate request) {
         return Intervention.builder()
-                .trialId(request.getTrialId())
+                .trialId(request.getTrialExtid() != null ? resolveTrialId(request.getTrialExtid()) : null)
                 .type(request.getType())
                 .name(request.getName())
                 .description(request.getDescription())
@@ -104,7 +131,7 @@ class InterventionConverter {
     ResponseIntervention toResponse(Intervention item) {
         return ResponseIntervention.builder()
                 .extid(item.getExtid())
-                .trialId(item.getTrialId())
+                .trialExtid(resolveTrialExtid(item.getTrialId()))
                 .type(item.getType())
                 .name(item.getName())
                 .description(item.getDescription())
@@ -116,7 +143,7 @@ class InterventionConverter {
     }
 
     void validateUpdateRequest(RequestInterventionUpdate request) {
-        if (request.getTrialId() == null &&
+        if (request.getTrialExtid() == null &&
                 request.getType() == null &&
                 request.getName() == null &&
                 request.getDescription() == null) {

@@ -7,7 +7,7 @@ import lombok.Data;
 @Builder
 public class ResponseOutcome {
     private String extid;
-    private Long trialId;
+    private String trialExtid;
     private String outcomeType;
     private String measure;
     private String description;

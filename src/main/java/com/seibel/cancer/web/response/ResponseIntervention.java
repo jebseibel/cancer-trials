@@ -7,7 +7,7 @@ import lombok.Data;
 @Builder
 public class ResponseIntervention {
     private String extid;
-    private Long trialId;
+    private String trialExtid;
     private String type;
     private String name;
     private String description;

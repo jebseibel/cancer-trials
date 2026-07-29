@@ -2,7 +2,9 @@ package com.seibel.cancer.web.controller;
 
 import com.seibel.cancer.common.domain.Location;
 import com.seibel.cancer.common.enums.ActiveEnum;
+import com.seibel.cancer.common.exceptions.ResourceNotFoundException;
 import com.seibel.cancer.common.exceptions.ValidationException;
+import com.seibel.cancer.database.db.repository.TrialRepository;
 import com.seibel.cancer.service.LocationService;
 import com.seibel.cancer.web.request.RequestLocationCreate;
 import com.seibel.cancer.web.request.RequestLocationUpdate;
@@ -16,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,7 +33,7 @@ import java.util.List;
 public class LocationController {
 
     private final LocationService locationService;
-    private final LocationConverter converter = new LocationConverter();
+    private final LocationConverter converter;
 
     @GetMapping
     @Operation(summary = "List locations (paginated)")
@@ -39,6 +42,13 @@ public class LocationController {
             @RequestParam(required = false) ActiveEnum active
     ) {
         return locationService.findAll(pageable, active).map(converter::toResponse);
+    }
+
+    @GetMapping("/by-trial/{trialExtid}")
+    @Operation(summary = "List all locations for a trial (unpaginated)")
+    public List<ResponseLocation> getByTrialExtid(@PathVariable String trialExtid) {
+        Long trialId = converter.resolveTrialId(trialExtid);
+        return converter.toResponse(locationService.findByTrialId(trialId));
     }
 
     @GetMapping("/{extid}")
@@ -81,11 +91,28 @@ public class LocationController {
     }
 }
 
+@Component
+@RequiredArgsConstructor
 class LocationConverter {
+
+    private final TrialRepository trialRepository;
+
+    Long resolveTrialId(String trialExtid) {
+        return trialRepository.findByExtid(trialExtid)
+                .orElseThrow(() -> new ResourceNotFoundException("Trial", trialExtid))
+                .getId();
+    }
+
+    private String resolveTrialExtid(Long trialId) {
+        if (trialId == null) return null;
+        return trialRepository.findById(trialId)
+                .map(t -> t.getExtid())
+                .orElse(null);
+    }
 
     Location toDomain(RequestLocationCreate request) {
         return Location.builder()
-                .trialId(request.getTrialId())
+                .trialId(resolveTrialId(request.getTrialExtid()))
                 .facility(request.getFacility())
                 .city(request.getCity())
                 .state(request.getState())
@@ -99,7 +126,7 @@ class LocationConverter {
 
     Location toDomain(RequestLocationUpdate request) {
         return Location.builder()
-                .trialId(request.getTrialId())
+                .trialId(request.getTrialExtid() != null ? resolveTrialId(request.getTrialExtid()) : null)
                 .facility(request.getFacility())
                 .city(request.getCity())
                 .state(request.getState())
@@ -114,7 +141,7 @@ class LocationConverter {
     ResponseLocation toResponse(Location item) {
         return ResponseLocation.builder()
                 .extid(item.getExtid())
-                .trialId(item.getTrialId())
+                .trialExtid(resolveTrialExtid(item.getTrialId()))
                 .facility(item.getFacility())
                 .city(item.getCity())
                 .state(item.getState())
@@ -131,7 +158,7 @@ class LocationConverter {
     }
 
     void validateUpdateRequest(RequestLocationUpdate request) {
-        if (request.getTrialId() == null &&
+        if (request.getTrialExtid() == null &&
                 request.getFacility() == null &&
                 request.getCity() == null &&
                 request.getState() == null &&

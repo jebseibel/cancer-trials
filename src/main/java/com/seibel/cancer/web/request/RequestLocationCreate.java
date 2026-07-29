@@ -1,6 +1,6 @@
 package com.seibel.cancer.web.request;
 
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -11,8 +11,8 @@ import java.math.BigDecimal;
 @Data
 public class RequestLocationCreate extends BaseRequest {
 
-    @NotNull(message = "The trialId is required.")
-    private Long trialId;
+    @NotEmpty(message = "The trialExtid is required.")
+    private String trialExtid;
 
     @Size(max = 255, message = "The facility must be at most 255 characters.")
     private String facility;

@@ -102,6 +102,18 @@ public class InterventionService extends BaseService {
         }
     }
 
+    public List<Intervention> findByTrialId(Long trialId) {
+        requireNonNull(trialId, "trialId");
+        log.info("findByTrialId(): trialId={}", trialId);
+
+        try {
+            return dbService.findByTrialId(trialId);
+        } catch (Exception e) {
+            log.error("Failed to retrieve interventions by trialId: {}", trialId, e);
+            throw new ServiceException("Unable to retrieve interventions", e);
+        }
+    }
+
     public Page<Intervention> findAll(Pageable pageable, ActiveEnum activeEnum) {
         Pageable safe = enforceCapsAndWhitelist(pageable);
         log.info("findAll(pageable): page={}, size={}, sort={}", safe.getPageNumber(), safe.getPageSize(), safe.getSort());

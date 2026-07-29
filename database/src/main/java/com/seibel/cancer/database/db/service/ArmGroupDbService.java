@@ -129,6 +129,10 @@ public class ArmGroupDbService extends BaseDbService {
         return findAndLog(repository.findAllActive(), "findAll");
     }
 
+    public List<ArmGroup> findByTrialId(@NonNull Long trialId) {
+        return findAndLog(repository.findByTrialId(trialId), String.format("trialId (%d)", trialId));
+    }
+
     public Page<ArmGroup> findAll(Pageable pageable) {
         Page<ArmGroupDb> page = repository.findByActive(ActiveEnum.ACTIVE, pageable);
         log.info(getFoundMessageByType("findAll(pageable)", (int) page.getTotalElements()));

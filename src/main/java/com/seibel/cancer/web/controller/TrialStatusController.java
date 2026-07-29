@@ -2,7 +2,10 @@ package com.seibel.cancer.web.controller;
 
 import com.seibel.cancer.common.domain.TrialStatus;
 import com.seibel.cancer.common.enums.ActiveEnum;
+import com.seibel.cancer.common.exceptions.ResourceNotFoundException;
 import com.seibel.cancer.common.exceptions.ValidationException;
+import com.seibel.cancer.database.db.repository.AppUserRepository;
+import com.seibel.cancer.database.db.repository.TrialRepository;
 import com.seibel.cancer.service.TrialStatusService;
 import com.seibel.cancer.web.request.RequestTrialStatusCreate;
 import com.seibel.cancer.web.request.RequestTrialStatusUpdate;
@@ -16,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,7 +34,7 @@ import java.util.List;
 public class TrialStatusController {
 
     private final TrialStatusService trialStatusService;
-    private final TrialStatusConverter converter = new TrialStatusConverter();
+    private final TrialStatusConverter converter;
 
     @GetMapping
     @Operation(summary = "List trial statuses (paginated)")
@@ -39,6 +43,13 @@ public class TrialStatusController {
             @RequestParam(required = false) ActiveEnum active
     ) {
         return trialStatusService.findAll(pageable, active).map(converter::toResponse);
+    }
+
+    @GetMapping("/by-appuser/{appUserExtid}")
+    @Operation(summary = "List all trial statuses for an app user (unpaginated)")
+    public List<ResponseTrialStatus> getByAppUserExtid(@PathVariable String appUserExtid) {
+        Long appUserId = converter.resolveAppUserId(appUserExtid);
+        return converter.toResponse(trialStatusService.findByAppUserId(appUserId));
     }
 
     @GetMapping("/{extid}")
@@ -81,12 +92,39 @@ public class TrialStatusController {
     }
 }
 
+@Component
+@RequiredArgsConstructor
 class TrialStatusConverter {
+
+    private final TrialRepository trialRepository;
+    private final AppUserRepository appUserRepository;
+
+    Long resolveTrialId(String trialExtid) {
+        return trialRepository.findByExtid(trialExtid)
+                .orElseThrow(() -> new ResourceNotFoundException("Trial", trialExtid))
+                .getId();
+    }
+
+    Long resolveAppUserId(String appUserExtid) {
+        return appUserRepository.findByExtid(appUserExtid)
+                .orElseThrow(() -> new ResourceNotFoundException("AppUser", appUserExtid))
+                .getId();
+    }
+
+    private String resolveTrialExtid(Long trialId) {
+        if (trialId == null) return null;
+        return trialRepository.findById(trialId).map(t -> t.getExtid()).orElse(null);
+    }
+
+    private String resolveAppUserExtid(Long appUserId) {
+        if (appUserId == null) return null;
+        return appUserRepository.findById(appUserId).map(u -> u.getExtid()).orElse(null);
+    }
 
     TrialStatus toDomain(RequestTrialStatusCreate request) {
         return TrialStatus.builder()
-                .trialId(request.getTrialId())
-                .appUserId(request.getAppUserId())
+                .trialId(resolveTrialId(request.getTrialExtid()))
+                .appUserId(resolveAppUserId(request.getAppUserExtid()))
                 .status(request.getStatus())
                 .notes(request.getNotes())
                 .statusChangedAt(request.getStatusChangedAt())
@@ -95,8 +133,8 @@ class TrialStatusConverter {
 
     TrialStatus toDomain(RequestTrialStatusUpdate request) {
         return TrialStatus.builder()
-                .trialId(request.getTrialId())
-                .appUserId(request.getAppUserId())
+                .trialId(request.getTrialExtid() != null ? resolveTrialId(request.getTrialExtid()) : null)
+                .appUserId(request.getAppUserExtid() != null ? resolveAppUserId(request.getAppUserExtid()) : null)
                 .status(request.getStatus())
                 .notes(request.getNotes())
                 .statusChangedAt(request.getStatusChangedAt())
@@ -106,8 +144,8 @@ class TrialStatusConverter {
     ResponseTrialStatus toResponse(TrialStatus item) {
         return ResponseTrialStatus.builder()
                 .extid(item.getExtid())
-                .trialId(item.getTrialId())
-                .appUserId(item.getAppUserId())
+                .trialExtid(resolveTrialExtid(item.getTrialId()))
+                .appUserExtid(resolveAppUserExtid(item.getAppUserId()))
                 .status(item.getStatus())
                 .notes(item.getNotes())
                 .statusChangedAt(item.getStatusChangedAt())
@@ -119,8 +157,8 @@ class TrialStatusConverter {
     }
 
     void validateUpdateRequest(RequestTrialStatusUpdate request) {
-        if (request.getTrialId() == null &&
-                request.getAppUserId() == null &&
+        if (request.getTrialExtid() == null &&
+                request.getAppUserExtid() == null &&
                 request.getStatus() == null &&
                 request.getNotes() == null &&
                 request.getStatusChangedAt() == null) {

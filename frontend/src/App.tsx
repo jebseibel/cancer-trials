@@ -4,9 +4,9 @@ import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import Customers from './pages/Customers';
-import Purchases from './pages/Purchases';
-import Users from './pages/Users';
+import TrialSearch from './pages/TrialSearch';
+import TrialDetail from './pages/TrialDetail';
+import SavedTrials from './pages/SavedTrials';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -33,9 +33,9 @@ function App() {
                         }
                     >
                         <Route index element={<Dashboard />} />
-                        <Route path="customers" element={<Customers />} />
-                        <Route path="purchases" element={<Purchases />} />
-                        <Route path="users" element={<Users />} />
+                        <Route path="trials" element={<TrialSearch />} />
+                        <Route path="trials/:extid" element={<TrialDetail />} />
+                        <Route path="saved-trials" element={<SavedTrials />} />
                     </Route>
                 </Routes>
             </Router>

@@ -8,7 +8,7 @@ import lombok.EqualsAndHashCode;
 @Data
 public class RequestInterventionUpdate extends BaseRequest {
 
-    private Long trialId;
+    private String trialExtid;
 
     @Size(max = 64, message = "The type must be at most 64 characters.")
     private String type;

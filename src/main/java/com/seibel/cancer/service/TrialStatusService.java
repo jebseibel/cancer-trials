@@ -104,6 +104,18 @@ public class TrialStatusService extends BaseService {
         }
     }
 
+    public List<TrialStatus> findByAppUserId(Long appUserId) {
+        requireNonNull(appUserId, "appUserId");
+        log.info("findByAppUserId(): appUserId={}", appUserId);
+
+        try {
+            return dbService.findByAppUserId(appUserId);
+        } catch (Exception e) {
+            log.error("Failed to retrieve trial statuses by appUserId: {}", appUserId, e);
+            throw new ServiceException("Unable to retrieve trial statuses", e);
+        }
+    }
+
     public Page<TrialStatus> findAll(Pageable pageable, ActiveEnum activeEnum) {
         Pageable safe = enforceCapsAndWhitelist(pageable);
         log.info("findAll(pageable): page={}, size={}, sort={}", safe.getPageNumber(), safe.getPageSize(), safe.getSort());

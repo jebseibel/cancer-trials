@@ -9,8 +9,8 @@ import java.time.LocalDateTime;
 @Builder
 public class ResponseTrialStatus {
     private String extid;
-    private Long trialId;
-    private Long appUserId;
+    private String trialExtid;
+    private String appUserExtid;
     private String status;
     private String notes;
     private LocalDateTime statusChangedAt;

@@ -2,7 +2,9 @@ package com.seibel.cancer.web.controller;
 
 import com.seibel.cancer.common.domain.OverallOfficial;
 import com.seibel.cancer.common.enums.ActiveEnum;
+import com.seibel.cancer.common.exceptions.ResourceNotFoundException;
 import com.seibel.cancer.common.exceptions.ValidationException;
+import com.seibel.cancer.database.db.repository.TrialRepository;
 import com.seibel.cancer.service.OverallOfficialService;
 import com.seibel.cancer.web.request.RequestOverallOfficialCreate;
 import com.seibel.cancer.web.request.RequestOverallOfficialUpdate;
@@ -16,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,7 +33,7 @@ import java.util.List;
 public class OverallOfficialController {
 
     private final OverallOfficialService overallOfficialService;
-    private final OverallOfficialConverter converter = new OverallOfficialConverter();
+    private final OverallOfficialConverter converter;
 
     @GetMapping
     @Operation(summary = "List overallOfficials (paginated)")
@@ -39,6 +42,13 @@ public class OverallOfficialController {
             @RequestParam(required = false) ActiveEnum active
     ) {
         return overallOfficialService.findAll(pageable, active).map(converter::toResponse);
+    }
+
+    @GetMapping("/by-trial/{trialExtid}")
+    @Operation(summary = "List all overallOfficials for a trial (unpaginated)")
+    public List<ResponseOverallOfficial> getByTrialExtid(@PathVariable String trialExtid) {
+        Long trialId = converter.resolveTrialId(trialExtid);
+        return converter.toResponse(overallOfficialService.findByTrialId(trialId));
     }
 
     @GetMapping("/{extid}")
@@ -81,11 +91,28 @@ public class OverallOfficialController {
     }
 }
 
+@Component
+@RequiredArgsConstructor
 class OverallOfficialConverter {
+
+    private final TrialRepository trialRepository;
+
+    Long resolveTrialId(String trialExtid) {
+        return trialRepository.findByExtid(trialExtid)
+                .orElseThrow(() -> new ResourceNotFoundException("Trial", trialExtid))
+                .getId();
+    }
+
+    private String resolveTrialExtid(Long trialId) {
+        if (trialId == null) return null;
+        return trialRepository.findById(trialId)
+                .map(t -> t.getExtid())
+                .orElse(null);
+    }
 
     OverallOfficial toDomain(RequestOverallOfficialCreate request) {
         return OverallOfficial.builder()
-                .trialId(request.getTrialId())
+                .trialId(resolveTrialId(request.getTrialExtid()))
                 .name(request.getName())
                 .affiliation(request.getAffiliation())
                 .role(request.getRole())
@@ -94,7 +121,7 @@ class OverallOfficialConverter {
 
     OverallOfficial toDomain(RequestOverallOfficialUpdate request) {
         return OverallOfficial.builder()
-                .trialId(request.getTrialId())
+                .trialId(request.getTrialExtid() != null ? resolveTrialId(request.getTrialExtid()) : null)
                 .name(request.getName())
                 .affiliation(request.getAffiliation())
                 .role(request.getRole())
@@ -104,7 +131,7 @@ class OverallOfficialConverter {
     ResponseOverallOfficial toResponse(OverallOfficial item) {
         return ResponseOverallOfficial.builder()
                 .extid(item.getExtid())
-                .trialId(item.getTrialId())
+                .trialExtid(resolveTrialExtid(item.getTrialId()))
                 .name(item.getName())
                 .affiliation(item.getAffiliation())
                 .role(item.getRole())
@@ -116,7 +143,7 @@ class OverallOfficialConverter {
     }
 
     void validateUpdateRequest(RequestOverallOfficialUpdate request) {
-        if (request.getTrialId() == null &&
+        if (request.getTrialExtid() == null &&
                 request.getName() == null &&
                 request.getAffiliation() == null &&
                 request.getRole() == null) {

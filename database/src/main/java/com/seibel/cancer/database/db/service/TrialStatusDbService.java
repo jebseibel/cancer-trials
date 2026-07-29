@@ -133,6 +133,10 @@ public class TrialStatusDbService extends BaseDbService {
         return findAndLog(repository.findAllActive(), "findAll");
     }
 
+    public List<TrialStatus> findByAppUserId(@NonNull Long appUserId) {
+        return findAndLog(repository.findByAppUserId(appUserId), String.format("appUserId (%d)", appUserId));
+    }
+
     public Page<TrialStatus> findAll(Pageable pageable) {
         Page<TrialStatusDb> page = repository.findByActive(ActiveEnum.ACTIVE, pageable);
         log.info(getFoundMessageByType("findAll(pageable)", (int) page.getTotalElements()));

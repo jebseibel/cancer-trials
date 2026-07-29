@@ -1,13 +1,18 @@
 import axios from 'axios';
 import type {
-    Company,
-    CompanyRequest,
-    Customer,
-    CustomerRequest,
-    Purchase,
-    PurchaseRequest,
-    User,
-    UserRequest,
+    Trial,
+    TrialRequest,
+    TrialSource,
+    TrialStatus,
+    TrialStatusRequest,
+    AppUser,
+    Location,
+    ArmGroup,
+    Intervention,
+    Outcome,
+    OverallOfficial,
+    Condition,
+    Sponsor,
     LoginRequest,
     RegisterRequest,
     AuthResponse,
@@ -56,37 +61,70 @@ apiClient.interceptors.response.use(
     }
 );
 
+export interface TrialSearchParams {
+    page?: number;
+    size?: number;
+    sort?: string;
+    active?: string;
+}
+
 // API Endpoints
-export const companyApi = {
-    getAll: () => apiClient.get<Company[]>('/company'),
-    getById: (extid: string) => apiClient.get<Company>(`/company/${extid}`),
-    create: (company: CompanyRequest) => apiClient.post<Company>('/company', company),
-    update: (extid: string, company: CompanyRequest) => apiClient.put<Company>(`/company/${extid}`, company),
-    delete: (extid: string) => apiClient.delete(`/company/${extid}`),
+export const trialApi = {
+    getAll: (params?: TrialSearchParams) => apiClient.get<PageResponse<Trial>>('/trial', { params }),
+    getByExtid: (extid: string) => apiClient.get<Trial>(`/trial/${extid}`),
+    create: (trial: TrialRequest) => apiClient.post<Trial>('/trial', trial),
+    update: (extid: string, trial: Partial<TrialRequest>) => apiClient.put<Trial>(`/trial/${extid}`, trial),
+    delete: (extid: string) => apiClient.delete(`/trial/${extid}`),
 };
 
-export const customerApi = {
-    getAll: () => apiClient.get<PageResponse<Customer>>('/customer'),
-    getById: (extid: string) => apiClient.get<Customer>(`/customer/${extid}`),
-    create: (customer: CustomerRequest) => apiClient.post<Customer>('/customer', customer),
-    update: (extid: string, customer: CustomerRequest) => apiClient.put<Customer>(`/customer/${extid}`, customer),
-    delete: (extid: string) => apiClient.delete(`/customer/${extid}`),
+export const trialSourceApi = {
+    getAll: () => apiClient.get<PageResponse<TrialSource>>('/trialsource', { params: { size: 100 } }),
 };
 
-export const purchaseApi = {
-    getAll: () => apiClient.get<PageResponse<Purchase>>('/purchase'),
-    getById: (extid: string) => apiClient.get<Purchase>(`/purchase/${extid}`),
-    create: (purchase: PurchaseRequest) => apiClient.post<Purchase>('/purchase', purchase),
-    update: (extid: string, purchase: PurchaseRequest) => apiClient.put<Purchase>(`/purchase/${extid}`, purchase),
-    delete: (extid: string) => apiClient.delete(`/purchase/${extid}`),
+export const trialStatusApi = {
+    getAll: (params?: { page?: number; size?: number }) =>
+        apiClient.get<PageResponse<TrialStatus>>('/trialstatus', { params: { size: 100, ...params } }),
+    getByExtid: (extid: string) => apiClient.get<TrialStatus>(`/trialstatus/${extid}`),
+    getByAppUserExtid: (appUserExtid: string) =>
+        apiClient.get<TrialStatus[]>(`/trialstatus/by-appuser/${appUserExtid}`),
+    create: (status: TrialStatusRequest) => apiClient.post<TrialStatus>('/trialstatus', status),
+    update: (extid: string, status: Partial<TrialStatusRequest>) =>
+        apiClient.put<TrialStatus>(`/trialstatus/${extid}`, status),
+    delete: (extid: string) => apiClient.delete(`/trialstatus/${extid}`),
 };
 
-export const userApi = {
-    getAll: () => apiClient.get<PageResponse<User>>('/user'),
-    getById: (extid: string) => apiClient.get<User>(`/user/${extid}`),
-    create: (user: UserRequest) => apiClient.post<User>('/user', user),
-    update: (extid: string, user: UserRequest) => apiClient.put<User>(`/user/${extid}`, user),
-    delete: (extid: string) => apiClient.delete(`/user/${extid}`),
+export const appUserApi = {
+    getAll: () => apiClient.get<PageResponse<AppUser>>('/appuser', { params: { size: 100 } }),
+};
+
+export const locationApi = {
+    getByTrialExtid: (trialExtid: string) => apiClient.get<Location[]>(`/location/by-trial/${trialExtid}`),
+};
+
+export const armGroupApi = {
+    getByTrialExtid: (trialExtid: string) => apiClient.get<ArmGroup[]>(`/armgroup/by-trial/${trialExtid}`),
+};
+
+export const interventionApi = {
+    getByTrialExtid: (trialExtid: string) =>
+        apiClient.get<Intervention[]>(`/intervention/by-trial/${trialExtid}`),
+};
+
+export const outcomeApi = {
+    getByTrialExtid: (trialExtid: string) => apiClient.get<Outcome[]>(`/outcome/by-trial/${trialExtid}`),
+};
+
+export const overallOfficialApi = {
+    getByTrialExtid: (trialExtid: string) =>
+        apiClient.get<OverallOfficial[]>(`/overallofficial/by-trial/${trialExtid}`),
+};
+
+export const conditionApi = {
+    getAll: () => apiClient.get<PageResponse<Condition>>('/condition', { params: { size: 100 } }),
+};
+
+export const sponsorApi = {
+    getAll: () => apiClient.get<PageResponse<Sponsor>>('/sponsor', { params: { size: 100 } }),
 };
 
 export const authApi = {
@@ -100,4 +138,7 @@ export const authHelpers = {
     getToken: () => localStorage.getItem('token'),
     removeToken: () => localStorage.removeItem('token'),
     isAuthenticated: () => !!localStorage.getItem('token'),
+    saveUsername: (username: string) => localStorage.setItem('username', username),
+    getUsername: () => localStorage.getItem('username'),
+    removeUsername: () => localStorage.removeItem('username'),
 };

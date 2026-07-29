@@ -133,6 +133,10 @@ public class OutcomeDbService extends BaseDbService {
         return findAndLog(repository.findAllActive(), "findAll");
     }
 
+    public List<Outcome> findByTrialId(@NonNull Long trialId) {
+        return findAndLog(repository.findByTrialId(trialId), String.format("trialId (%d)", trialId));
+    }
+
     public Page<Outcome> findAll(Pageable pageable) {
         Page<OutcomeDb> page = repository.findByActive(ActiveEnum.ACTIVE, pageable);
         log.info(getFoundMessageByType("findAll(pageable)", (int) page.getTotalElements()));

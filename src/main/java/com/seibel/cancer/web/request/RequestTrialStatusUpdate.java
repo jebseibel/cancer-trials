@@ -10,9 +10,9 @@ import java.time.LocalDateTime;
 @Data
 public class RequestTrialStatusUpdate extends BaseRequest {
 
-    private Long trialId;
+    private String trialExtid;
 
-    private Long appUserId;
+    private String appUserExtid;
 
     @Size(max = 16, message = "The status must be at most 16 characters.")
     private String status;

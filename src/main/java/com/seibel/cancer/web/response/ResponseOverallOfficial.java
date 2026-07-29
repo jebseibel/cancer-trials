@@ -7,7 +7,7 @@ import lombok.Data;
 @Builder
 public class ResponseOverallOfficial {
     private String extid;
-    private Long trialId;
+    private String trialExtid;
     private String name;
     private String affiliation;
     private String role;

@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 @Builder
 public class ResponseLocation {
     private String extid;
-    private Long trialId;
+    private String trialExtid;
     private String facility;
     private String city;
     private String state;

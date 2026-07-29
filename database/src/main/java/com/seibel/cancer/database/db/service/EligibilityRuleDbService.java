@@ -108,6 +108,10 @@ public class EligibilityRuleDbService extends BaseDbService {
         return findAndLog(repository.findAllActive(), "findAll");
     }
 
+    public List<EligibilityRule> findByTrialId(@NonNull Long trialId) {
+        return findAndLog(repository.findByTrialId(trialId), String.format("trialId (%d)", trialId));
+    }
+
     public Page<EligibilityRule> findAll(Pageable pageable) {
         Page<EligibilityRuleDb> page = repository.findByActive(ActiveEnum.ACTIVE, pageable);
         log.info(getFoundMessageByType("findAll(pageable)", (int) page.getTotalElements()));

@@ -102,6 +102,18 @@ public class EligibilityRuleService extends BaseService {
         }
     }
 
+    public List<EligibilityRule> findByTrialId(Long trialId) {
+        requireNonNull(trialId, "trialId");
+        log.info("findByTrialId(): trialId={}", trialId);
+
+        try {
+            return dbService.findByTrialId(trialId);
+        } catch (Exception e) {
+            log.error("Failed to retrieve eligibilityRules by trialId: {}", trialId, e);
+            throw new ServiceException("Unable to retrieve eligibilityRules", e);
+        }
+    }
+
     public Page<EligibilityRule> findAll(Pageable pageable, ActiveEnum activeEnum) {
         Pageable safe = enforceCapsAndWhitelist(pageable);
         log.info("findAll(pageable): page={}, size={}, sort={}", safe.getPageNumber(), safe.getPageSize(), safe.getSort());
