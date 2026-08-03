@@ -130,7 +130,7 @@ public class OverallOfficialDbService extends BaseDbService {
     }
 
     public List<OverallOfficial> findByTrialId(@NonNull Long trialId) {
-        return findAndLog(repository.findByTrialId(trialId), String.format("trialId (%d)", trialId));
+        return findAndLog(repository.findByTrialIdAndActive(trialId, ActiveEnum.ACTIVE), String.format("trialId (%d)", trialId));
     }
 
     public Page<OverallOfficial> findAll(Pageable pageable) {

@@ -17,6 +17,7 @@ public interface LocationRepository extends JpaRepository<LocationDb, Long> {
     Page<LocationDb> findByActive(ActiveEnum active, Pageable pageable);
     boolean existsByExtid(String extid);
     List<LocationDb> findByTrialId(Long trialId);
+    List<LocationDb> findByTrialIdAndActive(Long trialId, ActiveEnum active);
 
     default List<LocationDb> findAllActive() {
         return findByActive(ActiveEnum.ACTIVE);

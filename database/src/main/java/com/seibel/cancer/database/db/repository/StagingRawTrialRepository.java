@@ -18,6 +18,8 @@ public interface StagingRawTrialRepository extends JpaRepository<StagingRawTrial
     boolean existsByExtid(String extid);
 
     List<StagingRawTrialDb> findBySourceTrialId(String sourceTrialId);
+    Optional<StagingRawTrialDb> findByTrialSourceIdAndSourceTrialId(Long trialSourceId, String sourceTrialId);
+    List<StagingRawTrialDb> findByNormalizedAtIsNullAndActive(ActiveEnum active, Pageable pageable);
 
     default List<StagingRawTrialDb> findAllActive() {
         return findByActive(ActiveEnum.ACTIVE);

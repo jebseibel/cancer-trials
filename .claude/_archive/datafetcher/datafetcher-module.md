@@ -2,428 +2,203 @@
 
 ## What It Is
 
-The **datafetcher** module fetches data from external web sources (HTML pages, APIs) and imports it into the database. Unlike the fileloader module which processes files uploaded INTO the system, datafetcher reaches OUT to external sources to pull data.
-
-## Why
-
-Following separation of concerns:
-- **fileloader** - Handles files coming into the system (uploads, CSV imports)
-- **datafetcher** - Fetches data from external URLs (web scraping, API calls)
-
-This keeps each module focused and allows them to grow independently.
+The **datafetcher** module fetches clinical trial data from external sources and
+normalizes it into the core schema. Its first (and currently only) source is the
+ClinicalTrials.gov v2 REST API. It follows the staging-table-then-normalize pattern
+described in `PROJECT_PLAN.md` (sections 4, 6, 10): fetch raw payloads into a staging
+table first, then a separate normalization step upserts them into the real schema. This
+is the seam a future non-CT.gov source (e.g. a Playwright scraper) would plug into.
 
 ## Module Structure
 
 ```
 datafetcher/
 ├── src/main/java/com/seibel/cancer/datafetcher/
-│   ├── config/
-│   │   ├── DataFetcherProperties.java      # Configuration properties
-│   │   ├── TsNarProperties.java            # NAR configuration properties
-│   │   └── TsMretsProperties.java          # M-RETS configuration properties
-│   ├── importer/
-│   │   ├── AbstractHtmlTableImporter.java  # Base class for HTML scraping
-│   │   ├── GreenEApprovedHtmlImporter.java # Green-e approved facilities
-│   │   ├── GreenEPendingHtmlImporter.java  # Green-e pending facilities
-│   │   ├── TsNarHtmlImporter.java          # NAR HTML importer
-│   │   └── TsMretsApiImporter.java         # M-RETS API importer
-│   └── service/
-│       ├── GreenELoadingService.java       # Orchestration service
-│       ├── TsNarLoadingService.java        # NAR loading service
-│       └── TsMretsLoadingService.java      # M-RETS loading service
-├── src/test/java/com/seibel/cancer/datafetcher/
-│   ├── importer/
-│   │   ├── GreenEApprovedHtmlImporterTest.java
-│   │   └── GreenEPendingHtmlImporterTest.java
-│   └── service/
-│       └── GreenELoadingServiceTest.java
+│   ├── clinicaltrials/
+│   │   ├── ClinicalTrialsGovClient.java       REST client for GET /studies (paged)
+│   │   └── ClinicalTrialsGovIngestJob.java    fetch -> write StagingRawTrial rows
+│   └── normalization/
+│       ├── TrialSourceParser.java             interface: raw payload -> NormalizedTrial
+│       ├── ClinicalTrialsGovParser.java        implements TrialSourceParser for CT.gov's JSON
+│       ├── NormalizedTrial.java                bundles Trial + child records + condition/sponsor names
+│       ├── TrialNormalizationService.java      reads pending staging rows, loops, collects results
+│       └── TrialRowNormalizer.java             normalizes ONE row in its own transaction
+├── src/test/java/com/seibel/cancer/datafetcher/normalization/
+│   ├── ClinicalTrialsGovParserTest.java        fixture-based parser test
+│   └── TrialRowNormalizerTest.java             mocked-DbService normalizer test
 └── build.gradle
 ```
 
-## What It Does
-
-### 1. HTML Table Scraping
-
-**AbstractHtmlTableImporter** provides base functionality for scraping HTML tables:
-
-**Features:**
-- Fetches HTML from URL using Jsoup
-- Parses tables by CSS selector
-- Extracts headers automatically
-- Maps rows to domain entities
-- Row filtering (e.g., by status)
-- Error tracking per row
-- Batch saves to database
-
-**Abstract Methods to Implement:**
-```java
-protected abstract String getTableSelector();      // CSS selector for table
-protected abstract String getTableName();          // Table name for logging/identification
-protected abstract T mapRow(Map<String, String> rowData, String version);
-```
-
-**Optional Override:**
-```java
-protected boolean shouldImportRow(Map<String, String> rowData) {
-    // Return false to skip rows (default: import all)
-}
-```
-
-### 2. Green-e CRS Data Import
-
-Imports CRS Listed Facilities from https://www.green-e.org/sfdc/reports-data.php
-
-**Two importers handle the same HTML table:**
-
-| Importer | Filter | Target Load Table |
-|----------|--------|------------------|
-| `GreenEApprovedHtmlImporter` | Status = "Approved" | `crs_approved_load` |
-| `GreenEPendingHtmlImporter` | Status = "Pending" | `crs_pending_load` |
-
-**Two-Phase Process:**
-- **Phase 1:** Importers write to load tables (`crs_approved_load`, `crs_pending_load`)
-- **Phase 2:** `GreenELoadingService.processLoadedData()` clears main tables then transfers from load tables to `crs_approved` / `crs_pending` in batches
-
-**HTML Table Columns (15 fields):**
-- Name of Generation Facility
-- Tracking System
-- Tracking System ID Number
-- Status
-- Effective Date / Expiration Date
-- Renewable Resource Type
-- Facility State
-- EIA or QF
-- Facility ID Number
-- Nameplate Capacity (MW)
-- First Operational
-- Repowering Date
-- End Date of Extended Use
-- Oregon Obligated LSE HB2021
-
-### 3. Service Orchestration
-
-**GreenELoadingService** coordinates both importers with a two-phase process:
-
-- **Phase 1:** Deletes existing load data, then runs both importers to populate `crs_approved_load` and `crs_pending_load`
-- **Phase 2:** Calls `processLoadedData()` which clears the main tables and transfers records from load tables to `crs_approved` / `crs_pending` in batches, then flags duplicate uniqueIds
-
-**GreenELoadResult** provides:
-- `getApprovedCount()` / `getPendingCount()`
-- `getTotalImported()`
-- `getTotalErrors()` / `getAllErrors()`
-- `getSummary()` - Human-readable summary
-
-## Architecture
+## Data Flow
 
 ```
-┌─────────────────────────────────────────┐
-│  REST API / Scheduler                   │
-│  (FacilityReconService, GreenEImportScheduler)│
-└────────────────┬────────────────────────┘
-                 │
-┌────────────────▼────────────────────────┐
-│  GreenELoadingService                   │
-│  (orchestration)                        │
-└────────────────┬────────────────────────┘
-                 │
-        ┌────────┴────────┐
-        │                 │
-┌───────▼──────┐  ┌──────▼───────────────┐
-│ GreenE       │  │ GreenE               │
-│ Approved     │  │ Pending              │
-│ Importer     │  │ Importer             │
-└───────┬──────┘  └──────┬───────────────┘
-        │                │
-        └────────┬───────┘
-                 │
-┌────────────────▼────────────────────────┐
-│  AbstractHtmlTableImporter              │
-│  (Jsoup fetch + parse)                  │
-└────────────────┬────────────────────────┘
-                 │
-┌────────────────▼────────────────────────┐
-│  Database Module                        │
-│  (CrsApprovedLoadDbService,             │
-│   CrsPendingLoadDbService)              │
-└────────────────┬────────────────────────┘
-                 │ Phase 1: write to load tables
-┌────────────────▼────────────────────────┐
-│  MySQL Database                         │
-│  (crs_approved_load, crs_pending_load)  │
-└────────────────┬────────────────────────┘
-                 │ Phase 2: transfer to main tables
-┌────────────────▼────────────────────────┐
-│  MySQL Database                         │
-│  (crs_approved, crs_pending tables)     │
-└─────────────────────────────────────────┘
+POST /api/ingestion/clinicaltrials  (root module, IngestionController)
+        │  { condition, term, location, maxStudies }
+        ▼
+ClinicalTrialsGovIngestJob.run(...)
+        │  ClinicalTrialsGovClient pages GET /studies (pageSize 100, cursor pageToken)
+        │  until maxStudies reached or CT.gov has no more results
+        ▼
+StagingRawTrialDbService.create(...)   — one row per study, raw JSON preserved verbatim,
+                                          normalizedAt left null (pending)
+        ▼
+TrialNormalizationService.normalizePending(maxRows)
+        │  StagingRawTrialDbService.findPending(maxRows)
+        ▼
+TrialRowNormalizer.normalize(staging)   — per row, own @Transactional
+        │  1. Resolve TrialSource by staging.trialSourceId, pick matching TrialSourceParser
+        │  2. ClinicalTrialsGovParser.parse(rawPayload) -> NormalizedTrial
+        │  3. Upsert Trial by nctId (TrialDbService.findByNctId -> update or create)
+        │  4. If trial already existed: delete-and-reinsert all children
+        │     (Location, ArmGroup, Intervention, Outcome, OverallOfficial)
+        │  5. Insert fresh children from NormalizedTrial
+        │  6. Dedup-upsert Condition / Sponsor by name (lookup tables only, not yet
+        │     linked to the trial — join tables don't exist yet, see CURRENT_STATE.md)
+        │  7. Mark staging row normalizedAt = now(), or leave null + write
+        │     normalizationError on failure (so it's retried on the next run)
+        ▼
+IngestionController combines both results into ResponseIngestionResult
+(studiesFetched, stagingRowsWritten, pendingRowsProcessed, trialsNormalized, errors)
 ```
+
+`TrialNormalizationService` just loops and collects results; `TrialRowNormalizer` (package-private)
+does the actual per-row work inside `@Transactional`. They're split into two classes because a
+self-invoked `@Transactional` method (i.e. one method on the same bean calling another) bypasses
+Spring's transactional proxy entirely and would be silently non-transactional — splitting into a
+separate bean forces the proxy to apply.
+
+## Trigger
+
+**On-demand only**, via `POST /api/ingestion/clinicaltrials` (root module,
+`IngestionController`) — no `@Scheduled` job. Request body
+(`RequestClinicalTrialsIngest`): `condition` (→ `query.cond`), `term` (→ `query.term`),
+`location` (→ `query.locn`), `maxStudies` (default 50, min 1, max 500). Frontend trigger:
+`frontend/src/pages/Ingestion.tsx` (route `/ingestion`) calls this endpoint and shows the
+result counts/errors.
+
+**`maxStudies` is the actual cap on a single call** — it is not a hard limit in the
+client. `ClinicalTrialsGovClient.searchStudies` pages in batches of 100 (`PAGE_SIZE`)
+via the cursor-based `pageToken`, and keeps paging until either `maxStudies` is reached
+or CT.gov runs out of results (`nextPageToken` missing). A default-50 pull only returns
+50 because that's what was requested — raising `maxStudies` (up to the DTO's 500 max)
+pulls more in one call; pulling more than 500 in one shot means either raising that
+`@Max` or calling the endpoint multiple times.
+
+`normalizePending`'s `maxRows` is currently passed the same `maxStudies` value from the
+controller — it processes at most that many *pending* staging rows per call, which is
+usually fine since ingest and normalize run back-to-back synchronously in the same
+request, but if staging ever gets ahead of normalization (e.g. a call fails partway),
+pending rows beyond that count wait for the next call.
+
+## Dedup / Re-ingestion Behavior
+
+- **Trials** dedup by `Trial.nctId` — re-running the same search updates existing trials
+  in place (extid preserved) rather than duplicating them.
+- **Children** (Location, ArmGroup, Intervention, Outcome, OverallOfficial) use
+  delete-and-reinsert, not diff-and-merge: on re-normalization of an existing trial, all
+  existing child rows for that trial are deleted and replaced fresh from the new
+  payload. Simple, avoids diffing, but means any manual edits to a child row would be
+  lost on re-ingestion (none are exposed for manual edit today).
+- **Condition / Sponsor** dedup by name (`findByName` then create-if-absent) — these are
+  lookup tables only; nothing links them to a trial yet (see "Known gaps" below).
+- **Staging rows** also dedup, by `(trial_source_id, source_trial_id)` — enforced with a
+  DB-level unique constraint (`uq_staging_raw_trial_source` in
+  `010-staging-raw-trial.yaml`). `ClinicalTrialsGovIngestJob.run()` checks for an
+  existing row before staging each study: a pending (unnormalized) duplicate is skipped;
+  an already-normalized one is refreshed in place (new payload, `normalizedAt`/
+  `normalizationError` cleared so it's re-processed) instead of inserted as a new row.
+
+## Known Gaps
+
+- **Condition/Sponsor linkage.** The join tables (`trial_condition`, `trial_sponsor`,
+  `trial_phase`, `trial_std_age`, `trial_keyword`) don't exist yet. The normalizer
+  populates the standalone `Condition`/`Sponsor` lookup tables so the data isn't lost,
+  but nothing associates them with the trial they came from. See `CURRENT_STATE.md`.
+- **EligibilityRule is not populated.** Only raw narrative text lands in
+  `trial.eligibility_criteria`; parsing into the structured rule tree is manual, by
+  design, per `_archive/database/clinical-trials-tables.md`.
+- **No rate-limit/backoff logic.** CT.gov has no documented hard limit; the client pages
+  conservatively (100/page) but does not back off or retry on failure.
+- **Not yet pulling the full available result set.** Verified working end-to-end for a
+  50-study pull; CT.gov has thousands of matching studies for real conditions. Next step
+  is deciding how to pull the full set (raise `maxStudies` per call vs. multiple calls
+  vs. raising the `@Max(500)` cap) — see Suggested next steps in `CURRENT_STATE.md`.
 
 ## Dependencies
 
 ### Internal Modules
 ```gradle
-implementation project(':common')   // Shared DTOs, ImportResult, ImportError
-implementation project(':database') // DB services for persistence
+implementation project(':common')   // Trial, StagingRawTrial, TrialSource, etc. domain objects
+implementation project(':database') // *DbService classes, called directly (see below)
 ```
 
 ### External Libraries
 ```gradle
-// Spring Framework
 implementation 'org.springframework.boot:spring-boot-starter'
 implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 implementation 'org.springframework.boot:spring-boot-starter-validation'
-
-// Web Scraping
-implementation 'org.jsoup:jsoup:1.18.1'
-
-// Utilities
+implementation 'org.springframework.boot:spring-boot-starter-web'   // RestClient for the CT.gov HTTP calls
+implementation 'org.jsoup:jsoup:1.18.1'                              // unused by CT.gov ingestion; reserved for a future HTML-scraping source
 implementation 'org.apache.commons:commons-lang3:3.17.0'
-
-// Development
-compileOnly 'org.projectlombok:lombok:1.18.34'
 ```
 
-## Configuration
+## Architectural Note: Why `datafetcher` Bypasses Root's Service Layer
 
-**DataFetcherProperties** (`application.yaml`):
-
-```yaml
-cancer:
-  datafetcher:
-    green-e:
-      approved-enabled: true
-      approved-url: https://www.green-e.org/sfdc/reports-data.php
-      pending-enabled: true
-      pending-url: https://www.green-e.org/sfdc/reports-data.php
-      schedule-enabled: true
-      schedule-cron: "0 0 6 * * *"  # Daily at 6 AM
-```
-
-**Note:** Both URLs point to the same page currently. If Green-e splits into separate pages later, just update the URLs - no code changes needed.
-
-## Trigger Mechanisms
-
-### 1. REST Endpoint (On-Demand)
-
-The green-e load is triggered via the facility sync endpoint (`FacilityReconService`). `ImportController.java` has been removed.
-
-The green-e load runs as part of: `POST /api/facility-recon/sync` or `POST /api/facility-recon/recon`
-
-### 2. Scheduled Job (Automatic)
-
-Located in main app: `src/main/java/com/seibel/cancer/scheduler/GreenEImportScheduler.java`
-
-```java
-@Scheduled(cron = "${cancer.datafetcher.green-e.schedule-cron:0 0 6 * * *}")
-public void scheduledGreenELoad() {
-    greenELoadingService.loadGreenEData();
-}
-```
-
-Default: Daily at 6 AM
-
-## Data Import Flow
-
-```
-1. Fetch HTML from URL (Jsoup)
-        ↓
-2. Parse table by CSS selector ("table#myTable")
-        ↓
-3. Extract headers from <thead> or first <tr>
-        ↓
-4. For each data row:
-    a. Build Map<String, String> of header → cell value
-    b. Check shouldImportRow() filter
-    c. Call mapRow() to create entity
-    d. Apply standard fields (version, status)
-    e. Save via dbService.create()
-    f. Database generates unique_id automatically
-        ↓
-5. Return ImportResult with successful + errors
-```
-
-## Version and Status Tracking
-
-**Version Format:** `YYYY-MM-DD-HH-MM` (e.g., `2025-11-20-06-00`)
-
-**Status Values** (in `import_status_type` table):
-
-| Code | Name | Description |
-|------|------|-------------|
-| NEW | New | Newly imported, awaiting processing |
-| PRC | Processed | Processed by business logic |
-| SUP | Superseded | Replaced by newer import |
-
-**Lifecycle:**
-```
-Import runs → records created with status = NEW
-                    ↓
-(Future) Business logic processes → status = PROCESSED
-                    ↓
-(Future) New import arrives → old records → status = SUPERSEDED
-```
-
-**Unique ID:**
-
-The `unique_id` field is a MySQL generated column, automatically computed as:
-```sql
-CONCAT(tracking_system, ' ', tracking_system_id)
-```
-
-**Examples:** `MRETS 123456`, `WREGIS ABC-789`, `ERCOT TX-001`
-
-This ensures consistency between:
-- Data loaded via Liquibase CSV on startup
-- Data fetched via datafetcher at runtime
-
-The importer code does NOT set `unique_id` - the database generates it automatically.
-
-## Adding a New HTML Importer
-
-### Step 1: Create the Importer
-
-```java
-@Component
-public class NewSourceHtmlImporter extends AbstractHtmlTableImporter<MyEntity> {
-
-    public NewSourceHtmlImporter(MyEntityDbService dbService) {
-        super(dbService);
-    }
-
-    @Override
-    protected String getTableSelector() {
-        return "table.data-table";  // CSS selector
-    }
-
-    @Override
-    protected String getTableName() {
-        return "my_entity";
-    }
-
-    @Override
-    protected boolean shouldImportRow(Map<String, String> rowData) {
-        // Optional: filter rows
-        return true;
-    }
-
-    @Override
-    protected MyEntity mapRow(Map<String, String> rowData, String version) {
-        return MyEntity.builder()
-            .field1(rowData.get("Column Header 1"))
-            .field2(rowData.get("Column Header 2"))
-            .version(version)
-            .build();
-    }
-}
-```
-
-### Step 2: Create Service (if orchestrating multiple importers)
-
-```java
-@Service
-public class NewSourceLoadingService {
-    private final NewSourceHtmlImporter importer;
-
-    public ImportResult<MyEntity> loadData() {
-        String version = LocalDateTime.now().format(VERSION_FORMATTER);
-        return importer.importFromUrl("https://example.com/data", version);
-    }
-}
-```
-
-### Step 3: Add Configuration
-
-```java
-@Data
-@ConfigurationProperties(prefix = "cancer.datafetcher.new-source")
-public class NewSourceProperties {
-    private String url;
-    private boolean enabled = true;
-}
-```
-
-### Step 4: Add REST Endpoint / Scheduler (in main app)
+`datafetcher` depends on `:common`/`:database` only; the root module depends on
+`datafetcher`. Root's `TrialService`/`ConditionService`/`SponsorService` (in
+`com.seibel.cancer.service`) live in the root module, so `datafetcher` calling into them
+would be a circular dependency. Resolution: `TrialNormalizationService`/
+`TrialRowNormalizer` call `:database`'s `*DbService` classes
+(`TrialDbService`, `ConditionDbService`, `SponsorDbService`, etc.) directly, bypassing
+root's REST-facing Service layer entirely for ingestion. Root's Service-layer
+upsert/dedup methods added alongside this feature are harmless but unused by ingestion —
+they only serve the REST API's own CRUD endpoints.
 
 ## Testing
 
 ```bash
-# Run all datafetcher tests
 ./gradlew :datafetcher:test
-
-# Run specific test
-./gradlew :datafetcher:test --tests "*GreenEApprovedHtmlImporterTest"
+./gradlew :datafetcher:test --tests "*ClinicalTrialsGovParserTest"
+./gradlew :datafetcher:test --tests "*TrialRowNormalizerTest"
 ```
 
-**Test Types:**
-- **Unit Tests** - HTML parsing with sample HTML fixtures
-- **Service Tests** - Orchestration logic with mocked importers
-- **Integration Tests** - REST endpoint response format (in main app)
-
-## Key Features
-
-- **Jsoup Integration** - Robust HTML parsing and scraping
-- **CSS Selectors** - Flexible table selection
-- **Row Filtering** - Import only matching rows
-- **Error Tracking** - Per-row error collection with ImportResult
-- **Version Tracking** - Each import gets a unique version
-- **Status Lifecycle** - NEW → PROCESSED → SUPERSEDED
-- **Configurable URLs** - Change sources without code changes
-- **Dual Triggers** - REST endpoint + scheduled job
-- **Extensible** - Easy to add new HTML importers
-
-## DataFetcher vs FileLoader
-
-| Aspect | FileLoader | DataFetcher |
-|--------|------------|-------------|
-| **Direction** | Files coming IN | Fetches from external URLs |
-| **Input** | CSV, PDF, ZIP uploads | HTML pages, APIs |
-| **Parser** | Apache Commons CSV | Jsoup HTML parser |
-| **Trigger** | User upload | Scheduled / on-demand |
-| **Base Class** | `AbstractCsvImporter` | `AbstractHtmlTableImporter` |
-
-Both modules:
-- Use `ImportResult` / `ImportError` from common module
-- Save via database module services
-- Support version tracking
-- Return detailed error information
+- **`ClinicalTrialsGovParserTest`** — fixture-based (`src/test/resources/sample-clinicaltrials-study.json`),
+  asserts a captured-shape CT.gov payload parses into the expected `NormalizedTrial` fields.
+- **`TrialRowNormalizerTest`** — mocks the `*DbService` collaborators, covers the
+  new-trial-vs-existing-trial branch and the delete-and-reinsert-children behavior.
+- No live-network test against the real CT.gov API in the automated suite — verified
+  manually instead (a 50-study pull has been run successfully; see Known Gaps above for
+  what's still outstanding at larger volumes).
 
 ## Module Type
 
-**java-library** - Plain library module
-- Used by main app for REST endpoints and scheduling
-- No main class or embedded server
-- Components discovered via Spring scanning
+**java-library** — plain library module, no main class or embedded server. Components
+discovered via Spring scanning when the root app starts (root depends on `datafetcher`
+via `implementation project(':datafetcher')`).
 
 ## Integration with Other Modules
 
-### Used By:
-- **Root (main application)** - REST endpoints, scheduler
+### Used By
+- **Root module** — `IngestionController` (`POST /api/ingestion/clinicaltrials`)
 
-### Uses:
-- **:common** - ImportResult, ImportError, domain classes
-- **:database** - CrsApprovedDbService, CrsPendingDbService
-
-## Build Status
-
-- **BUILD SUCCESSFUL** - All classes compile
-- **Tests passing** - 15 tests (unit + integration)
-- **Module integrated** - Added to settings.gradle
-- **Ready to use** - Production-ready
-
-## Planned Direction
-
-This module is planned to expand beyond Green-e to handle all external data fetching:
-
-**Current:**
-- Green-e CRS Listed Facilities (Approved + Pending)
-
-**Planned:**
-- EIA data (Generator Operable, Generator Proposed, Plant, Utility)
-- Tracking Systems (ERCOT, M-RETS, WREGIS, MIRECS, NAR, NC-RETS, NE Pool GIS, NYGATS, PJM-GATS)
-- FacilityOutput data
-
-This will replace the CSV importers currently in the `fileloader` module, pulling data directly from external sources rather than requiring manual CSV uploads.
+### Uses
+- **`:common`** — `Trial`, `StagingRawTrial`, `TrialSource`, `Location`, `ArmGroup`,
+  `Intervention`, `Outcome`, `OverallOfficial`, `Condition` domain objects
+- **`:database`** — `*DbService` classes, called directly (see architectural note above)
 
 ## Related Documentation
 
-- **Design Doc:** `.claude/green-e-loading-design.md` - Detailed design decisions and implementation history for Green-e loading feature
+- `PROJECT_PLAN.md` — sections 4 (CT.gov API), 6 (package layout), 10 (phased roadmap)
+- `.claude/INGESTION_PLAN.md` — the original build plan for this feature, with the
+  verification checklist
+- `.claude/CURRENT_STATE.md` — current overall project status, including join-table gaps
+- `_archive/database/clinical-trials-tables.md` — schema design + CT.gov field-mapping reference
+
+## History
+
+This module previously handled Green-e CRS facility HTML scraping and other
+energy-tracking data sources, from this project's earlier life as an energy-data
+tracking app (before the pivot to clinical trials). That code and its design docs
+(`green-e-loading-design.md`, `crs-facility-sync.md`, `crs-sync-design.md`) have been
+removed; `jsoup` remains a dependency, unused today, reserved for a possible future
+HTML-scraping source under the same `TrialSourceParser` seam.

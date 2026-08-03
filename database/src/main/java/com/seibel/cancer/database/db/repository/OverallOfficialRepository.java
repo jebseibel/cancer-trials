@@ -17,6 +17,7 @@ public interface OverallOfficialRepository extends JpaRepository<OverallOfficial
     Page<OverallOfficialDb> findByActive(ActiveEnum active, Pageable pageable);
     boolean existsByExtid(String extid);
     List<OverallOfficialDb> findByTrialId(Long trialId);
+    List<OverallOfficialDb> findByTrialIdAndActive(Long trialId, ActiveEnum active);
 
     default List<OverallOfficialDb> findAllActive() {
         return findByActive(ActiveEnum.ACTIVE);

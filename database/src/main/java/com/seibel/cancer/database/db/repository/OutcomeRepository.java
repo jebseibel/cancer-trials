@@ -17,6 +17,7 @@ public interface OutcomeRepository extends JpaRepository<OutcomeDb, Long> {
     Page<OutcomeDb> findByActive(ActiveEnum active, Pageable pageable);
     boolean existsByExtid(String extid);
     List<OutcomeDb> findByTrialId(Long trialId);
+    List<OutcomeDb> findByTrialIdAndActive(Long trialId, ActiveEnum active);
 
     default List<OutcomeDb> findAllActive() {
         return findByActive(ActiveEnum.ACTIVE);

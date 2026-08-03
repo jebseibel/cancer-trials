@@ -130,7 +130,7 @@ public class ArmGroupDbService extends BaseDbService {
     }
 
     public List<ArmGroup> findByTrialId(@NonNull Long trialId) {
-        return findAndLog(repository.findByTrialId(trialId), String.format("trialId (%d)", trialId));
+        return findAndLog(repository.findByTrialIdAndActive(trialId, ActiveEnum.ACTIVE), String.format("trialId (%d)", trialId));
     }
 
     public Page<ArmGroup> findAll(Pageable pageable) {

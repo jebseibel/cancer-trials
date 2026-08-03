@@ -9,6 +9,7 @@ import com.seibel.cancer.common.exceptions.ServiceException;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
@@ -131,8 +132,42 @@ public class StagingRawTrialDbService extends BaseDbService {
         return mapper.toModel(record);
     }
 
+    public StagingRawTrial refreshForRenormalization(@NonNull String extid, @NonNull String rawPayload,
+                                                      @NonNull LocalDateTime fetchedAt) {
+        StagingRawTrialDb record = repository.findByExtid(extid)
+                .orElseThrow(() -> new ServiceException(getFoundFailureMessage(extid)));
+
+        try {
+            record.setRawPayload(rawPayload);
+            record.setFetchedAt(fetchedAt);
+            record.setNormalizedAt(null);
+            record.setNormalizationError(null);
+            record.setUpdatedAt(LocalDateTime.now());
+
+            StagingRawTrialDb saved = repository.save(record);
+            log.info(getUpdatedMessage(extid));
+            return mapper.toModel(saved);
+
+        } catch (Exception e) {
+            handleException("update", extid, e);
+            return null;
+        }
+    }
+
+    public StagingRawTrial findByTrialSourceIdAndSourceTrialId(@NonNull Long trialSourceId, @NonNull String sourceTrialId) {
+        return repository.findByTrialSourceIdAndSourceTrialId(trialSourceId, sourceTrialId)
+                .map(mapper::toModel)
+                .orElse(null);
+    }
+
     public List<StagingRawTrial> findAll() {
         return findAndLog(repository.findAllActive(), "findAll");
+    }
+
+    public List<StagingRawTrial> findPending(int maxRows) {
+        List<StagingRawTrialDb> records = repository.findByNormalizedAtIsNullAndActive(
+                ActiveEnum.ACTIVE, PageRequest.of(0, maxRows));
+        return findAndLog(records, String.format("pending (max %d)", maxRows));
     }
 
     public Page<StagingRawTrial> findAll(Pageable pageable) {

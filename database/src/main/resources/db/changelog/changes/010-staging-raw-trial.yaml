@@ -21,3 +21,8 @@ databaseChangeLog:
               - column: { name: updated_at, type: datetime }
               - column: { name: deleted_at, type: datetime }
               - column: { name: active, type: int, defaultValueNumeric: 1 }
+
+        - addUniqueConstraint:
+            tableName: staging_raw_trial
+            columnNames: trial_source_id, source_trial_id
+            constraintName: uq_staging_raw_trial_source

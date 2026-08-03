@@ -170,6 +170,24 @@ export interface Sponsor {
     orgClass?: string;
 }
 
+// Ingestion (on-demand ClinicalTrials.gov fetch + normalize)
+export interface IngestionRequest {
+    condition?: string;
+    term?: string;
+    location?: string;
+    maxStudies?: number;
+}
+
+export interface IngestionResult {
+    studiesFetched: number;
+    stagingRowsWritten: number;
+    stagingRowsSkipped: number;
+    pendingRowsProcessed: number;
+    trialsNormalized: number;
+    ingestErrors: string[];
+    normalizationErrors: string[];
+}
+
 // Pagination
 export interface PageResponse<T> {
     content: T[];

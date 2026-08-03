@@ -18,6 +18,7 @@ public interface InterventionRepository extends JpaRepository<InterventionDb, Lo
     boolean existsByExtid(String extid);
 
     List<InterventionDb> findByTrialId(Long trialId);
+    List<InterventionDb> findByTrialIdAndActive(Long trialId, ActiveEnum active);
 
     default List<InterventionDb> findAllActive() {
         return findByActive(ActiveEnum.ACTIVE);

@@ -17,6 +17,7 @@ public interface ArmGroupRepository extends JpaRepository<ArmGroupDb, Long> {
     Page<ArmGroupDb> findByActive(ActiveEnum active, Pageable pageable);
     boolean existsByExtid(String extid);
     List<ArmGroupDb> findByTrialId(Long trialId);
+    List<ArmGroupDb> findByTrialIdAndActive(Long trialId, ActiveEnum active);
 
     default List<ArmGroupDb> findAllActive() {
         return findByActive(ActiveEnum.ACTIVE);

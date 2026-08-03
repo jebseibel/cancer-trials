@@ -1,0 +1,76 @@
+{
+  "protocolSection": {
+    "identificationModule": {
+      "nctId": "NCT01234567",
+      "briefTitle": "A Study of Test Drug in Advanced Cancer",
+      "officialTitle": "A Phase 2 Study of Test Drug in Participants With Advanced Solid Tumors"
+    },
+    "statusModule": {
+      "overallStatus": "RECRUITING",
+      "startDateStruct": { "date": "2024-01-15" },
+      "primaryCompletionDateStruct": { "date": "2025-06" },
+      "completionDateStruct": { "date": "2025-12-31" },
+      "lastUpdatePostDateStruct": { "date": "2024-03-01" }
+    },
+    "descriptionModule": {
+      "briefSummary": "This study evaluates Test Drug in patients with advanced solid tumors.",
+      "detailedDescription": "A multi-center, open-label study of Test Drug administered on a 28-day cycle."
+    },
+    "designModule": {
+      "studyType": "INTERVENTIONAL",
+      "phases": ["PHASE2"],
+      "enrollmentInfo": { "count": 120, "type": "ESTIMATED" }
+    },
+    "armsInterventionsModule": {
+      "armGroups": [
+        { "label": "Test Drug Arm", "type": "EXPERIMENTAL", "description": "Participants receive Test Drug." }
+      ],
+      "interventions": [
+        { "type": "DRUG", "name": "Test Drug", "description": "Administered orally once daily." }
+      ]
+    },
+    "outcomesModule": {
+      "primaryOutcomes": [
+        { "measure": "Overall Response Rate", "description": "Proportion with confirmed response.", "timeFrame": "12 months" }
+      ],
+      "secondaryOutcomes": [
+        { "measure": "Progression-Free Survival", "description": "Time to progression or death.", "timeFrame": "24 months" }
+      ]
+    },
+    "eligibilityModule": {
+      "eligibilityCriteria": "Inclusion Criteria:\n- Age 18 or older\n- Confirmed advanced solid tumor\n\nExclusion Criteria:\n- Prior treatment with Test Drug",
+      "healthyVolunteers": false,
+      "sex": "ALL",
+      "minimumAge": "18 Years",
+      "maximumAge": "N/A",
+      "stdAges": ["ADULT", "OLDER_ADULT"]
+    },
+    "sponsorCollaboratorsModule": {
+      "leadSponsor": { "name": "Test Pharma Inc.", "class": "INDUSTRY" },
+      "collaborators": [
+        { "name": "Test University", "class": "OTHER" }
+      ]
+    },
+    "contactsLocationsModule": {
+      "locations": [
+        {
+          "facility": "Test Cancer Center",
+          "city": "Denver",
+          "state": "Colorado",
+          "zip": "80202",
+          "country": "United States",
+          "status": "RECRUITING",
+          "geoPoint": { "lat": 39.7392, "lon": -104.9903 }
+        }
+      ],
+      "overallOfficials": [
+        { "name": "Jane Doe, MD", "affiliation": "Test Cancer Center", "role": "PRINCIPAL_INVESTIGATOR" }
+      ]
+    },
+    "conditionsModule": {
+      "conditions": ["Advanced Solid Tumor", "Metastatic Cancer"],
+      "keywords": ["immunotherapy", "targeted therapy"]
+    }
+  },
+  "hasResults": false
+}
