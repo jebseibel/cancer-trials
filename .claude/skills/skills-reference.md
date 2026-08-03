@@ -35,7 +35,7 @@ skill run per target":
 
 **Example: scaffold every remaining entity in one go.**
 
-> "Using `.claude/clinical-trials-tables.md` as the source of table names and the file
+> "Using `../_archive/database/clinical-trials-tables.md` as the source of table names and the file
 > listing at `common/src/main/java/com/seibel/cancer/common/domain/` to see which
 > Domain POJOs already exist, identify every core (non-join) table that has a Domain
 > POJO but has not yet been scaffolded (no matching `{Entity}Db` in
@@ -67,7 +67,7 @@ generate tests — that's `database-restapi-testing`'s job, run as a separate st
 
 **Fan out, one agent per remaining entity:**
 
-> "Using `.claude/clinical-trials-tables.md` as the source of table names and the file
+> "Using `../_archive/database/clinical-trials-tables.md` as the source of table names and the file
 > listing at `common/src/main/java/com/seibel/cancer/common/domain/` to see which
 > Domain POJOs already exist, identify every core (non-join) table that has a Domain
 > POJO but has not yet been scaffolded (no matching `{Entity}Db` in
