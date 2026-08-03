@@ -47,6 +47,7 @@ dependencies {
     // --- Modules ---
     implementation project(':common')
     implementation project(':database')
+    implementation project(':datafetcher')
 
     // --- Spring Boot Starters ---
     implementation 'org.springframework.boot:spring-boot-starter-web'

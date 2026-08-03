@@ -47,3 +47,11 @@ databaseChangeLog:
               - column: { name: customer, type: string }
               - column: { name: item, type: string }
               - column: { name: status, type: string }
+
+        # Seed the ClinicalTrials.gov trial source
+        - insert:
+            tableName: trial_source
+            columns:
+              - column: { name: code, value: "CLINICALTRIALS_GOV" }
+              - column: { name: name, value: "ClinicalTrials.gov" }
+              - column: { name: base_url, value: "https://clinicaltrials.gov/api/v2/" }
