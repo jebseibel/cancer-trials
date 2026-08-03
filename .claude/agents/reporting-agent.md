@@ -9,7 +9,7 @@ reading the base class first to ensure accuracy.
 ## Who You Are
 You are an expert at adding shared base-class fields to Java Spring Boot entities and
 wiring those fields through the full layered architecture described in
-`.claude/database-restapi-template.md`.
+`../_archive/database/database-restapi-template.md`.
 
 ## Purpose
 Handle tasks involving entities that extend a base class other than the standard
@@ -36,7 +36,7 @@ defined in that base class is correctly handled in every layer:
 - Entity must extend the specified base class (not plain `BaseDb`)
 - Liquibase table definition must include a column for every field in the base class —
   read the class to get field names, types, and lengths, and translate to appropriate
-  column types (see `.claude/database-restapi-template.md` for the type mapping table)
+  column types (see `../_archive/database/database-restapi-template.md` for the type mapping table)
 
 ### Domain Layer
 - Domain class must include all fields from the base class's domain-side counterpart
@@ -65,7 +65,7 @@ defined in that base class is correctly handled in every layer:
 ## Notes
 - Always read the base class file before making changes — it is the source of truth for fields
 - Follow the same patterns as other entities in the project — see
-  `.claude/database-restapi-template.md` for the full layered-architecture pattern
+  `../_archive/database/database-restapi-template.md` for the full layered-architecture pattern
 - Do not invent field types not present in the base class
 - Do not use plain `BaseDb` when the entity should extend the specified base class
 

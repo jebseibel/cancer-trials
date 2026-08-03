@@ -49,24 +49,29 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configure(http)) // Enable CORS
+                // TEMPORARY: all endpoint security disabled for local dev - see CURRENT_STATE.md TODO.
+                // Re-enable the commented block below before any deployment.
                 .authorizeHttpRequests(auth -> auth
-                        // Allow React SPA and static resources (no backend auth)
-                        .requestMatchers("/", "/index.html", "/favicon.ico", "/vite.svg").permitAll()
-                        .requestMatchers("/assets/**", "/*.js", "/*.css").permitAll()
-                        .requestMatchers("/css/**", "/js/**", "/images/**").permitAll()
-
-                        // Allow auth endpoints (login/register)
-                        .requestMatchers("/api/auth/**").permitAll()
-
-                        // Protect all other API endpoints (require JWT)
-                        .requestMatchers("/api/**").authenticated()
-
-                        // Swagger (optional)
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-
-                        // Everything else requires authentication
-                        .anyRequest().authenticated()
+                        .anyRequest().permitAll()
                 )
+                // .authorizeHttpRequests(auth -> auth
+                //         // Allow React SPA and static resources (no backend auth)
+                //         .requestMatchers("/", "/index.html", "/favicon.ico", "/vite.svg").permitAll()
+                //         .requestMatchers("/assets/**", "/*.js", "/*.css").permitAll()
+                //         .requestMatchers("/css/**", "/js/**", "/images/**").permitAll()
+                //
+                //         // Allow auth endpoints (login/register)
+                //         .requestMatchers("/api/auth/**").permitAll()
+                //
+                //         // Protect all other API endpoints (require JWT)
+                //         .requestMatchers("/api/**").authenticated()
+                //
+                //         // Swagger (optional)
+                //         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                //
+                //         // Everything else requires authentication
+                //         .anyRequest().authenticated()
+                // )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )

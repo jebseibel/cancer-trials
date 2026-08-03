@@ -45,7 +45,7 @@ If no input directory is specified, process all `.md` files under `.claude/` rec
 If an input directory is provided (e.g., `.claude/_archive/database`), process only the `.md` files in that directory. Do not recurse into subdirectories unless the input path ends with `/**`.
 
 ### Files to NEVER modify
-- `.claude/database-restapi-template.md` — skip entirely, regardless of input (this is the canonical layered-architecture pattern reference; other agents point to it and it must stay stable)
+- `../_archive/database/database-restapi-template.md` — skip entirely, regardless of input (this is the canonical layered-architecture pattern reference; other agents point to it and it must stay stable)
 - All files under `.claude/_archive/hosting/` — skip entirely, regardless of input
 
 ---

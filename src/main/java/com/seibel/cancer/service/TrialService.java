@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Slf4j
@@ -100,6 +101,29 @@ public class TrialService extends BaseService {
             log.error("Failed to retrieve all trials", e);
             throw new ServiceException("Unable to retrieve trials", e);
         }
+    }
+
+    public Optional<Trial> findByNctId(String nctId) {
+        requireNonBlank(nctId, "nctId");
+        log.info("findByNctId(): nctId={}", nctId);
+
+        try {
+            return Optional.ofNullable(dbService.findByNctId(nctId));
+        } catch (Exception e) {
+            log.error("Failed to retrieve trial by nctId: {}", nctId, e);
+            throw new ServiceException("Unable to retrieve trial", e);
+        }
+    }
+
+    @Transactional
+    public Trial upsertByNctId(Trial incoming) {
+        requireNonNull(incoming, "Trial");
+        requireNonBlank(incoming.getNctId(), "nctId");
+        log.info("upsertByNctId(): nctId={}", incoming.getNctId());
+
+        return findByNctId(incoming.getNctId())
+                .map(existing -> update(existing.getExtid(), incoming))
+                .orElseGet(() -> create(incoming));
     }
 
     public Page<Trial> findAll(Pageable pageable, ActiveEnum activeEnum) {

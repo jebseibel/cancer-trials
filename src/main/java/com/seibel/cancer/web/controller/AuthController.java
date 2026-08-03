@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -30,6 +31,7 @@ import java.util.UUID;
 @Validated
 @Tag(name = "Authentication", description = "Authentication endpoints")
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
@@ -75,7 +77,10 @@ public class AuthController {
         UserDb user = new UserDb();
         user.setExtid(UUID.randomUUID().toString());
         user.setUsername(request.getUsername());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        String encodedPassword = passwordEncoder.encode(request.getPassword());
+        // TEMP DEBUG - remove after capturing hash for 02-user.csv seeding
+        log.warn("TEMP DEBUG - bcrypt hash for user '{}': {}", request.getUsername(), encodedPassword);
+        user.setPassword(encodedPassword);
         user.setEmail(request.getEmail());
         user.setRole("USER");
         user.setActive(ActiveEnum.ACTIVE);

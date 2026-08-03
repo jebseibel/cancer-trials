@@ -104,6 +104,17 @@ public class StagingRawTrialService extends BaseService {
         }
     }
 
+    public List<StagingRawTrial> findPending(int maxRows) {
+        log.info("findPending(): maxRows={}", maxRows);
+
+        try {
+            return dbService.findPending(maxRows);
+        } catch (Exception e) {
+            log.error("Failed to retrieve pending stagingRawTrials", e);
+            throw new ServiceException("Unable to retrieve pending stagingRawTrials", e);
+        }
+    }
+
     public Page<StagingRawTrial> findAll(Pageable pageable, ActiveEnum activeEnum) {
         Pageable safe = enforceCapsAndWhitelist(pageable);
         log.info("findAll(pageable): page={}, size={}, sort={}", safe.getPageNumber(), safe.getPageSize(), safe.getSort());

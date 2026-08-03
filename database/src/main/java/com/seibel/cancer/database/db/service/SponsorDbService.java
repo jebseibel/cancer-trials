@@ -121,6 +121,15 @@ public class SponsorDbService extends BaseDbService {
         return mapper.toModel(record);
     }
 
+    public Sponsor findByName(@NonNull String name) {
+        return repository.findByName(name)
+                .map(record -> {
+                    log.info("findByName(): found name={}", name);
+                    return mapper.toModel(record);
+                })
+                .orElse(null);
+    }
+
     public List<Sponsor> findAll() {
         return findAndLog(repository.findAllActive(), "findAll");
     }

@@ -116,6 +116,15 @@ public class TrialDbService extends BaseDbService {
         return mapper.toModel(record);
     }
 
+    public Trial findByNctId(@NonNull String nctId) {
+        return repository.findByNctId(nctId)
+                .map(record -> {
+                    log.info("findByNctId(): found nctId={}", nctId);
+                    return mapper.toModel(record);
+                })
+                .orElse(null);
+    }
+
     public List<Trial> findAll() {
         return findAndLog(repository.findAllActive(), "findAll");
     }

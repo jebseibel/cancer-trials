@@ -41,7 +41,7 @@ export default function Login() {
             <div className="max-w-md w-full space-y-8">
                 <div>
                     <h2 className="text-center text-3xl font-extrabold text-gray-900 mb-2">
-                        Basic Customer System
+                        Tina Cancer Project
                     </h2>
                     <p className="mt-2 text-center text-sm text-gray-600">
                         {isLogin ? 'Sign in to your account' : 'Create a new account'}

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Slf4j
@@ -100,6 +101,27 @@ public class ConditionService extends BaseService {
             log.error("Failed to retrieve all conditions", e);
             throw new ServiceException("Unable to retrieve conditions", e);
         }
+    }
+
+    public Optional<Condition> findByName(String name) {
+        requireNonBlank(name, "name");
+        log.info("findByName(): name={}", name);
+
+        try {
+            return Optional.ofNullable(dbService.findByName(name));
+        } catch (Exception e) {
+            log.error("Failed to retrieve condition by name: {}", name, e);
+            throw new ServiceException("Unable to retrieve condition", e);
+        }
+    }
+
+    @Transactional
+    public Condition findOrCreateByName(String name) {
+        requireNonBlank(name, "name");
+        log.info("findOrCreateByName(): name={}", name);
+
+        return findByName(name)
+                .orElseGet(() -> dbService.create(name));
     }
 
     public Page<Condition> findAll(Pageable pageable, ActiveEnum activeEnum) {

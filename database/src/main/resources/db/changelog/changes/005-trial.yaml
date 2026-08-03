@@ -30,7 +30,7 @@ databaseChangeLog:
               - column: { name: maximum_age, type: varchar(32) }
               - column: { name: eligibility_criteria, type: text }
               - column: { name: is_paid_study, type: tinyint(1) }
-              - column: { name: paid_amount, type: decimal(10,2) }
+              - column: { name: paid_amount, type: "decimal(10,2)" }
               - column: { name: primary_trial_source_id, type: bigint, constraints: { nullable: false } }
               - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
               - column: { name: updated_at, type: datetime }

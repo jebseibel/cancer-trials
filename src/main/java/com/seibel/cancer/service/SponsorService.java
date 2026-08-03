@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Slf4j
@@ -100,6 +101,27 @@ public class SponsorService extends BaseService {
             log.error("Failed to retrieve all sponsors", e);
             throw new ServiceException("Unable to retrieve sponsors", e);
         }
+    }
+
+    public Optional<Sponsor> findByName(String name) {
+        requireNonBlank(name, "name");
+        log.info("findByName(): name={}", name);
+
+        try {
+            return Optional.ofNullable(dbService.findByName(name));
+        } catch (Exception e) {
+            log.error("Failed to retrieve sponsor by name: {}", name, e);
+            throw new ServiceException("Unable to retrieve sponsor", e);
+        }
+    }
+
+    @Transactional
+    public Sponsor findOrCreateByName(String name, String orgClass) {
+        requireNonBlank(name, "name");
+        log.info("findOrCreateByName(): name={}", name);
+
+        return findByName(name)
+                .orElseGet(() -> dbService.create(name, orgClass));
     }
 
     public Page<Sponsor> findAll(Pageable pageable, ActiveEnum activeEnum) {

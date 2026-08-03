@@ -123,6 +123,22 @@ public class TrialSourceDbService extends BaseDbService {
         return mapper.toModel(record);
     }
 
+    public TrialSource findByCode(@NonNull String code) {
+        return repository.findByCode(code)
+                .map(record -> {
+                    log.info("findByCode(): found code={}", code);
+                    return mapper.toModel(record);
+                })
+                .orElse(null);
+    }
+
+    /** For internal callers (e.g. datafetcher) resolving a numeric FK back to a TrialSource. */
+    public TrialSource findById(@NonNull Long id) {
+        return repository.findById(id)
+                .map(mapper::toModel)
+                .orElse(null);
+    }
+
     public List<TrialSource> findAll() {
         return findAndLog(repository.findAllActive(), "findAll");
     }

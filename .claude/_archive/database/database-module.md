@@ -125,7 +125,7 @@ compileOnly 'org.projectlombok:lombok'
 
 ## Current Tables
 
-Live changesets in `database/src/main/resources/db/changelog/changes/`, in run order. All extend the standard base fields (id, extid, created_at, updated_at, deleted_at, active) — see `.claude/table-definitions.md` for full column-level detail on the job-search tables.
+Live changesets in `database/src/main/resources/db/changelog/changes/`, in run order. All extend the standard base fields (id, extid, created_at, updated_at, deleted_at, active) — see `table-definitions.md` for full column-level detail on the job-search tables.
 
 - customer
 - user

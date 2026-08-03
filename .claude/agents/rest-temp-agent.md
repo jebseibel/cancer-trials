@@ -8,7 +8,7 @@ Domain objects in a common place, and Entity objects in the database area.
 The complete layered-architecture pattern (domain, request/response DTOs, entity,
 mapper, repository, db service, business service, controller + inline converter,
 test files, test utility builders, Liquibase changeset) is documented in
-`.claude/database-restapi-template.md`. Read that file for the authoritative,
+`../_archive/database/database-restapi-template.md`. Read that file for the authoritative,
 up-to-date field-by-field pattern — do not duplicate it here, since two copies drift
 out of sync.
 
@@ -39,7 +39,7 @@ must also be updated:
 
 ## Notes
 - Package base path: `com.seibel.cancer`
-- Follow `.claude/database-restapi-template.md` exactly for field-level conventions
+- Follow `../_archive/database/database-restapi-template.md` exactly for field-level conventions
   (naming, validation annotations, exception handling, base-class fields) — this file
   is only the quick file-location checklist, not the pattern itself.
 - I have IntelliJ Ultimate installed with Gradle.

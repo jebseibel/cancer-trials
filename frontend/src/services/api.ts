@@ -17,6 +17,8 @@ import type {
     RegisterRequest,
     AuthResponse,
     PageResponse,
+    IngestionRequest,
+    IngestionResult,
 } from '../types/api';
 
 // API Configuration
@@ -125,6 +127,11 @@ export const conditionApi = {
 
 export const sponsorApi = {
     getAll: () => apiClient.get<PageResponse<Sponsor>>('/sponsor', { params: { size: 100 } }),
+};
+
+export const ingestionApi = {
+    runClinicalTrials: (request: IngestionRequest) =>
+        apiClient.post<IngestionResult>('/ingestion/clinicaltrials', request),
 };
 
 export const authApi = {

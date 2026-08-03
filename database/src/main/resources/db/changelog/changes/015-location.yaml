@@ -18,8 +18,8 @@ databaseChangeLog:
               - column: { name: zip, type: varchar(16) }
               - column: { name: country, type: varchar(128) }
               - column: { name: status, type: varchar(32) }
-              - column: { name: latitude, type: decimal(9,6) }
-              - column: { name: longitude, type: decimal(9,6) }
+              - column: { name: latitude, type: "decimal(9,6)" }
+              - column: { name: longitude, type: "decimal(9,6)" }
               - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
               - column: { name: updated_at, type: datetime }
               - column: { name: deleted_at, type: datetime }
