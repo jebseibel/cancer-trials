@@ -1,7 +1,7 @@
 package com.seibel.cancer.database.db.repository;
 
 import com.seibel.cancer.common.enums.ActiveEnum;
-import com.seibel.cancer.database.db.entity.ConditionDb;
+import com.seibel.cancer.database.db.entity.MedicalConditionDb;
 import com.seibel.cancer.testutils.DomainBuilderDatabase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,11 +34,11 @@ class ConditionRepositoryTest {
     @Test
     void findByExtid_shouldReturnCondition_whenExists() {
         // Arrange
-        ConditionDb condition = DomainBuilderDatabase.getConditionDb();
+        MedicalConditionDb condition = DomainBuilderDatabase.getConditionDb();
         repository.save(condition);
 
         // Act
-        Optional<ConditionDb> result = repository.findByExtid(condition.getExtid());
+        Optional<MedicalConditionDb> result = repository.findByExtid(condition.getExtid());
 
         // Assert
         assertTrue(result.isPresent());
@@ -49,7 +49,7 @@ class ConditionRepositoryTest {
     @Test
     void findByExtid_shouldReturnEmpty_whenNotExists() {
         // Act
-        Optional<ConditionDb> result = repository.findByExtid("nonexistent-extid");
+        Optional<MedicalConditionDb> result = repository.findByExtid("nonexistent-extid");
 
         // Assert
         assertTrue(result.isEmpty());
@@ -58,11 +58,11 @@ class ConditionRepositoryTest {
     @Test
     void findByName_shouldReturnCondition_whenExists() {
         // Arrange
-        ConditionDb condition = DomainBuilderDatabase.getConditionDb();
+        MedicalConditionDb condition = DomainBuilderDatabase.getConditionDb();
         repository.save(condition);
 
         // Act
-        Optional<ConditionDb> result = repository.findByName(condition.getName());
+        Optional<MedicalConditionDb> result = repository.findByName(condition.getName());
 
         // Assert
         assertTrue(result.isPresent());
@@ -72,7 +72,7 @@ class ConditionRepositoryTest {
     @Test
     void findByName_shouldReturnEmpty_whenNotExists() {
         // Act
-        Optional<ConditionDb> result = repository.findByName("nonexistent-name");
+        Optional<MedicalConditionDb> result = repository.findByName("nonexistent-name");
 
         // Assert
         assertTrue(result.isEmpty());
@@ -81,11 +81,11 @@ class ConditionRepositoryTest {
     @Test
     void findByActive_shouldReturnActiveOnly() {
         // Arrange
-        ConditionDb active1 = DomainBuilderDatabase.getConditionDb();
+        MedicalConditionDb active1 = DomainBuilderDatabase.getConditionDb();
         active1.setActive(ActiveEnum.ACTIVE);
-        ConditionDb active2 = DomainBuilderDatabase.getConditionDb();
+        MedicalConditionDb active2 = DomainBuilderDatabase.getConditionDb();
         active2.setActive(ActiveEnum.ACTIVE);
-        ConditionDb inactive = DomainBuilderDatabase.getConditionDb();
+        MedicalConditionDb inactive = DomainBuilderDatabase.getConditionDb();
         inactive.setActive(ActiveEnum.INACTIVE);
 
         repository.save(active1);
@@ -94,7 +94,7 @@ class ConditionRepositoryTest {
 
         // Act
         Pageable pageable = PageRequest.of(0, 10);
-        Page<ConditionDb> result = repository.findByActive(ActiveEnum.ACTIVE, pageable);
+        Page<MedicalConditionDb> result = repository.findByActive(ActiveEnum.ACTIVE, pageable);
 
         // Assert
         assertEquals(2, result.getContent().size());
@@ -104,9 +104,9 @@ class ConditionRepositoryTest {
     @Test
     void findByActive_shouldReturnInactiveOnly() {
         // Arrange
-        ConditionDb active = DomainBuilderDatabase.getConditionDb();
+        MedicalConditionDb active = DomainBuilderDatabase.getConditionDb();
         active.setActive(ActiveEnum.ACTIVE);
-        ConditionDb inactive = DomainBuilderDatabase.getConditionDb();
+        MedicalConditionDb inactive = DomainBuilderDatabase.getConditionDb();
         inactive.setActive(ActiveEnum.INACTIVE);
 
         repository.save(active);
@@ -114,7 +114,7 @@ class ConditionRepositoryTest {
 
         // Act
         Pageable pageable = PageRequest.of(0, 10);
-        Page<ConditionDb> result = repository.findByActive(ActiveEnum.INACTIVE, pageable);
+        Page<MedicalConditionDb> result = repository.findByActive(ActiveEnum.INACTIVE, pageable);
 
         // Assert
         assertEquals(1, result.getContent().size());
@@ -124,7 +124,7 @@ class ConditionRepositoryTest {
     @Test
     void existsByExtid_shouldReturnTrue_whenExists() {
         // Arrange
-        ConditionDb condition = DomainBuilderDatabase.getConditionDb();
+        MedicalConditionDb condition = DomainBuilderDatabase.getConditionDb();
         repository.save(condition);
 
         // Act
@@ -146,10 +146,10 @@ class ConditionRepositoryTest {
     @Test
     void save_shouldPersistCondition() {
         // Arrange
-        ConditionDb condition = DomainBuilderDatabase.getConditionDb();
+        MedicalConditionDb condition = DomainBuilderDatabase.getConditionDb();
 
         // Act
-        ConditionDb saved = repository.save(condition);
+        MedicalConditionDb saved = repository.save(condition);
 
         // Assert
         assertNotNull(saved.getId());
@@ -159,13 +159,13 @@ class ConditionRepositoryTest {
     @Test
     void findAll_shouldReturnAllConditions() {
         // Arrange
-        ConditionDb condition1 = DomainBuilderDatabase.getConditionDb();
-        ConditionDb condition2 = DomainBuilderDatabase.getConditionDb();
+        MedicalConditionDb condition1 = DomainBuilderDatabase.getConditionDb();
+        MedicalConditionDb condition2 = DomainBuilderDatabase.getConditionDb();
         repository.save(condition1);
         repository.save(condition2);
 
         // Act
-        List<ConditionDb> result = (List<ConditionDb>) repository.findAll();
+        List<MedicalConditionDb> result = (List<MedicalConditionDb>) repository.findAll();
 
         // Assert
         assertEquals(2, result.size());
@@ -174,14 +174,14 @@ class ConditionRepositoryTest {
     @Test
     void deleteById_shouldRemoveCondition() {
         // Arrange
-        ConditionDb condition = DomainBuilderDatabase.getConditionDb();
-        ConditionDb saved = repository.save(condition);
+        MedicalConditionDb condition = DomainBuilderDatabase.getConditionDb();
+        MedicalConditionDb saved = repository.save(condition);
 
         // Act
         repository.deleteById(saved.getId());
 
         // Assert
-        Optional<ConditionDb> result = repository.findById(saved.getId());
+        Optional<MedicalConditionDb> result = repository.findById(saved.getId());
         assertTrue(result.isEmpty());
     }
 }

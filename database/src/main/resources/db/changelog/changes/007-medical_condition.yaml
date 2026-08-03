@@ -7,7 +7,7 @@ databaseChangeLog:
 
         # Condition Table
         - createTable:
-            tableName: condition
+            tableName: medical_condition
             columns:
               - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
               - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }

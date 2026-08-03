@@ -20,7 +20,7 @@ import com.seibel.cancer.common.domain.TrialStatus;
 import com.seibel.cancer.common.domain.User;
 import com.seibel.cancer.database.db.entity.AppUserDb;
 import com.seibel.cancer.database.db.entity.ArmGroupDb;
-import com.seibel.cancer.database.db.entity.ConditionDb;
+import com.seibel.cancer.database.db.entity.MedicalConditionDb;
 import com.seibel.cancer.database.db.entity.CustomerDb;
 import com.seibel.cancer.database.db.entity.EligibilityRuleDb;
 import com.seibel.cancer.database.db.entity.InterventionDb;
@@ -207,24 +207,24 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
     // ///////////////////////////////////////////////////////////////////
     // Condition
     public static Condition getCondition() {
-        ConditionDb item = getConditionDb();
+        MedicalConditionDb item = getConditionDb();
         return new ConditionMapper().toModel(item);
     }
 
-    public static Condition getCondition(ConditionDb item) {
+    public static Condition getCondition(MedicalConditionDb item) {
         return new ConditionMapper().toModel(item);
     }
 
-    public static ConditionDb getConditionDb() {
+    public static MedicalConditionDb getConditionDb() {
         return getConditionDb(null, null);
     }
 
-    public static ConditionDb getConditionDb(String name) {
+    public static MedicalConditionDb getConditionDb(String name) {
         return getConditionDb(name, null);
     }
 
-    public static ConditionDb getConditionDb(String name, String extid) {
-        ConditionDb item = new ConditionDb();
+    public static MedicalConditionDb getConditionDb(String name, String extid) {
+        MedicalConditionDb item = new MedicalConditionDb();
         item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
         item.setName(name != null ? name : getNameRandom("Condition_"));
         setBaseSyncFields(item);

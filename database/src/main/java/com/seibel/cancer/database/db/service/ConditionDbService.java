@@ -2,7 +2,7 @@ package com.seibel.cancer.database.db.service;
 
 import com.seibel.cancer.common.domain.Condition;
 import com.seibel.cancer.common.enums.ActiveEnum;
-import com.seibel.cancer.database.db.entity.ConditionDb;
+import com.seibel.cancer.database.db.entity.MedicalConditionDb;
 import com.seibel.cancer.database.db.mapper.ConditionMapper;
 import com.seibel.cancer.database.db.repository.ConditionRepository;
 import com.seibel.cancer.common.exceptions.ServiceException;
@@ -24,7 +24,7 @@ public class ConditionDbService extends BaseDbService {
     private final ConditionMapper mapper;
 
     public ConditionDbService(ConditionRepository repository, ConditionMapper mapper) {
-        super("ConditionDb");
+        super("MedicalConditionDb");
         this.repository = repository;
         this.mapper = mapper;
     }
@@ -35,13 +35,13 @@ public class ConditionDbService extends BaseDbService {
         LocalDateTime now = LocalDateTime.now();
 
         try {
-            ConditionDb record = mapper.toDb(item);
+            MedicalConditionDb record = mapper.toDb(item);
             record.setExtid(extid);
             record.setCreatedAt(now);
             record.setUpdatedAt(now);
             record.setActive(ActiveEnum.ACTIVE);
 
-            ConditionDb saved = repository.save(record);
+            MedicalConditionDb saved = repository.save(record);
             log.info(getCreatedMessage(extid));
             return mapper.toModel(saved);
 
@@ -57,14 +57,14 @@ public class ConditionDbService extends BaseDbService {
         LocalDateTime now = LocalDateTime.now();
 
         try {
-            ConditionDb record = new ConditionDb();
+            MedicalConditionDb record = new MedicalConditionDb();
             record.setExtid(extid);
             record.setName(name);
             record.setCreatedAt(now);
             record.setUpdatedAt(now);
             record.setActive(ActiveEnum.ACTIVE);
 
-            ConditionDb saved = repository.save(record);
+            MedicalConditionDb saved = repository.save(record);
             log.info(getCreatedMessage(extid));
             return mapper.toModel(saved);
 
@@ -76,14 +76,14 @@ public class ConditionDbService extends BaseDbService {
 
     public Condition update(@NonNull String extid, String name) {
 
-        ConditionDb record = repository.findByExtid(extid)
+        MedicalConditionDb record = repository.findByExtid(extid)
                 .orElseThrow(() -> new ServiceException(getFoundFailureMessage(extid)));
 
         try {
             if (name != null) record.setName(name);
             record.setUpdatedAt(LocalDateTime.now());
 
-            ConditionDb saved = repository.save(record);
+            MedicalConditionDb saved = repository.save(record);
             log.info(getUpdatedMessage(extid));
             return mapper.toModel(saved);
 
@@ -95,7 +95,7 @@ public class ConditionDbService extends BaseDbService {
 
     public boolean delete(@NonNull String extid) {
 
-        ConditionDb record = repository.findByExtid(extid)
+        MedicalConditionDb record = repository.findByExtid(extid)
                 .orElseThrow(() -> new ServiceException(getFoundFailureMessage(extid)));
 
         try {
@@ -113,10 +113,19 @@ public class ConditionDbService extends BaseDbService {
     }
 
     public Condition findByExtid(@NonNull String extid) {
-        ConditionDb record = repository.findByExtid(extid)
+        MedicalConditionDb record = repository.findByExtid(extid)
                 .orElseThrow(() -> new ServiceException(getFoundFailureMessage(extid)));
         log.info(getFoundMessage(extid));
         return mapper.toModel(record);
+    }
+
+    public Condition findByName(@NonNull String name) {
+        return repository.findByName(name)
+                .map(record -> {
+                    log.info("findByName(): found name={}", name);
+                    return mapper.toModel(record);
+                })
+                .orElse(null);
     }
 
     public List<Condition> findAll() {
@@ -124,7 +133,7 @@ public class ConditionDbService extends BaseDbService {
     }
 
     public Page<Condition> findAll(Pageable pageable) {
-        Page<ConditionDb> page = repository.findByActive(ActiveEnum.ACTIVE, pageable);
+        Page<MedicalConditionDb> page = repository.findByActive(ActiveEnum.ACTIVE, pageable);
         log.info(getFoundMessageByType("findAll(pageable)", (int) page.getTotalElements()));
         return page.map(mapper::toModel);
     }
@@ -135,12 +144,12 @@ public class ConditionDbService extends BaseDbService {
     }
 
     public Page<Condition> findByActive(@NonNull ActiveEnum activeEnum, Pageable pageable) {
-        Page<ConditionDb> page = repository.findByActive(activeEnum, pageable);
+        Page<MedicalConditionDb> page = repository.findByActive(activeEnum, pageable);
         log.info(getFoundMessageByType(String.format("active (%s) pageable", activeEnum), (int) page.getTotalElements()));
         return page.map(mapper::toModel);
     }
 
-    private List<Condition> findAndLog(List<ConditionDb> records, String type) {
+    private List<Condition> findAndLog(List<MedicalConditionDb> records, String type) {
         log.info(getFoundMessageByType(type, records.size()));
         return mapper.toModelList(records);
     }

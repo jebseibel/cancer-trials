@@ -1,7 +1,7 @@
 package com.seibel.cancer.database.db.mapper;
 
 import com.seibel.cancer.common.domain.Condition;
-import com.seibel.cancer.database.db.entity.ConditionDb;
+import com.seibel.cancer.database.db.entity.MedicalConditionDb;
 import com.seibel.cancer.testutils.DomainBuilderDatabase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,7 +24,7 @@ class ConditionMapperTest {
     @Test
     void toModel_shouldMapAllFields() {
         // Arrange
-        ConditionDb db = DomainBuilderDatabase.getConditionDb();
+        MedicalConditionDb db = DomainBuilderDatabase.getConditionDb();
 
         // Act
         Condition domain = mapper.toModel(db);
@@ -45,7 +45,7 @@ class ConditionMapperTest {
         Condition domain = DomainBuilderDatabase.getCondition();
 
         // Act
-        ConditionDb db = mapper.toDb(domain);
+        MedicalConditionDb db = mapper.toDb(domain);
 
         // Assert
         assertNotNull(db);
@@ -60,9 +60,9 @@ class ConditionMapperTest {
     @Test
     void toModelList_shouldMapAllItems() {
         // Arrange
-        ConditionDb db1 = DomainBuilderDatabase.getConditionDb();
-        ConditionDb db2 = DomainBuilderDatabase.getConditionDb();
-        List<ConditionDb> dbList = Arrays.asList(db1, db2);
+        MedicalConditionDb db1 = DomainBuilderDatabase.getConditionDb();
+        MedicalConditionDb db2 = DomainBuilderDatabase.getConditionDb();
+        List<MedicalConditionDb> dbList = Arrays.asList(db1, db2);
 
         // Act
         List<Condition> domainList = mapper.toModelList(dbList);
@@ -77,7 +77,7 @@ class ConditionMapperTest {
     @Test
     void toModelList_shouldHandleEmptyList() {
         // Arrange
-        List<ConditionDb> dbList = Arrays.asList();
+        List<MedicalConditionDb> dbList = Arrays.asList();
 
         // Act
         List<Condition> domainList = mapper.toModelList(dbList);
@@ -105,7 +105,7 @@ class ConditionMapperTest {
         List<Condition> domainList = Arrays.asList(domain1, domain2);
 
         // Act
-        List<ConditionDb> dbList = mapper.toDbList(domainList);
+        List<MedicalConditionDb> dbList = mapper.toDbList(domainList);
 
         // Assert
         assertNotNull(dbList);
@@ -120,7 +120,7 @@ class ConditionMapperTest {
         List<Condition> domainList = Arrays.asList();
 
         // Act
-        List<ConditionDb> dbList = mapper.toDbList(domainList);
+        List<MedicalConditionDb> dbList = mapper.toDbList(domainList);
 
         // Assert
         assertNotNull(dbList);
@@ -130,7 +130,7 @@ class ConditionMapperTest {
     @Test
     void toDbList_shouldHandleNullList() {
         // Act
-        List<ConditionDb> dbList = mapper.toDbList(null);
+        List<MedicalConditionDb> dbList = mapper.toDbList(null);
 
         // Assert
         assertNotNull(dbList);

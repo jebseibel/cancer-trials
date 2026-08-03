@@ -9,8 +9,8 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 @Entity
-@Table(name = "condition")
-public class ConditionDb extends BaseDb {
+@Table(name = "medical_condition")
+public class MedicalConditionDb extends BaseDb {
 
     private static final long serialVersionUID = 1234567890123456792L;
 

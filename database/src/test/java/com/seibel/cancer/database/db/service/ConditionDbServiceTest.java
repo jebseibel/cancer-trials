@@ -2,7 +2,7 @@ package com.seibel.cancer.database.db.service;
 
 import com.seibel.cancer.common.domain.Condition;
 import com.seibel.cancer.common.enums.ActiveEnum;
-import com.seibel.cancer.database.db.entity.ConditionDb;
+import com.seibel.cancer.database.db.entity.MedicalConditionDb;
 import com.seibel.cancer.common.exceptions.ServiceException;
 import com.seibel.cancer.database.db.mapper.ConditionMapper;
 import com.seibel.cancer.database.db.repository.ConditionRepository;
@@ -38,10 +38,10 @@ class ConditionDbServiceTest {
     void create_shouldGenerateUuidAndSetFields() {
         // Arrange
         String name = "Test Condition";
-        ConditionDb savedDb = DomainBuilderDatabase.getConditionDb(name, null);
+        MedicalConditionDb savedDb = DomainBuilderDatabase.getConditionDb(name, null);
         Condition expectedDomain = DomainBuilderDatabase.getCondition(savedDb);
 
-        when(repository.save(any(ConditionDb.class))).thenReturn(savedDb);
+        when(repository.save(any(MedicalConditionDb.class))).thenReturn(savedDb);
         when(mapper.toModel(savedDb)).thenReturn(expectedDomain);
 
         // Act
@@ -49,10 +49,10 @@ class ConditionDbServiceTest {
 
         // Assert
         assertNotNull(result);
-        ArgumentCaptor<ConditionDb> captor = ArgumentCaptor.forClass(ConditionDb.class);
+        ArgumentCaptor<MedicalConditionDb> captor = ArgumentCaptor.forClass(MedicalConditionDb.class);
         verify(repository).save(captor.capture());
 
-        ConditionDb captured = captor.getValue();
+        MedicalConditionDb captured = captor.getValue();
         assertNotNull(captured.getExtid());
         assertEquals(name, captured.getName());
         assertEquals(ActiveEnum.ACTIVE, captured.getActive());
@@ -64,13 +64,13 @@ class ConditionDbServiceTest {
     @Test
     void create_shouldThrowException_whenRepositoryFails() {
         // Arrange
-        when(repository.save(any(ConditionDb.class))).thenThrow(new RuntimeException("Database error"));
+        when(repository.save(any(MedicalConditionDb.class))).thenThrow(new RuntimeException("Database error"));
 
         // Act & Assert
         assertThrows(ServiceException.class, () -> {
             service.create("Name");
         });
-        verify(repository).save(any(ConditionDb.class));
+        verify(repository).save(any(MedicalConditionDb.class));
         verify(mapper, never()).toModel(any());
     }
 
@@ -80,12 +80,12 @@ class ConditionDbServiceTest {
         String extid = "existing-extid";
         String name = "Updated Name";
 
-        ConditionDb existingDb = DomainBuilderDatabase.getConditionDb("Old Name", extid);
-        ConditionDb updatedDb = DomainBuilderDatabase.getConditionDb(name, extid);
+        MedicalConditionDb existingDb = DomainBuilderDatabase.getConditionDb("Old Name", extid);
+        MedicalConditionDb updatedDb = DomainBuilderDatabase.getConditionDb(name, extid);
         Condition expectedDomain = DomainBuilderDatabase.getCondition(updatedDb);
 
         when(repository.findByExtid(extid)).thenReturn(Optional.of(existingDb));
-        when(repository.save(any(ConditionDb.class))).thenReturn(updatedDb);
+        when(repository.save(any(MedicalConditionDb.class))).thenReturn(updatedDb);
         when(mapper.toModel(updatedDb)).thenReturn(expectedDomain);
 
         // Act
@@ -95,10 +95,10 @@ class ConditionDbServiceTest {
         assertNotNull(result);
         verify(repository).findByExtid(extid);
 
-        ArgumentCaptor<ConditionDb> captor = ArgumentCaptor.forClass(ConditionDb.class);
+        ArgumentCaptor<MedicalConditionDb> captor = ArgumentCaptor.forClass(MedicalConditionDb.class);
         verify(repository).save(captor.capture());
 
-        ConditionDb captured = captor.getValue();
+        MedicalConditionDb captured = captor.getValue();
         assertEquals(name, captured.getName());
         assertNotNull(captured.getUpdatedAt());
         verify(mapper).toModel(updatedDb);
@@ -123,10 +123,10 @@ class ConditionDbServiceTest {
     void update_shouldThrowException_whenRepositoryFails() {
         // Arrange
         String extid = "existing-extid";
-        ConditionDb existingDb = DomainBuilderDatabase.getConditionDb("Name", extid);
+        MedicalConditionDb existingDb = DomainBuilderDatabase.getConditionDb("Name", extid);
 
         when(repository.findByExtid(extid)).thenReturn(Optional.of(existingDb));
-        when(repository.save(any(ConditionDb.class))).thenThrow(new RuntimeException("Database error"));
+        when(repository.save(any(MedicalConditionDb.class))).thenThrow(new RuntimeException("Database error"));
 
         // Act & Assert
         assertThrows(ServiceException.class, () -> {
@@ -138,10 +138,10 @@ class ConditionDbServiceTest {
     void delete_shouldSetDeletedAtAndInactive() {
         // Arrange
         String extid = "existing-extid";
-        ConditionDb existingDb = DomainBuilderDatabase.getConditionDb("Name", extid);
+        MedicalConditionDb existingDb = DomainBuilderDatabase.getConditionDb("Name", extid);
 
         when(repository.findByExtid(extid)).thenReturn(Optional.of(existingDb));
-        when(repository.save(any(ConditionDb.class))).thenReturn(existingDb);
+        when(repository.save(any(MedicalConditionDb.class))).thenReturn(existingDb);
 
         // Act
         boolean result = service.delete(extid);
@@ -149,10 +149,10 @@ class ConditionDbServiceTest {
         // Assert
         assertTrue(result);
 
-        ArgumentCaptor<ConditionDb> captor = ArgumentCaptor.forClass(ConditionDb.class);
+        ArgumentCaptor<MedicalConditionDb> captor = ArgumentCaptor.forClass(MedicalConditionDb.class);
         verify(repository).save(captor.capture());
 
-        ConditionDb captured = captor.getValue();
+        MedicalConditionDb captured = captor.getValue();
         assertNotNull(captured.getDeletedAt());
         assertEquals(ActiveEnum.INACTIVE, captured.getActive());
     }
@@ -173,7 +173,7 @@ class ConditionDbServiceTest {
     void findByExtid_shouldReturnCondition_whenExists() {
         // Arrange
         String extid = "existing-extid";
-        ConditionDb db = DomainBuilderDatabase.getConditionDb("Name", extid);
+        MedicalConditionDb db = DomainBuilderDatabase.getConditionDb("Name", extid);
         Condition expectedDomain = DomainBuilderDatabase.getCondition(db);
 
         when(repository.findByExtid(extid)).thenReturn(Optional.of(db));
@@ -206,9 +206,9 @@ class ConditionDbServiceTest {
     @Test
     void findAll_shouldReturnAllConditions() {
         // Arrange
-        ConditionDb db1 = DomainBuilderDatabase.getConditionDb();
-        ConditionDb db2 = DomainBuilderDatabase.getConditionDb();
-        List<ConditionDb> dbList = Arrays.asList(db1, db2);
+        MedicalConditionDb db1 = DomainBuilderDatabase.getConditionDb();
+        MedicalConditionDb db2 = DomainBuilderDatabase.getConditionDb();
+        List<MedicalConditionDb> dbList = Arrays.asList(db1, db2);
 
         Condition domain1 = DomainBuilderDatabase.getCondition(db1);
         Condition domain2 = DomainBuilderDatabase.getCondition(db2);
@@ -230,11 +230,11 @@ class ConditionDbServiceTest {
     @Test
     void findByActive_shouldReturnFilteredConditions() {
         // Arrange
-        ConditionDb db1 = DomainBuilderDatabase.getConditionDb();
+        MedicalConditionDb db1 = DomainBuilderDatabase.getConditionDb();
         db1.setActive(ActiveEnum.ACTIVE);
-        ConditionDb db2 = DomainBuilderDatabase.getConditionDb();
+        MedicalConditionDb db2 = DomainBuilderDatabase.getConditionDb();
         db2.setActive(ActiveEnum.ACTIVE);
-        List<ConditionDb> dbList = Arrays.asList(db1, db2);
+        List<MedicalConditionDb> dbList = Arrays.asList(db1, db2);
 
         Condition domain1 = DomainBuilderDatabase.getCondition(db1);
         Condition domain2 = DomainBuilderDatabase.getCondition(db2);
