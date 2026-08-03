@@ -84,9 +84,9 @@ Shrank `source_url` from `varchar(1024)` to `varchar(768)` (768 × 4 = 3072 byte
 - `database/src/main/resources/db/changelog/changes/005-job_posting.yaml` (the actual DB column definition)
 - `database/src/main/java/com/seibel/jobhunting/database/db/entity/JobPostingDb.java` (`@Column(name = "source_url", length = ...)`, kept in sync with the DB even though Liquibase — not Hibernate DDL — owns schema creation here)
 - `src/main/java/com/seibel/jobhunting/web/request/RequestJobPostingCreate.java` and `RequestJobPostingUpdate.java` (`@Size(max = ...)` validation, was still 1024 and would have let invalid-length values reach the DB)
-- `table-definitions.md` documentation updated to reflect the 768 cap and why
+- `_archive/database/table-definitions.md` documentation updated to reflect the 768 cap and why
 
-The unique constraint itself (dedup on `source_url` for re-import handling, per `table-definitions.md`) was kept — this is a length fix, not a constraint removal.
+The unique constraint itself (dedup on `source_url` for re-import handling, per `_archive/database/table-definitions.md`) was kept — this is a length fix, not a constraint removal.
 
 ## Next step
 Restart the backend once more to confirm `005-job_posting.yaml` and the remaining changesets (`006` through `100-load-init-data`) complete cleanly with no further key-length or other errors.
