@@ -9,7 +9,7 @@ Backend fails to start. HikariPool connects successfully (`HikariPool-1 - Start 
 This means the JDBC connection itself is fine; the failure is in building the JPA EntityManagerFactory, which happens after Hikari connects but before the app is ready. The Tomcat/UnsatisfiedDependencyException output is a downstream symptom, not the root cause — the real error is expected earlier in the log, around EntityManagerFactory / Liquibase initialization.
 
 ## Environment
-Local MySQL, not AWS RDS. `.env` values as of this investigation:
+Local MySQL, not AWS RDS. `../../../.env` values as of this investigation:
 - RDS_HOSTNAME: localhost
 - RDS_PORT: 3306
 - RDS_DB_NAME: jobhunting
@@ -18,12 +18,12 @@ Local MySQL, not AWS RDS. `.env` values as of this investigation:
 `application.yml` has Liquibase `drop-first: true` (schema is dropped and recreated on every boot — expected in this non-production project).
 
 ## Leading hypothesis (superseded — see findings log)
-Originally suspected a Liquibase changeset failure during schema rebuild, given `drop-first: true` re-runs the full changelog on every startup. Candidates, in run order, from `database/src/main/resources/db/changelog/changes/`: 001-customer, 002-user, 003-purchase, 004-company, 005-job_posting, 006-skill, 007-application, 008-contact, 009-friend, 010-job_posting_skill, 011-user_skill, 012-friend_skill, 013-friend_company, 014-friend_job_posting, 100-load-init-data. Ruled out by the DEBUG log evidence below — no changeset-level Liquibase output ever appeared, meaning Liquibase never got far enough to touch a changeset.
+Originally suspected a Liquibase changeset failure during schema rebuild, given `drop-first: true` re-runs the full changelog on every startup. Candidates, in run order, from `../../../database/src/main/resources/db/changelog/changes`: 001-customer, 002-user, 003-purchase, 004-company, 005-job_posting, 006-skill, 007-application, 008-contact, 009-friend, 010-job_posting_skill, 011-user_skill, 012-friend_skill, 013-friend_company, 014-friend_job_posting, 100-load-init-data. Ruled out by the DEBUG log evidence below — no changeset-level Liquibase output ever appeared, meaning Liquibase never got far enough to touch a changeset.
 
 ## Findings log
 
 ### DEBUG log added, first restart with `logging.level.liquibase: DEBUG`
-Added `logging.level.liquibase: DEBUG` to `src/main/resources/application.yml`. Restarted and captured the full startup log.
+Added `logging.level.liquibase: DEBUG` to `../../../src/main/resources/application.yml`. Restarted and captured the full startup log.
 
 Result: HikariPool connects and logs "Start completed" at 09:19:27.834. Then a 30-second gap with **zero** Liquibase changeset/lock-table log lines. At 09:19:57.851 (exactly 30s later) the Tomcat/EntityManagerFactory failure fires — same UnsatisfiedDependencyException chain as before (`jwtAuthenticationFilter` → `customUserDetailsService` → `userRepository` → cannot resolve `jpaSharedEM_entityManagerFactory`).
 
@@ -62,7 +62,7 @@ The `jobhunting_user` MySQL account was missing sufficient privileges (or otherw
 User corrected the `jobhunting_user` MySQL account (existing user, needed privileges reset/granted rather than recreated, since `CREATE USER` failed with Error 1396 — user already existed) via `ALTER USER` / `GRANT ALL PRIVILEGES ON jobhunting.* TO 'jobhunting_user'@'localhost'` / `FLUSH PRIVILEGES`. After this, the backend started cleanly with Liquibase running the full changelog against the local MySQL instance.
 
 ## Follow-up (optional)
-`logging.level.liquibase: DEBUG` was added to `src/main/resources/application.yml` for this investigation, then removed once Issue 1 was confirmed fixed. Re-added briefly to diagnose Issue 2 below, then should be removed again.
+`logging.level.liquibase: DEBUG` was added to `../../../src/main/resources/application.yml` for this investigation, then removed once Issue 1 was confirmed fixed. Re-added briefly to diagnose Issue 2 below, then should be removed again.
 
 ---
 

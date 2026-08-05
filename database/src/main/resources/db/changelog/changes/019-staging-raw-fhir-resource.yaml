@@ -1,0 +1,28 @@
+databaseChangeLog:
+  - changeSet:
+      id: create_staging_raw_fhir_resource_table
+      author: jeb
+      labels: uchealth
+      changes:
+
+        # StagingRawFhirResource Table
+        - createTable:
+            tableName: staging_raw_fhir_resource
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: resource_type, type: varchar(64), constraints: { nullable: false } }
+              - column: { name: fhir_resource_id, type: varchar(255), constraints: { nullable: false } }
+              - column: { name: raw_payload, type: longtext }
+              - column: { name: fetched_at, type: datetime, constraints: { nullable: false } }
+              - column: { name: normalized_at, type: datetime }
+              - column: { name: normalization_error, type: text }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }
+
+        - addUniqueConstraint:
+            tableName: staging_raw_fhir_resource
+            columnNames: resource_type, fhir_resource_id
+            constraintName: uq_staging_raw_fhir_resource_source

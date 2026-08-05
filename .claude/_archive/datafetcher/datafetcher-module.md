@@ -189,7 +189,7 @@ via `implementation project(':datafetcher')`).
 ## Related Documentation
 
 - `PROJECT_PLAN.md` — sections 4 (CT.gov API), 6 (package layout), 10 (phased roadmap)
-- `.claude/INGESTION_PLAN.md` — the original build plan for this feature, with the
+- `INGESTION_PLAN.md` — the original build plan for this feature, with the
   verification checklist
 - `.claude/CURRENT_STATE.md` — current overall project status, including join-table gaps
 - `_archive/database/clinical-trials-tables.md` — schema design + CT.gov field-mapping reference

@@ -8,6 +8,52 @@ and `.claude/_archive/datafetcher/datafetcher-module.md` (module architecture th
 follows). This doc is the concrete build plan — execute top to bottom once you're ready
 to start.
 
+## Status
+
+`UcHealthOAuthToken` and `StagingRawFhirResource` are fully scaffolded (domain, entity,
+mapper, repository, dbservice, service, request/response DTOs, controller, Liquibase
+changeset — changesets `018`/`019`) ahead of Epic registration, since that part of the
+plan needs no real credentials.
+
+**Steps 2–3 are now built** (OAuth client + auth controller), along with the
+token-lifecycle tests from step 8:
+
+- A properties class holds the Epic connection settings, bound from environment
+  variables via `application.yml` under a `uchealth` prefix. All six values default to
+  empty/localhost, so the app starts fine unconfigured and fails with a clear message
+  only when the flow is actually invoked.
+- A PKCE challenge store keeps the `state` → `code_verifier` pair in memory between the
+  authorize redirect and the callback, with a 15-minute TTL and single-use consumption
+  (a replayed callback is rejected). In-memory is deliberate — a pending authorization
+  only needs to outlive the patient's trip through the login page.
+- The OAuth client builds the authorization URL, exchanges the authorization code, and
+  refreshes an expiring token, persisting through `UcHealthOAuthTokenDbService`. It also
+  exposes an "ensure valid token" entry point (refreshes 60s ahead of expiry) — that's
+  the seam the FHIR client in step 4 calls.
+- The auth controller exposes `GET /api/uchealth/authorize` (302 to Epic) and
+  `GET /api/uchealth/callback` (code → stored token, plain-text result for the browser),
+  and handles Epic returning `error`/`error_description` instead of a code.
+- Tests cover the refresh branch (expired and within-skew both refresh and persist;
+  a valid token doesn't), refresh-token retention when Epic returns none, unknown-state
+  rejection, the authorization URL's PKCE params, and the PKCE store's single-use and
+  S256 behavior (RFC 7636 test vector).
+
+**Decided this session:** public client + PKCE, no client secret — matching what
+`uchealth-epic-api-notes.md` says Epic expects for patient-facing apps, and avoiding a
+stored secret. Confirm this against Epic's actual registration form in step 1; if Epic
+forces a confidential client, the token-exchange and refresh calls need a
+`client_secret` added and the PKCE store becomes optional.
+
+**Note for when endpoint security is re-enabled:** `/api/uchealth/callback` must stay
+`permitAll` — Epic's redirect arrives from the patient's browser and cannot carry a JWT.
+A reminder to that effect is in the commented-out rule block in `SecurityConfig`.
+
+Not yet started: Epic developer registration (step 1, requires you), the FHIR client, the
+ingest job, and the parser (steps 4–7). The scaffolded entities still have no
+mapper/repository/dbservice tests — that pass was skipped deliberately, per this
+project's usual two-pass convention (`database-restapi-template` then
+`database-restapi-testing`).
+
 ## Why this exists
 
 The end goal (per your direction this session) is **RAG over your wife's actual medical
@@ -18,6 +64,39 @@ endpoint and into this app's database in a form that's ready to be chunked/embed
 later. The embedding/vector-store/retrieval pipeline itself is **out of scope for this
 plan** — a separate plan once real data exists to design against.
 
+## Target data (confirmed against the real My Health Connection portal)
+
+Per a screenshot of the actual My Health Connection home screen, the portal exposes six
+categories: Appointments and notes, Messages, Test results, Schedule appointment,
+Billing summary, Medications. Of these, the three you want captured are **Test
+results**, **Medications**, and **Messages** — but they map very differently onto
+Epic's FHIR API:
+
+- **Test results → `Observation`** (labs, vitals — the standard FHIR resource for
+  discrete result values) **and possibly `DiagnosticReport`** (the report-level wrapper
+  around a panel of related Observations, e.g. a full CBC). Both confirmed as
+  standard, patient-accessible FHIR R4 resources.
+- **Medications → `MedicationRequest`** (active/historical prescriptions) only.
+  `MedicationStatement` was originally listed here as an "and/or" alternative, but
+  **Epic's app-registration catalog offers it only in DSTU2 and STU3 — there is no R4
+  version** (confirmed on the registration form while registering the sandbox app).
+  Since this pipeline is R4 throughout, `MedicationStatement` is dropped from scope:
+  no scope requested, no client method, no parser branch. `MedicationRequest` alone
+  carries prescriptions, which is the medication data actually wanted. Revisit only if
+  a real gap shows up in the sandbox data.
+- **Messages → not confirmed available via FHIR.** Patient-provider portal messaging
+  (MyChart's secure messages) generally has **no standard FHIR R4 resource** and is
+  typically not exposed through Epic's patient-facing SMART on FHIR API — this is
+  portal-UI-only functionality in most Epic deployments. **This needs dedicated research
+  before it's buildable at all**; it may turn out to be inaccessible outside the portal
+  UI itself (which would rule out an API-based approach entirely, leaving only something
+  like browser automation against the portal — a very different and more fragile
+  approach than the rest of this plan). Do not assume Messages ingestion is possible
+  until this is confirmed one way or the other.
+
+**This plan's build order below targets Test results and Medications only.** Messages
+is out of scope until the research question above is resolved — see "Open questions."
+
 ## Decisions made this session
 
 - **Lives in `datafetcher`, for now.** Same module as the ClinicalTrials.gov pipeline —
@@ -25,10 +104,12 @@ plan** — a separate plan once real data exists to design against.
   If/when this grows large or its OAuth/token-lifecycle concerns start crowding out the
   CT.gov code, split it into its own module (e.g. `:patientdata` or `:fhir`) — not
   designed now, revisit if it becomes a problem.
-- **Pull both structured resources and narrative documents.** RAG benefits most from
-  free text (clinical notes, visit summaries), not just coded data — so this plan
-  includes `DocumentReference`/`Binary` fetching alongside the structured FHIR
-  resources, unlike the CT.gov pipeline which only ever dealt with structured JSON.
+- **Target Test results and Medications first; Messages is a research question, not yet
+  in scope.** See "Target data" above. This narrows the original broader idea (pull
+  everything, including narrative documents) down to what's actually confirmed
+  available and wanted. If Messages later proves feasible via some FHIR-adjacent or
+  alternate mechanism, it would likely need its own client/parser given how differently
+  it's accessed compared to standard clinical resources — not designed here.
 - **This is patient-authorized access, not bulk/system access.** UCHealth has no
   system-level API program — per `uchealth-epic-api-notes.md`, the only path is a
   SMART on FHIR app registered with Epic (`fhir.epic.com`), where your wife logs in with
@@ -53,6 +134,8 @@ plan** — a separate plan once real data exists to design against.
   refresh flow is needed (see below) but no `@Scheduled` background sync job.
 - **Multi-patient support.** This is your wife's record only. No UI for managing
   multiple patients/authorizations.
+- **Messages.** Not confirmed accessible via FHIR — see "Target data" above and "Open
+  questions" below. No client/parser/schema work for it in this pass.
 
 ## The access model (read this before building)
 
@@ -92,8 +175,8 @@ datafetcher/src/main/java/com/seibel/cancer/datafetcher/
 │   ├── UcHealthOAuthClient.java             authorization-code exchange, token refresh,
 │   │                                         talks to UCHealth/Epic's OAuth endpoints
 │   ├── UcHealthFhirClient.java               authenticated FHIR R4 client (GET Patient,
-│   │                                         Condition, Observation, MedicationRequest,
-│   │                                         AllergyIntolerance, DocumentReference, etc.)
+│   │                                         Observation, DiagnosticReport,
+│   │                                         MedicationRequest)
 │   └── UcHealthIngestJob.java                orchestrates: ensure valid token -> fetch
 │                                              resources -> write staging rows
 └── normalization/
@@ -132,25 +215,27 @@ before seeing real sandbox FHIR payloads), but the table shape should be:
   (`id`/`extid`/`created_at`/etc.) apply. **Tokens are sensitive — do not commit any
   seed data containing a real token, and treat this table like credentials.**
 - **`staging_raw_fhir_resource`** — mirrors `staging_raw_trial`'s shape: `resource_type`
-  (e.g. `"Condition"`, `"Observation"`, `"DocumentReference"`), `fhir_resource_id`
-  (Epic's id for that resource — the dedup key, analogous to `nct_id`), `raw_payload`
-  (the FHIR JSON, `longtext`), `fetched_at`, `normalized_at`, `normalization_error`. Add
-  the same composite unique constraint pattern learned from the CT.gov staging bug this
-  session: unique on `(resource_type, fhir_resource_id)` from the start, not bolted on
-  after finding duplicates.
-- **`clinical_document`** (or similar) — normalized narrative documents:
-  `fhir_resource_id`, `document_type` (from `DocumentReference.type`), `title`,
-  `content_text` (extracted plain text — Epic's `DocumentReference`/`Binary` content is
-  often base64-encoded and may be RTF/PDF/XML under the hood; extraction approach is a
-  build-time decision, not decided here), `document_date`, plus `BaseDb` fields. This is
-  the table RAG chunking will eventually read from.
-- **Structured clinical facts** (conditions, medications, allergies, observations) —
-  whether these get their own normalized tables now (mirroring `Trial`'s children) or
-  are deferred until Phase 3 actually needs structured querying is an **open
-  question, see below.** For RAG alone, it may be sufficient to store these as
-  additional narrative-ish rows (e.g. a formatted text summary per resource) rather than
-  fully normalized structured columns — decide once you see what the sandbox data
-  actually looks like.
+  (`"Observation"`, `"DiagnosticReport"`, or `"MedicationRequest"` for this pass), `fhir_resource_id` (Epic's id for that
+  resource — the dedup key, analogous to `nct_id`), `raw_payload` (the FHIR JSON,
+  `longtext`), `fetched_at`, `normalized_at`, `normalization_error`. **This table has
+  already been scaffolded** (this session, ahead of Epic registration) — see
+  `database/src/main/resources/db/changelog/changes/019-staging-raw-fhir-resource.yaml`,
+  with the composite unique constraint on `(resource_type, fhir_resource_id)` already in
+  place from the start, applying the CT.gov staging-dedup lesson from day one.
+- **Structured clinical facts** (test results, medications) — whether these get their
+  own normalized tables now (mirroring `Trial`'s children — e.g. a `LabResult` table for
+  `Observation`/`DiagnosticReport`, a `PatientMedication` table for
+  `MedicationRequest`) or are deferred until Phase 3 actually needs
+  structured querying is an **open question, see below.** For RAG alone, it may be
+  sufficient to store these as a formatted text summary per resource rather than fully
+  normalized structured columns — decide once you see what the sandbox data actually
+  looks like. Given Messages (narrative-heavy) is on hold pending research, this pass's
+  data is likely more structured/discrete than originally scoped (test result values,
+  medication names/dosages) — lean toward structured normalization unless the sandbox
+  payloads suggest otherwise.
+- **`clinical_message`** (or similar) — **only if/when Messages ingestion turns out to be
+  feasible** per the open research question below. Not scaffolded, not designed further,
+  pending that answer.
 
 ## Step-by-step build order
 
@@ -162,7 +247,7 @@ before seeing real sandbox FHIR payloads), but the table shape should be:
 - **Do not look up UCHealth's production endpoint or attempt real login yet** — build
   and verify everything against sandbox first.
 
-### 2. `UcHealthOAuthClient` (`datafetcher/uchealth/`)
+### 2. `UcHealthOAuthClient` (`datafetcher/uchealth/`) — **built**
 - Authorization-code exchange: given a `code` from the OAuth redirect, POST to Epic's
   token endpoint, get back `access_token` + `refresh_token` + `expires_in` +
   `patient` (the patient FHIR id).
@@ -170,7 +255,7 @@ before seeing real sandbox FHIR payloads), but the table shape should be:
 - Persists/reads tokens via a new `UcHealthOAuthTokenDbService` (`:database`, follows
   the existing `*DbService` pattern).
 
-### 3. `UcHealthAuthController` (root module)
+### 3. `UcHealthAuthController` (root module) — **built**
 - `GET /api/uchealth/authorize` — builds the Epic authorization URL (client_id, redirect
   URI, scopes, state) and redirects the browser there.
 - `GET /api/uchealth/callback` — receives the authorization code, calls
@@ -180,11 +265,12 @@ before seeing real sandbox FHIR payloads), but the table shape should be:
   real browser round-trip, not just curl/Swagger.
 
 ### 4. `UcHealthFhirClient` (`datafetcher/uchealth/`)
-- Authenticated GET against FHIR R4 resource endpoints (`/Patient/{id}`,
-  `/Condition?patient={id}`, `/Observation?patient={id}`,
-  `/MedicationRequest?patient={id}`, `/AllergyIntolerance?patient={id}`,
-  `/DocumentReference?patient={id}`, etc.), using the stored (and auto-refreshed if
-  expired) access token as a Bearer header.
+- Authenticated GET against FHIR R4 resource endpoints for the target data only:
+  `/Patient/{id}` (resolve the authorized patient), `/Observation?patient={id}&category=laboratory`
+  (test results — confirm the right `category` search param against sandbox; Epic
+  supports filtering Observation by category), `/DiagnosticReport?patient={id}`,
+  `/MedicationRequest?patient={id}`, using the
+  stored (and auto-refreshed if expired) access token as a Bearer header.
 - FHIR search results are paginated via `Bundle.link[relation=next]` — different
   pagination shape than CT.gov's `pageToken`, handle accordingly.
 
@@ -198,13 +284,9 @@ before seeing real sandbox FHIR payloads), but the table shape should be:
   again.
 
 ### 6. `UcHealthFhirParser` (`datafetcher/normalization/`)
-- Parses each `staging_raw_fhir_resource` row's JSON per its `resource_type`.
-- For `DocumentReference`: resolve and extract the actual document content (may require
-  a separate authenticated fetch to a `Binary` endpoint referenced by the
-  `DocumentReference`, and text-extraction from whatever format comes back) into
-  `clinical_document.content_text`.
-- For structured resources: normalize into whatever table shape gets decided in the
-  schema step above.
+- Parses each `staging_raw_fhir_resource` row's JSON per its `resource_type`
+  (`Observation`/`DiagnosticReport`/`MedicationRequest`) into
+  whatever normalized table shape gets decided in the schema step above.
 
 ### 7. `UcHealthIngestionController` (root module)
 - `POST /api/ingestion/uchealth` — triggers fetch → stage → normalize synchronously
@@ -223,19 +305,31 @@ before seeing real sandbox FHIR payloads), but the table shape should be:
 
 ## Open questions to resolve before/during the build
 
-- **Where do tokens live?** A DB table is the simplest fit with this project's existing
-  patterns, but a refresh token is a long-lived credential for your wife's real medical
-  record — is a plain DB column acceptable for personal/local-only use, or does it
-  warrant encryption at rest even in a non-production app? Decide before building
-  `UcHealthOAuthTokenDbService`.
+- **Can Messages be accessed at all, via any means?** Research needed: check Epic's FHIR
+  documentation and open endpoints info for any Messages-related resource (there is no
+  standard FHIR Communication-resource guarantee for MyChart secure messages across all
+  Epic deployments — confirm UCHealth's specific configuration once sandbox/production
+  access exists). If FHIR genuinely doesn't expose it, the only remaining path would be
+  something like authenticated browser automation against the portal UI itself — a
+  fundamentally different, more fragile approach than everything else in this plan, and
+  not something to build without a deliberate separate decision. Do not start that work
+  without first confirming FHIR access is truly a dead end.
+- **Where do tokens live? — still open, currently plain columns.** As built, access and
+  refresh tokens sit in plain `uchealth_oauth_token` columns, matching the project's
+  existing patterns. That's fine against Epic's sandbox (synthetic patients, throwaway
+  credentials), but it is **not** a decision about the real thing: before the one real
+  authorization against your wife's My Health Connection account, decide whether a
+  long-lived refresh token to her actual medical record warrants encryption at rest even
+  in a local-only app. Changing this later touches only the DbService and the changeset —
+  nothing in the OAuth client depends on how the columns are stored. Related: the
+  scaffolded `UcHealthOAuthTokenController` exposes full CRUD over this table, including
+  reading tokens back out over HTTP — consider removing or restricting it before real
+  credentials land.
 - **Structured data depth.** As noted in the schema section — full normalized tables
   per resource type (mirroring Trial's children) vs. lighter-weight
   text-summary-per-resource rows, given the actual target is RAG, not structured
   querying. Recommend deciding after seeing real sandbox payload shapes, not
   up front.
-- **Document content extraction.** `DocumentReference`/`Binary` content types vary
-  (plain text, RTF, PDF, XML/CDA). Needs a concrete decision on what to extract from
-  and how, once real sandbox documents are available to inspect.
 - **Redirect URI / local dev.** Epic's OAuth flow needs a real registered redirect URI.
   For local dev this likely means registering `http://localhost:8080/api/uchealth/callback`
   (or similar) with Epic — confirm Epic's sandbox app registration allows a localhost
@@ -247,8 +341,11 @@ before seeing real sandbox FHIR payloads), but the table shape should be:
 - [ ] `/api/uchealth/authorize` → sandbox login → `/api/uchealth/callback` round-trip
       successfully stores a token.
 - [ ] `POST /api/ingestion/uchealth` against sandbox pulls a sandbox test patient's
-      Condition/Observation/MedicationRequest/DocumentReference data into staging and
-      normalizes it.
+      Observation/DiagnosticReport/MedicationRequest data into
+      staging and normalizes it.
+- [ ] Messages research question (above) resolved one way or the other — feasible via
+      FHIR, feasible via some other means, or confirmed not accessible — before deciding
+      whether any Messages work gets added to this plan.
 - [ ] Re-running the same call updates/dedups rather than duplicating (apply this
       session's staging-dedup lesson from the start, verify it holds).
 - [ ] An expired access token triggers a successful automatic refresh mid-flow, without

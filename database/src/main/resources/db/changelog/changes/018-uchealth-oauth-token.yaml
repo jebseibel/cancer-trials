@@ -1,0 +1,22 @@
+databaseChangeLog:
+  - changeSet:
+      id: create_uchealth_oauth_token_table
+      author: jeb
+      labels: uchealth
+      changes:
+
+        # UcHealthOAuthToken Table
+        - createTable:
+            tableName: uchealth_oauth_token
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: access_token, type: varchar(2048) }
+              - column: { name: refresh_token, type: varchar(2048) }
+              - column: { name: expires_at, type: datetime }
+              - column: { name: patient_fhir_id, type: varchar(128) }
+              - column: { name: scope, type: varchar(512) }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }

@@ -63,6 +63,10 @@ public class SecurityConfig {
                 //         // Allow auth endpoints (login/register)
                 //         .requestMatchers("/api/auth/**").permitAll()
                 //
+                //         // Epic's OAuth redirect lands here from the patient's browser and
+                //         // cannot carry a JWT - it must stay permitAll when security returns.
+                //         .requestMatchers("/api/uchealth/callback").permitAll()
+                //
                 //         // Protect all other API endpoints (require JWT)
                 //         .requestMatchers("/api/**").authenticated()
                 //

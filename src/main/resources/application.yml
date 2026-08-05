@@ -21,7 +21,21 @@ spring:
   liquibase:
     enabled: true
     change-log: classpath:db/changelog/db.changelog-master.yaml
-    drop-first: true
+    # drop-first disabled so a stored UCHealth OAuth token survives a backend restart.
+    # Trade-off: edits to an already-applied changeset no longer take effect on startup -
+    # rebuild the DB (n8n clear-db webhook) to pick those up.
+    drop-first: false
+
+uchealth:
+  # Epic / SMART on FHIR settings. Point at Epic's sandbox first; switch to UCHealth
+  # production only after the sandbox round-trip works. Values live in .env.
+  client-id: ${UCHEALTH_CLIENT_ID:}
+  authorize-url: ${UCHEALTH_AUTHORIZE_URL:}
+  token-url: ${UCHEALTH_TOKEN_URL:}
+  fhir-base-url: ${UCHEALTH_FHIR_BASE_URL:}
+  redirect-uri: ${UCHEALTH_REDIRECT_URI:http://localhost:8080/api/uchealth/callback}
+  # MedicationStatement is deliberately absent - Epic exposes it only in DSTU2/STU3, not R4.
+  scope: ${UCHEALTH_SCOPE:launch/patient openid fhirUser offline_access patient/Patient.read patient/Observation.read patient/DiagnosticReport.read patient/MedicationRequest.read}
 
 logging:
   level:

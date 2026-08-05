@@ -130,7 +130,7 @@ The current constraints, in order of what you'll hit first when trying to pull
 ## Related documentation
 
 - `datafetcher-module.md` (same directory) — generic module architecture
-- `.claude/INGESTION_PLAN.md` — original build plan and design decisions for this
+- `INGESTION_PLAN.md` — original build plan and design decisions for this
   feature
 - `.claude/CURRENT_STATE.md` — overall project status, including the join-table gaps
   that limit what's linked once trials are normalized

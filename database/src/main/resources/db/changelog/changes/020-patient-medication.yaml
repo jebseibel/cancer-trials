@@ -1,0 +1,40 @@
+databaseChangeLog:
+  - changeSet:
+      id: create_patient_medication_table
+      author: jeb
+      labels: uchealth
+      changes:
+
+        # PatientMedication Table - normalized from FHIR R4 MedicationRequest
+        - createTable:
+            tableName: patient_medication
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: fhir_resource_id, type: varchar(64), constraints: { nullable: false, unique: true } }
+              - column: { name: medication_name, type: varchar(500), constraints: { nullable: false } }
+              - column: { name: rxnorm_code, type: varchar(32) }
+              - column: { name: status, type: varchar(32) }
+              - column: { name: intent, type: varchar(32) }
+              - column: { name: authored_on, type: date }
+              - column: { name: dosage_text, type: varchar(1000) }
+              - column: { name: dose_quantity, type: "decimal(12,3)" }
+              - column: { name: dose_unit, type: varchar(64) }
+              - column: { name: route, type: varchar(128) }
+              - column: { name: frequency_text, type: varchar(255) }
+              - column: { name: prescriber_name, type: varchar(255) }
+              - column: { name: reason_text, type: varchar(1000) }
+              - column: { name: validity_start, type: date }
+              - column: { name: validity_end, type: date }
+              - column: { name: refills_allowed, type: int }
+              - column: { name: display_text, type: text, constraints: { nullable: false } }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }
+
+        - createIndex:
+            tableName: patient_medication
+            indexName: idx_patient_medication_status
+            columns:
+              - column: { name: status }

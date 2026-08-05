@@ -266,7 +266,21 @@ public class DomainBuilderUtils {
 
     // ===== Decimal =====
     public static BigDecimal getDecimalRandom() {
+        return getDecimalRandom(2);
+    }
+
+    /** Scale-aware variant, for columns declared with something other than decimal(p,2). */
+    public static BigDecimal getDecimalRandom(int scale) {
         double value = ThreadLocalRandom.current().nextDouble(0, 10000);
-        return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP);
+        return BigDecimal.valueOf(value).setScale(scale, RoundingMode.HALF_UP);
+    }
+
+    // ===== Integer =====
+    public static Integer getIntegerRandom() {
+        return getIntegerRandom(0, 100);
+    }
+
+    public static Integer getIntegerRandom(int minInclusive, int maxExclusive) {
+        return ThreadLocalRandom.current().nextInt(minInclusive, maxExclusive);
     }
 }

@@ -1,0 +1,35 @@
+databaseChangeLog:
+  - changeSet:
+      id: create_lab_result_component_table
+      author: jeb
+      labels: uchealth
+      changes:
+
+        # LabResultComponent Table - one row per FHIR Observation.component entry.
+        # A panel (CBC, CMP) arrives as ONE Observation carrying several components.
+        - createTable:
+            tableName: lab_result_component
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: lab_result_id, type: bigint, constraints: { nullable: false } }
+              - column: { name: component_name, type: varchar(500), constraints: { nullable: false } }
+              - column: { name: loinc_code, type: varchar(32) }
+              - column: { name: value_quantity, type: "decimal(18,6)" }
+              - column: { name: value_unit, type: varchar(64) }
+              - column: { name: value_string, type: varchar(1000) }
+              - column: { name: interpretation, type: varchar(128) }
+              - column: { name: reference_range_low, type: "decimal(18,6)" }
+              - column: { name: reference_range_high, type: "decimal(18,6)" }
+              - column: { name: reference_range_text, type: varchar(255) }
+              - column: { name: display_text, type: varchar(1000), constraints: { nullable: false } }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }
+
+        - createIndex:
+            tableName: lab_result_component
+            indexName: idx_lab_result_component_lab_result_id
+            columns:
+              - column: { name: lab_result_id }

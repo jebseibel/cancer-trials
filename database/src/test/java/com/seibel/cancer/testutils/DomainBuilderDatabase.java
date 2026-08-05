@@ -7,9 +7,12 @@ import com.seibel.cancer.common.domain.Customer;
 import com.seibel.cancer.common.domain.EligibilityRule;
 import com.seibel.cancer.common.domain.Intervention;
 import com.seibel.cancer.common.domain.Keyword;
+import com.seibel.cancer.common.domain.LabResult;
+import com.seibel.cancer.common.domain.LabResultComponent;
 import com.seibel.cancer.common.domain.Location;
 import com.seibel.cancer.common.domain.Medication;
 import com.seibel.cancer.common.domain.Outcome;
+import com.seibel.cancer.common.domain.PatientMedication;
 import com.seibel.cancer.common.domain.OverallOfficial;
 import com.seibel.cancer.common.domain.Purchase;
 import com.seibel.cancer.common.domain.Sponsor;
@@ -21,10 +24,13 @@ import com.seibel.cancer.common.domain.User;
 import com.seibel.cancer.database.db.entity.AppUserDb;
 import com.seibel.cancer.database.db.entity.ArmGroupDb;
 import com.seibel.cancer.database.db.entity.MedicalConditionDb;
+import com.seibel.cancer.database.db.entity.PatientMedicationDb;
 import com.seibel.cancer.database.db.entity.CustomerDb;
 import com.seibel.cancer.database.db.entity.EligibilityRuleDb;
 import com.seibel.cancer.database.db.entity.InterventionDb;
 import com.seibel.cancer.database.db.entity.KeywordDb;
+import com.seibel.cancer.database.db.entity.LabResultDb;
+import com.seibel.cancer.database.db.entity.LabResultComponentDb;
 import com.seibel.cancer.database.db.entity.LocationDb;
 import com.seibel.cancer.database.db.entity.MedicationDb;
 import com.seibel.cancer.database.db.entity.OutcomeDb;
@@ -43,10 +49,13 @@ import com.seibel.cancer.database.db.mapper.CustomerMapper;
 import com.seibel.cancer.database.db.mapper.EligibilityRuleMapper;
 import com.seibel.cancer.database.db.mapper.InterventionMapper;
 import com.seibel.cancer.database.db.mapper.KeywordMapper;
+import com.seibel.cancer.database.db.mapper.LabResultMapper;
+import com.seibel.cancer.database.db.mapper.LabResultComponentMapper;
 import com.seibel.cancer.database.db.mapper.LocationMapper;
 import com.seibel.cancer.database.db.mapper.MedicationMapper;
 import com.seibel.cancer.database.db.mapper.OutcomeMapper;
 import com.seibel.cancer.database.db.mapper.OverallOfficialMapper;
+import com.seibel.cancer.database.db.mapper.PatientMedicationMapper;
 import com.seibel.cancer.database.db.mapper.PurchaseMapper;
 import com.seibel.cancer.database.db.mapper.SponsorMapper;
 import com.seibel.cancer.database.db.mapper.StagingRawTrialMapper;
@@ -614,6 +623,133 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
         item.setName(name != null ? name : getNameRandom("Official_"));
         item.setAffiliation(affiliation != null ? affiliation : getNameRandom("Affiliation_"));
         item.setRole(role != null ? role : getStatusRandom("Role_"));
+        setBaseSyncFields(item);
+        return item;
+    }
+
+    // ///////////////////////////////////////////////////////////////////
+    // PatientMedication
+    public static PatientMedication getPatientMedication() {
+        PatientMedicationDb item = getPatientMedicationDb();
+        return new PatientMedicationMapper().toModel(item);
+    }
+
+    public static PatientMedication getPatientMedication(PatientMedicationDb item) {
+        return new PatientMedicationMapper().toModel(item);
+    }
+
+    public static PatientMedicationDb getPatientMedicationDb() {
+        return getPatientMedicationDb(null, null, null);
+    }
+
+    public static PatientMedicationDb getPatientMedicationDb(String fhirResourceId, String medicationName) {
+        return getPatientMedicationDb(fhirResourceId, medicationName, null);
+    }
+
+    /**
+     * Full-override builder. Only the two identity-relevant fields plus extid are exposed
+     * positionally - the other 15 columns get type-matched random defaults, since a
+     * 17-parameter signature would be unreadable and easy to transpose.
+     */
+    public static PatientMedicationDb getPatientMedicationDb(String fhirResourceId, String medicationName, String extid) {
+        PatientMedicationDb item = new PatientMedicationDb();
+        item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
+        item.setFhirResourceId(fhirResourceId != null ? fhirResourceId : getUniqueRandom("Fhir_"));
+        item.setMedicationName(medicationName != null ? medicationName : getNameRandom("Med_"));
+        item.setRxnormCode(getCodeRandom("Rx_"));
+        item.setStatus(getStatusRandom("Sta_"));
+        item.setIntent(getStatusRandom("Int_"));
+        item.setAuthoredOn(getDateRandom());
+        item.setDosageText(getDescriptionRandom("Dosage_"));
+        item.setDoseQuantity(getDecimalRandom(3));
+        item.setDoseUnit(getCodeRandom("Unit_"));
+        item.setRoute(getNameRandom("Route_"));
+        item.setFrequencyText(getNameRandom("Freq_"));
+        item.setPrescriberName(getNameRandom("Presc_"));
+        item.setReasonText(getDescriptionRandom("Reason_"));
+        item.setValidityStart(getDateRandom());
+        item.setValidityEnd(getDateRandom());
+        item.setRefillsAllowed(getIntegerRandom());
+        item.setDisplayText(getDescriptionRandom("Display_"));
+        setBaseSyncFields(item);
+        return item;
+    }
+
+    // ///////////////////////////////////////////////////////////////////
+    // LabResult
+    public static LabResult getLabResult() {
+        LabResultDb item = getLabResultDb();
+        return new LabResultMapper().toModel(item);
+    }
+
+    public static LabResult getLabResult(LabResultDb item) {
+        return new LabResultMapper().toModel(item);
+    }
+
+    public static LabResultDb getLabResultDb() {
+        return getLabResultDb(null, null, null);
+    }
+
+    public static LabResultDb getLabResultDb(String fhirResourceId, String testName) {
+        return getLabResultDb(fhirResourceId, testName, null);
+    }
+
+    public static LabResultDb getLabResultDb(String fhirResourceId, String testName, String extid) {
+        LabResultDb item = new LabResultDb();
+        item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
+        item.setFhirResourceId(fhirResourceId != null ? fhirResourceId : getUniqueRandom("Fhir_"));
+        item.setTestName(testName != null ? testName : getNameRandom("Test_"));
+        item.setLoincCode(getCodeRandom("Loinc_"));
+        item.setStatus(getStatusRandom("Sta_"));
+        item.setCategory(getCodeRandom("Cat_"));
+        item.setEffectiveAt(getDateTimeRandom());
+        item.setIssuedAt(getDateTimeRandom());
+        item.setValueQuantity(getDecimalRandom(6));
+        item.setValueUnit(getCodeRandom("Unit_"));
+        item.setValueString(getNameRandom("Val_"));
+        item.setInterpretation(getCodeRandom("Interp_"));
+        item.setReferenceRangeLow(getDecimalRandom(6));
+        item.setReferenceRangeHigh(getDecimalRandom(6));
+        item.setReferenceRangeText(getNameRandom("Range_"));
+        item.setIsPanel(getBooleanRandom());
+        item.setDisplayText(getDescriptionRandom("Display_"));
+        setBaseSyncFields(item);
+        return item;
+    }
+
+    // ///////////////////////////////////////////////////////////////////
+    // LabResultComponent
+    public static LabResultComponent getLabResultComponent() {
+        LabResultComponentDb item = getLabResultComponentDb();
+        return new LabResultComponentMapper().toModel(item);
+    }
+
+    public static LabResultComponent getLabResultComponent(LabResultComponentDb item) {
+        return new LabResultComponentMapper().toModel(item);
+    }
+
+    public static LabResultComponentDb getLabResultComponentDb() {
+        return getLabResultComponentDb(null, null, null);
+    }
+
+    public static LabResultComponentDb getLabResultComponentDb(Long labResultId, String componentName) {
+        return getLabResultComponentDb(labResultId, componentName, null);
+    }
+
+    public static LabResultComponentDb getLabResultComponentDb(Long labResultId, String componentName, String extid) {
+        LabResultComponentDb item = new LabResultComponentDb();
+        item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
+        item.setLabResultId(labResultId != null ? labResultId : ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setComponentName(componentName != null ? componentName : getNameRandom("Component_"));
+        item.setLoincCode(getCodeRandom("Loinc_"));
+        item.setValueQuantity(getDecimalRandom(6));
+        item.setValueUnit(getCodeRandom("Unit_"));
+        item.setValueString(getNameRandom("Val_"));
+        item.setInterpretation(getCodeRandom("Interp_"));
+        item.setReferenceRangeLow(getDecimalRandom(6));
+        item.setReferenceRangeHigh(getDecimalRandom(6));
+        item.setReferenceRangeText(getNameRandom("Range_"));
+        item.setDisplayText(getDescriptionRandom("Display_"));
         setBaseSyncFields(item);
         return item;
     }

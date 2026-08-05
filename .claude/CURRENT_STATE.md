@@ -79,7 +79,7 @@ above for any new endpoint that exposes a trial/condition/sponsor reference.
 
 ## ClinicalTrials.gov ingestion — built, not yet manually verified
 
-Full ingestion pipeline built this session per `.claude/INGESTION_PLAN.md` (read that
+Full ingestion pipeline built this session per `_archive/datafetcher/INGESTION_PLAN.md` (read that
 doc for the detailed design/decisions). Summary:
 
 - **`datafetcher` module** now has real content and is wired into the root app
@@ -121,8 +121,80 @@ doc for the detailed design/decisions). Summary:
   yourself per project convention, hasn't happened yet this session.
 - **Not committed.** Everything above (`datafetcher/src/**`, `IngestionController` +
   its DTOs, the `*DbService` additions, `build.gradle`/`datafetcher/build.gradle`
-  changes, the `100-load-init-data.yaml` seed row, `.claude/INGESTION_PLAN.md`) is
+  changes, the `100-load-init-data.yaml` seed row, `_archive/datafetcher/INGESTION_PLAN.md`) is
   sitting as uncommitted changes in the working tree.
+
+## UCHealth / Epic FHIR ingestion — working end to end against Epic's sandbox
+
+Design and build plan live in `UCHEALTH_INGESTION_PLAN.md`; the schema is in
+`epic-tables.md`. This section is the "where did we stop" view.
+
+**Verified working against Epic's real sandbox** (test patient Camila Lopez):
+OAuth authorize → MyChart login → consent → callback → token stored → authenticated
+FHIR R4 call → payload staged verbatim → re-run dedups (0 written, 1 skipped).
+
+**What's built:**
+
+- **OAuth (public client + PKCE, no client secret).** `UcHealthOAuthProperties` (config
+  from `.env`), `PkceChallengeStore` (in-memory state→verifier, 15-min TTL, single use),
+  `UcHealthOAuthClient` (authorize URL, code exchange, refresh, `ensureValidToken()`),
+  and `UcHealthAuthController` (`GET /api/uchealth/authorize`, `GET /api/uchealth/callback`).
+- **Fetch + stage.** `UcHealthFhirClient` (Bearer auth, Bundle next-link pagination,
+  filters entries by `resourceType`), `UcHealthIngestJob` (dedup-before-insert from day
+  one, matching the CT.gov pattern).
+- **Normalization.** `FhirSourceParser` (interface, deliberately *not* `TrialSourceParser`),
+  `EpicObservationParser`, `NormalizedLabResult`, `FhirRowNormalizer` (per-row
+  transaction, upsert by `fhirResourceId`, delete-and-reinsert components),
+  `FhirNormalizationService`.
+- **Endpoint.** `POST /api/ingestion/uchealth/observation` — fetch → stage → normalize
+  in one call. **Never yet run against a live backend** (added after the last successful
+  pull, which was staging-only).
+- **Entities scaffolded + tested:** `UcHealthOAuthToken`, `StagingRawFhirResource`,
+  `PatientMedication`, `LabResult`, `LabResultComponent` (changesets `018`–`022`).
+- **Tests:** 34 in `datafetcher` (11 for the parser, against a real captured payload at
+  `datafetcher/src/test/resources/sample-epic-observation.json`), 67 for the
+  LabResult/LabResultComponent DB layers, 34 for PatientMedication. All passing.
+
+**Pick up here tomorrow:**
+
+1. Start the backend, **re-authorize** (`http://localhost:8080/api/uchealth/authorize`,
+   logging in as Epic's sandbox test patient — Camila Lopez; credentials are in Epic's
+   sandbox docs, not recorded here), then
+   `POST /api/ingestion/uchealth/observation` and confirm a row actually lands in
+   `lab_result`. This is the one untested link in the chain.
+2. Retry `POST /api/ingestion/uchealth/medicationrequest` — the Epic grant may have
+   propagated overnight (see blocker below).
+
+**Blockers / open issues, worst first:**
+
+- **No refresh token.** Epic granted `patient/*.read fhirUser launch/patient openid` but
+  silently dropped `offline_access`. The access token dies in ~1 hour and there is no way
+  to renew it — every ingestion run past that needs a fresh interactive browser login.
+  The refresh code path exists and is unit-tested but has **never executed against Epic**.
+  Fine for sandbox; defeats the purpose against a real record. Resolve before the
+  production authorization.
+- **MedicationRequest fetch is blocked.** Epic rejects the patient search with
+  *"Combination of parameters is not valid for any authorized sub-resource."* The app was
+  registered for `MedicationRequest.*(Order Template Medication)` — a formulary catalog,
+  not patient prescriptions. Re-registered for **`Signed Medication Order` (R4)**; the
+  grant hadn't propagated by end of session. The whole `patient_medication` stack
+  (changeset `020`, scaffolded + tested) sits unused until this clears.
+- **`DiagnosticReport` returns 403** despite `.Read/.Search (Results) (R4)` being
+  registered. Not investigated — not needed for the current slice.
+- **`MedicationStatement` is unavailable in R4.** Epic's catalog offers it only in
+  DSTU2/STU3. Dropped from scope; `MedicationRequest` covers prescriptions.
+- **`spring.liquibase.drop-first` was turned off** (`application.yml`) so the OAuth token
+  survives a restart — it was being wiped on every boot. Trade-off: edits to an
+  *already-applied* changeset no longer take effect on startup; rebuild the DB (n8n
+  `clear-db` webhook) for those. New changesets still apply normally.
+- **Panel handling is untested against real data.** `lab_result_component` and the
+  parser's component logic are exercised only by a hand-built CBC payload — Camila's
+  sandbox record has exactly one lab (an A1C) and no panels.
+- **`UcHealthOAuthTokenController` exposes full CRUD over the token table**, including
+  reading refresh tokens back over HTTP. Harmless for sandbox; remove or restrict before
+  real credentials.
+- **Nothing is committed.** All 88 changed/untracked files are sitting in the working
+  tree, including everything above.
 
 ## What's deliberately left off — join tables / foreign keys
 
@@ -177,7 +249,7 @@ exposes a trial/condition/sponsor reference.
 
 1. Manually verify the ingestion endpoint end to end (start backend, call
    `POST /api/ingestion/clinicaltrials` with a real condition, confirm DB rows and
-   re-run dedup behavior) — see checklist in `.claude/INGESTION_PLAN.md`. Then commit
+   re-run dedup behavior) — see checklist in `_archive/datafetcher/INGESTION_PLAN.md`. Then commit
    the ingestion work.
 2. Add a frontend button to trigger ingestion — **done**: `frontend/src/pages/Ingestion.tsx`
    (route `/ingestion`, "Ingest" nav link) calls `POST /api/ingestion/clinicaltrials` and

@@ -2,13 +2,13 @@
 
 Design for the `datafetcher` module's first real feature: pulling trial data from the
 ClinicalTrials.gov v2 API and normalizing it into the core schema. Companion to
-`PROJECT_PLAN.md` (section 4, 6, 10) and `_archive/database/clinical-trials-tables.md` (schema +
+`../../PROJECT_PLAN.md` (section 4, 6, 10) and `_archive/database/clinical-trials-tables.md` (schema +
 field-mapping reference). This doc is the concrete build plan; execute it top to bottom.
 
 ## Decisions made this session
 
 - **Trigger:** on-demand only, via a REST endpoint. No `@Scheduled` job yet — matches
-  `PROJECT_PLAN.md` section 11's recommendation ("trial data doesn't change fast"). The
+  `../../PROJECT_PLAN.md` section 11's recommendation ("trial data doesn't change fast"). The
   frontend button that calls this endpoint is a later task — for now, "a call triggers
   it" (e.g. via Swagger or curl) is sufficient.
 - **Search parameters:** supplied per-call in the trigger endpoint's request body
@@ -18,7 +18,7 @@ field-mapping reference). This doc is the concrete build plan; execute it top to
   and returns a summary (counts, errors). No separate "stage now, normalize later" step
   for this pass — simplest thing that works, matches personal-scale data volumes.
 - **`TrialSourceParser` seam:** build the interface now (not deferred), with
-  `ClinicalTrialsGovParser` as the sole implementation, per `PROJECT_PLAN.md` section 6's
+  `ClinicalTrialsGovParser` as the sole implementation, per `../../PROJECT_PLAN.md` section 6's
   explicit design intent — this is exactly the seam Phase 2 scrapers need.
 - **Dedup key:** `Trial.nctId`. Add `findByNctId` + an upsert path to `TrialService`
   (repository method `TrialRepository.findByNctId` already exists, just needs wiring
@@ -28,10 +28,9 @@ field-mapping reference). This doc is the concrete build plan; execute it top to
   trial that already exists gets re-normalized, soft-delete all its existing
   Location/ArmGroup/Intervention/Outcome/OverallOfficial rows (via each entity's
   existing `findByTrialId` + `delete(extid)`) and insert fresh rows from the new
-  payload. Simple, avoids complex diffing, matches the "clean slate" refresh pattern
-  used in the archived `ts-nar-import.md` reference doc.
+  payload. Simple, avoids complex diffing — a "clean slate" refresh rather than a diff.
 - **Extid-only rule applies.** Everything built here follows the session's standing
-  rule ([[feedback_extid_only]] in memory / `CURRENT_STATE.md`) — no internal numeric
+  rule ([[feedback_extid_only]] in memory / `../../CURRENT_STATE.md`) — no internal numeric
   ids cross the API boundary. Internally, the normalizer works with numeric ids freely
   (it's not the wire boundary), but the trigger endpoint's request/response DTOs must
   not expose any.
@@ -58,7 +57,7 @@ field-mapping reference). This doc is the concrete build plan; execute it top to
   `trial.eligibility_criteria` as raw narrative text. No parsing into the rule tree.
 - **Condition/Sponsor linkage.** The join tables (`trial_condition`, `trial_sponsor`,
   `trial_phase`, `trial_std_age`, `trial_keyword`) don't exist yet (see
-  `CURRENT_STATE.md`). The normalizer should still populate the standalone `Condition`
+  `../../CURRENT_STATE.md`). The normalizer should still populate the standalone `Condition`
   and `Sponsor` lookup tables (dedup by name) so that data isn't lost, but it cannot
   link them to a trial yet — add that linkage when the join tables land.
 - **Frontend trigger button.** Only the backend endpoint is being built now.
@@ -69,14 +68,14 @@ field-mapping reference). This doc is the concrete build plan; execute it top to
 
 ## Module wiring
 
-1. Add `implementation project(':datafetcher')` to root `build.gradle` (currently
-   missing — `datafetcher` exists in `settings.gradle` and depends on `:common`/
+1. Add `implementation project(':datafetcher')` to root `../../../build.gradle` (currently
+   missing — `datafetcher` exists in `../../../settings.gradle` and depends on `:common`/
    `:database`, but nothing depends on *it* yet).
-2. `datafetcher`'s `build.gradle` already has what's needed (Spring Boot starters,
+2. `datafetcher`'s `../../../build.gradle` already has what's needed (Spring Boot starters,
    `:common`, `:database`) — no dependency changes expected. `jsoup` stays unused for
    this pass (it's for future HTML-scraping sources, not the CT.gov JSON API).
 
-## Package layout (mirrors `PROJECT_PLAN.md` section 6)
+## Package layout (mirrors `../../PROJECT_PLAN.md` section 6)
 
 ```
 datafetcher/src/main/java/com/seibel/cancer/datafetcher/
@@ -207,7 +206,7 @@ reference" table in `_archive/database/clinical-trials-tables.md`.
 - `TrialNormalizationServiceTest` — mock `TrialService`/child services, verify
   create-vs-update branching and delete-and-reinsert behavior for children.
 - Skip a live-network test against the real CT.gov API in the automated suite; a manual
-  end-to-end run (per `PROJECT_PLAN.md` phase 1 step 8) covers that.
+  end-to-end run (per `../../PROJECT_PLAN.md` phase 1 step 8) covers that.
 
 ## Verification checklist before calling this done
 
