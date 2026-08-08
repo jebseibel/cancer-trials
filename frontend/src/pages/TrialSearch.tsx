@@ -2,7 +2,10 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Search, FlaskConical } from 'lucide-react';
-import { trialApi } from '../services/api';
+import { trialApi, patientDiagnosisApi } from '../services/api';
+import { useCurrentAppUser } from '../lib/useCurrentAppUser';
+import { runTier1Checks, summariseTier1 } from '../lib/tier1Matching';
+import type { PatientDiagnosis, Trial } from '../types/api';
 
 const STATUS_OPTIONS = [
     'RECRUITING',
@@ -16,6 +19,17 @@ const STATUS_OPTIONS = [
 export default function TrialSearch() {
     const [term, setTerm] = useState('');
     const [status, setStatus] = useState('');
+
+    const { data: appUser } = useCurrentAppUser();
+
+    const { data: diagnosis } = useQuery({
+        queryKey: ['patientDiagnosis', appUser?.extid],
+        queryFn: async () => {
+            const rows = (await patientDiagnosisApi.getByAppUserExtid(appUser!.extid)).data;
+            return rows[0] ?? null;
+        },
+        enabled: !!appUser?.extid,
+    });
 
     const { data, isLoading, isError } = useQuery({
         queryKey: ['trials'],
@@ -93,6 +107,7 @@ export default function TrialSearch() {
                                 {trial.briefSummary && (
                                     <p className="text-sm text-gray-600 mt-1 line-clamp-2">{trial.briefSummary}</p>
                                 )}
+                                {diagnosis && <Tier1Badge diagnosis={diagnosis} trial={trial} />}
                             </div>
                             {trial.overallStatus && (
                                 <span className="flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -104,5 +119,26 @@ export default function TrialSearch() {
                 ))}
             </div>
         </div>
+    );
+}
+
+/**
+ * One-line Tier 1 summary. Amber rather than red on a mismatch, and never hidden from the
+ * list - DIAGNOSIS_MATCHING_DESIGN.md section 5 forbids auto-excluding a trial because a
+ * check did not match.
+ */
+function Tier1Badge({ diagnosis, trial }: { diagnosis: PatientDiagnosis; trial: Trial }) {
+    const summary = summariseTier1(runTier1Checks(diagnosis, trial));
+    const style =
+        summary.outcome === 'pass'
+            ? 'bg-green-50 text-green-800'
+            : summary.outcome === 'fail'
+              ? 'bg-amber-50 text-amber-800'
+              : 'bg-gray-100 text-gray-600';
+
+    return (
+        <span className={`mt-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${style}`}>
+            {summary.text}
+        </span>
     );
 }

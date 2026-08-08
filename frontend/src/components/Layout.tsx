@@ -1,5 +1,5 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom';
-import { Home, Search, Bookmark, LogOut, FlaskConical, Download } from 'lucide-react';
+import { Home, Search, Bookmark, LogOut, FlaskConical, Download, Stethoscope } from 'lucide-react';
 import { authHelpers } from '../services/api';
 
 export default function Layout() {
@@ -43,6 +43,13 @@ export default function Layout() {
                                 >
                                     <Bookmark className="h-4 w-4 mr-2" />
                                     Saved Trials
+                                </Link>
+                                <Link
+                                    to="/diagnosis"
+                                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 border-b-2 border-transparent hover:border-gray-300"
+                                >
+                                    <Stethoscope className="h-4 w-4 mr-2" />
+                                    Diagnosis
                                 </Link>
                                 <Link
                                     to="/ingestion"

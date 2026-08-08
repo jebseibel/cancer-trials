@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, MapPin, Target, UserCircle, Layers } from 'lucide-react';
+import { ArrowLeft, MapPin, Target, UserCircle, Layers, Check, X, HelpCircle, Stethoscope } from 'lucide-react';
 import {
     trialApi,
     locationApi,
@@ -10,8 +10,11 @@ import {
     outcomeApi,
     overallOfficialApi,
     trialStatusApi,
+    patientDiagnosisApi,
 } from '../services/api';
 import { useCurrentAppUser } from '../lib/useCurrentAppUser';
+import { runTier1Checks } from '../lib/tier1Matching';
+import type { CheckOutcome } from '../lib/tier1Matching';
 import { TRIAL_STATUS_VALUES } from '../types/api';
 
 export default function TrialDetail() {
@@ -60,6 +63,15 @@ export default function TrialDetail() {
     const { data: myStatuses } = useQuery({
         queryKey: ['trialStatuses', appUser?.extid],
         queryFn: async () => (await trialStatusApi.getByAppUserExtid(appUser!.extid)).data,
+        enabled: !!appUser?.extid,
+    });
+
+    const { data: diagnosis } = useQuery({
+        queryKey: ['patientDiagnosis', appUser?.extid],
+        queryFn: async () => {
+            const rows = (await patientDiagnosisApi.getByAppUserExtid(appUser!.extid)).data;
+            return rows[0] ?? null;
+        },
         enabled: !!appUser?.extid,
     });
 
@@ -200,6 +212,37 @@ export default function TrialDetail() {
                 )}
             </div>
 
+            {/* Tier 1 matching - deterministic checks only, per DIAGNOSIS_MATCHING_DESIGN.md */}
+            {diagnosis && (
+                <div className="bg-white shadow rounded-lg p-6 mb-6">
+                    <h2 className="text-lg font-medium text-gray-900 mb-1 flex items-center gap-2">
+                        <Stethoscope className="h-5 w-5 text-green-600" />
+                        Basic Eligibility Checks
+                    </h2>
+                    <p className="text-sm text-gray-500 mb-4">
+                        Compares your recorded diagnosis against this trial's stated age, sex, and
+                        recruitment status. These are the only checks that can be made
+                        automatically — they are not an eligibility decision.
+                    </p>
+                    <ul className="space-y-3">
+                        {runTier1Checks(diagnosis, trial).map((check) => (
+                            <li key={check.label} className="flex items-start gap-3">
+                                <OutcomeIcon outcome={check.outcome} />
+                                <div className="text-sm">
+                                    <span className="font-medium text-gray-900">{check.label}</span>
+                                    <p className="text-gray-600">{check.detail}</p>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                    <p className="mt-4 text-xs text-gray-500 border-t pt-3">
+                        Everything else in the eligibility criteria below is unassessed. A trial
+                        that fails a check here may still be worth asking about — confirm with the
+                        study team.
+                    </p>
+                </div>
+            )}
+
             {/* Eligibility */}
             {trial.eligibilityCriteria && (
                 <div className="bg-white shadow rounded-lg p-6 mb-6">
@@ -285,6 +328,17 @@ export default function TrialDetail() {
             )}
         </div>
     );
+}
+
+/** Amber, not red, for a failed check - it is a flag to ask about, never an auto-exclusion. */
+function OutcomeIcon({ outcome }: { outcome: CheckOutcome }) {
+    if (outcome === 'pass') {
+        return <Check className="h-5 w-5 text-green-600 shrink-0 mt-0.5" aria-label="matches" />;
+    }
+    if (outcome === 'fail') {
+        return <X className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" aria-label="does not match" />;
+    }
+    return <HelpCircle className="h-5 w-5 text-gray-400 shrink-0 mt-0.5" aria-label="not assessed" />;
 }
 
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {

@@ -217,6 +217,53 @@ export interface IngestionResult {
     normalizationErrors: string[];
 }
 
+// Patient diagnosis - one row per patient, compared against trial eligibility criteria.
+// Vocabularies below mirror the column comments in DIAGNOSIS_MATCHING_DESIGN.md; the backend
+// stores them as plain varchars, so these constrain the UI only.
+export const STAGE_VALUES = ['I', 'IA', 'IB', 'II', 'IIA', 'IIB', 'III', 'IIIA', 'IIIB', 'IIIC', 'IV'] as const;
+export const STAGE_SYSTEM_VALUES = ['AJCC_8', 'AJCC_7'] as const;
+export const RECEPTOR_STATUS_VALUES = ['POSITIVE', 'NEGATIVE', 'UNKNOWN'] as const;
+export const RECEPTOR_SUBTYPE_VALUES = [
+    'HR_POSITIVE_HER2_NEGATIVE',
+    'HR_POSITIVE_HER2_POSITIVE',
+    'HER2_POSITIVE',
+    'TRIPLE_NEGATIVE',
+] as const;
+export const MENOPAUSAL_STATUS_VALUES = ['PRE', 'PERI', 'POST', 'UNKNOWN'] as const;
+export const SEX_VALUES = ['FEMALE', 'MALE'] as const;
+export const ECOG_VALUES = [0, 1, 2, 3, 4] as const;
+
+export type ReceptorStatus = (typeof RECEPTOR_STATUS_VALUES)[number];
+
+export interface PatientDiagnosis {
+    extid: string;
+    appUserExtid?: string;
+    cancerType: string;
+    stage?: string;
+    stageSystem?: string;
+    isMetastatic?: boolean;
+    metastasisSites?: string;
+    receptorSubtype?: string;
+    erStatus?: string;
+    prStatus?: string;
+    her2Status?: string;
+    biomarkers?: string;
+    ecogStatus?: number;
+    priorChemoRegimens?: number;
+    lastChemoEndDate?: string;
+    priorTreatments?: string;
+    hasMeasurableDisease?: boolean;
+    menopausalStatus?: string;
+    dateOfBirth?: string;
+    sex?: string;
+    diagnosisDate?: string;
+    notes?: string;
+}
+
+// Same shape minus the server-assigned extid. Every field is optional except cancerType,
+// which the backend marks @NotEmpty.
+export type PatientDiagnosisRequest = Omit<PatientDiagnosis, 'extid'>;
+
 // Pagination
 export interface PageResponse<T> {
     content: T[];

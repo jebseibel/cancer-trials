@@ -20,6 +20,8 @@ import type {
     IngestionRequest,
     IngestionResult,
     BackfillResult,
+    PatientDiagnosis,
+    PatientDiagnosisRequest,
 } from '../types/api';
 
 // API Configuration
@@ -144,6 +146,17 @@ export const ragApi = {
     /** Re-index a single trial by extid. */
     reindexTrial: (trialExtid: string) =>
         apiClient.post<BackfillResult>(`/rag/reindex/${trialExtid}`),
+};
+
+// One diagnosis per patient in practice, so the page loads the app user's list and edits
+// the first row rather than offering a list/detail flow.
+export const patientDiagnosisApi = {
+    getByAppUserExtid: (appUserExtid: string) =>
+        apiClient.get<PatientDiagnosis[]>(`/patientdiagnosis/by-appuser/${appUserExtid}`),
+    create: (diagnosis: PatientDiagnosisRequest) =>
+        apiClient.post<PatientDiagnosis>('/patientdiagnosis', diagnosis),
+    update: (extid: string, diagnosis: Partial<PatientDiagnosisRequest>) =>
+        apiClient.put<PatientDiagnosis>(`/patientdiagnosis/${extid}`, diagnosis),
 };
 
 export const authApi = {
