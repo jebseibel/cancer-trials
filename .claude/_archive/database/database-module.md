@@ -57,14 +57,20 @@ Manages database schema evolution:
 **Features:**
 - Version-controlled schema changes
 - Automatic migration on startup
-- Rollback capability
-- Multi-environment support (dev, test, prod)
-- Data seeding and reference data
+- Data seeding and reference data (see `../csv-load/liquibase-csv-loading-pattern.md`)
 
 **Migration Files:**
-- SQL changesets in `db/changelog/changes/`
-- Master changelog in `db.changelog-master.yaml`
-- Tracked in `databasechangelog` table
+- YAML changesets in `db/changelog/changes/`
+- Master changelog in `db.changelog-master.yaml` (a single `includeAll` on `changes/`)
+- Tracked in the `databasechangelog` table
+
+⚠️ **`spring.liquibase.drop-first` is OFF** in `application.yml` (so the UCHealth OAuth token
+survives restarts). Consequence: **edits to an already-applied changeset do not take effect on
+startup.** Rebuild the database via the n8n `clear-db` webhook for those. New changesets still
+apply normally.
+
+This project is not in production, so schema changes are made by editing the existing changeset
+files rather than adding new ones.
 
 ## Architecture
 
@@ -100,8 +106,8 @@ Manages database schema evolution:
 └───────────────┬─────────────────────────┘
                 │
 ┌───────────────▼─────────────────────────┐
-│  AWS RDS MySQL                          │
-│  (Relational Database)                  │
+│  MySQL (local)                          │
+│  connection from RDS_* vars in .env     │
 └─────────────────────────────────────────┘
 ```
 ## Dependencies
@@ -125,33 +131,39 @@ compileOnly 'org.projectlombok:lombok'
 
 ## Current Tables
 
-Live changesets in `database/src/main/resources/db/changelog/changes/`, in run order. All extend the standard base fields (id, extid, created_at, updated_at, deleted_at, active) — see `table-definitions.md` for full column-level detail on the job-search tables.
+Verified 2026-08-08 from `database/src/main/resources/db/changelog/changes/`. All extend the
+standard base fields (`id`, `extid`, `created_at`, `updated_at`, `deleted_at`, `active`).
+Column-level detail for the clinical-trials tables is in
+`../clinical-trials/clinical-trials-tables.md`; for the Epic/FHIR tables, in
+`../../epic-integration/epic-tables.md`.
 
-- customer
-- user
-- purchase
-- company
-- job_posting
-- skill
-- application
-- contact
-- friend
-- job_posting_skill (join: job_posting ↔ skill)
-- user_skill (join: user ↔ skill)
-- friend_skill (join: friend ↔ skill)
-- friend_company (join: friend ↔ company)
-- friend_job_posting (join: friend ↔ job_posting)
+**Clinical trials core** — `trial`, `trial_source`, `trial_status`, `staging_raw_trial`,
+`sponsor`, `medical_condition`, `medication`, `location`, `arm_group`, `intervention`,
+`outcome`, `overall_official`, `eligibility_rule`, `keyword`
+
+**Patient** — `app_user`, `patient_diagnosis`, `patient_medication`, `lab_result`,
+`lab_result_component`
+
+**Epic / UCHealth FHIR** — `uchealth_oauth_token`, `staging_raw_fhir_resource`
+
+**AI prompt management** — `ai_soul`, `ai_prompt_gang`, `ai_prompt_envelope`, `ai_prompt`
+(inherited, unused — see `../ai-prompt/ai-prompt-structure.md`)
+
+**Auth / inherited scaffolding** — `user` (login identity), `customer`, `purchase`
+(from the original template project, not clinical-trials data)
+
+Note the many-to-many join tables designed in `clinical-trials-tables.md` — `trial_condition`,
+`trial_sponsor`, `trial_phase`, `trial_std_age`, `trial_keyword` — were **never scaffolded**.
+That is deliberate and is what blocks condition/sponsor/phase filtering.
 
 ## Key Features
 
-✅ **JPA Entities** - Domain models for all database tables
-✅ **Spring Data Repositories** - Clean data access layer
-✅ **Database Services** - Business logic interface
-✅ **Liquibase Migrations** - Version-controlled schema changes
-✅ **Generic Base Classes** - Reusable components for CSV entities
-✅ **Query Methods** - Type-safe database queries
-✅ **Transaction Management** - Automatic transaction handling
-✅ **Connection Pooling** - Efficient database connections
-✅ **MySQL Integration** - Optimized for AWS RDS MySQL
-✅ **Multi-Environment** - Dev, test, and production configurations
+- JPA entities extending `BaseDb`, one per table
+- Spring Data repositories
+- `*DbService` classes (extend `BaseDbService`) — the layer that `:datafetcher` and `:rag` call
+  directly, since both sit below the root module's `service` package
+- Liquibase migrations, `includeAll` on the `changes/` directory
+- Soft deletes via `ActiveEnum` — records are never hard-deleted
+- ModelMapper-based entity ↔ domain mappers (note: no enum validation — see
+  `../code-style/enum-data-issue.md`)
 

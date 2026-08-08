@@ -1,3 +1,7 @@
+> **This file has no YAML frontmatter, so it is not a registered subagent** — it cannot be
+> invoked via the Agent tool. It works as a prompt you paste or reference by path. Add
+> `name:`/`description:` frontmatter (see `enum-migration-agent.md`) to make it invocable.
+
 ## Project Goal
 I am writing lots and lots of the same kind of code in my Java, Spring, Gradle projects.
 I repeat this pattern over and over. I have request objects/response objects,
@@ -8,7 +12,7 @@ Domain objects in a common place, and Entity objects in the database area.
 The complete layered-architecture pattern (domain, request/response DTOs, entity,
 mapper, repository, db service, business service, controller + inline converter,
 test files, test utility builders, Liquibase changeset) is documented in
-`../_archive/database/database-restapi-template.md`. Read that file for the authoritative,
+`../skills/database-restapi-template/SKILL.md`. Read that file for the authoritative,
 up-to-date field-by-field pattern — do not duplicate it here, since two copies drift
 out of sync.
 
@@ -39,7 +43,7 @@ must also be updated:
 
 ## Notes
 - Package base path: `com.seibel.cancer`
-- Follow `../_archive/database/database-restapi-template.md` exactly for field-level conventions
+- Follow `../skills/database-restapi-template/SKILL.md` exactly for field-level conventions
   (naming, validation annotations, exception handling, base-class fields) — this file
   is only the quick file-location checklist, not the pattern itself.
 - I have IntelliJ Ultimate installed with Gradle.

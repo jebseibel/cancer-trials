@@ -1,3 +1,7 @@
+> **This file has no YAML frontmatter, so it is not a registered subagent** — it cannot be
+> invoked via the Agent tool. It works as a prompt you paste or reference by path. Add
+> `name:`/`description:` frontmatter (see `enum-migration-agent.md`) to make it invocable.
+
 # Execute Plan Agent
 
 ## My Goal

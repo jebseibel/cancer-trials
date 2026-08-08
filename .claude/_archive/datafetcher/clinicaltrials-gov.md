@@ -6,13 +6,11 @@ directory) covers the module's generic architecture (staging → normalize patte
 that first if you haven't. This doc is the "everything about this one source" reference:
 the API itself, exact field mappings, what's been verified, and what's still open.
 
-## Status as of this writing
+## Status (verified 2026-08-08)
 
-Pipeline is built and has been run successfully end-to-end: a call to
-`POST /api/ingestion/clinicaltrials` with `maxStudies=50` fetched real studies from the
-live API, staged them, normalized them into `trial` + child tables, and they render
-correctly in the frontend's Trial Detail page. That's the only verified run so far — see
-"Open work" below for what a full-volume pull still needs.
+Pipeline is built, working, and has been run many times end-to-end against the live API —
+including multi-page pulls of 1,000+ studies and repeat runs proving dedup. See "What's
+verified" below for specifics and the one remaining untested path.
 
 ## The API
 
@@ -50,7 +48,7 @@ reaching the staging table.
 ## Field mapping (raw JSON → core schema)
 
 Full authoritative mapping table lives in
-`_archive/database/clinical-trials-tables.md` ("Source field mapping reference"
+`_archive/clinical-trials/clinical-trials-tables.md` ("Source field mapping reference"
 section) — this is a pointer, not a duplicate, so it doesn't drift out of sync. Key
 points specific to how `ClinicalTrialsGovParser` implements that mapping:
 
@@ -59,7 +57,7 @@ points specific to how `ClinicalTrialsGovParser` implements that mapping:
   "Inclusion Criteria:" / "Exclusion Criteria:" headers and bullet items. Stored as-is
   in `trial.eligibility_criteria`. This pipeline does **not** parse it into the
   `EligibilityRule` tree — that's a manual step by design (see
-  `_archive/database/clinical-trials-tables.md`).
+  `_archive/clinical-trials/clinical-trials-tables.md`).
 - Only `minimumAge`, `maximumAge` (free text like `"18 Years"`), `sex`,
   `healthyVolunteers`, and `stdAges[]` are structured eligibility fields; everything
   else in that module is narrative.
@@ -75,64 +73,53 @@ points specific to how `ClinicalTrialsGovParser` implements that mapping:
   See `ClinicalTrialsGovParser` for the exact JSON paths per field; not duplicated here
   to avoid drift as CT.gov's schema or the parser evolves.
 
-## What's verified vs. not
+## What's verified
 
-**Verified** (one successful run, `maxStudies=50`):
-- Fetch → stage → normalize round-trip works against the live API.
-- Trials, and their Location/ArmGroup/Intervention/Outcome/OverallOfficial children,
-  land correctly and render in the frontend's Trial Detail page.
+Verified repeatedly against the live API, most recently 2026-08-08 (49 of 50 normalized;
+the one failure was a `LocationDb` insert hitting the `decimal(9,6)` latitude overflow,
+not a parser problem):
 
-**Not yet verified:**
-- **Re-running the same search dedups correctly.** The nctId-based upsert path and the
-  delete-and-reinsert-children logic are covered by `TrialRowNormalizerTest` with mocks,
-  but not yet confirmed against a second live run over already-ingested studies.
-- **Full-volume pulls.** Only a 50-study pull has been run; CT.gov has thousands of
-  studies for real conditions. Nothing has tested paging through more than one page (50
-  < the 100/page batch size, so the single live run so far never actually exercised the
-  `pageToken` loop).
-- **Failure handling on a malformed/unexpected payload shape** in a live pull (only
-  covered by the fixture-based `ClinicalTrialsGovParserTest`, which uses one
-  captured-shape sample, not the full variety of real CT.gov studies).
+- Fetch → stage → normalize round-trip, including the `pageToken` loop on multi-page pulls.
+- **Re-running the same search dedups correctly** — trials upsert by `nctId`, children are
+  delete-and-reinserted, staging rows skip or refresh in place.
+- Trials and their Location/ArmGroup/Intervention/Outcome/OverallOfficial children render
+  in the frontend's Trial Detail page.
+- A 1,000-trial pull completed in ~82 seconds; a 736-row normalization run was measured in
+  detail (see the performance note in `datafetcher-module.md`).
 
-## Open work — pulling the full result set
+**Still not verified:** failure handling on a genuinely malformed payload in a live pull.
+The fixture-based `ClinicalTrialsGovParserTest` uses one captured-shape sample, and real
+CT.gov data varies far more than it suggests.
 
-The current constraints, in order of what you'll hit first when trying to pull
-"thousands" instead of 50:
+## Resolved constraints
 
-1. **`maxStudies` is capped at 500** by validation on `RequestClinicalTrialsIngest`
-   (`@Max(value = 500)`). Raise this cap, or call the endpoint multiple times, to get
-   beyond it.
-2. ~~**Staging never dedups.**~~ — **fixed.** `staging_raw_trial` now has a composite
-   unique constraint on `(trial_source_id, source_trial_id)`
-   (`010-staging-raw-trial.yaml`, `uq_staging_raw_trial_source`).
-   `ClinicalTrialsGovIngestJob.run()` checks
-   `StagingRawTrialDbService.findByTrialSourceIdAndSourceTrialId` before staging each
-   study: if a pending (unnormalized) row already exists for that `nctId`, it's skipped
-   (counted in the new `stagingRowsSkipped` / `IngestResult.stagingRowsSkipped()`); if an
-   already-normalized row exists, it's refreshed in place
-   (`StagingRawTrialDbService.refreshForRenormalization` — updates the payload/
-   `fetchedAt` and clears `normalizedAt`/`normalizationError` so it's picked up by the
-   next `normalizePending` pass) rather than inserted as a new duplicate row.
-3. **One synchronous request does fetch+stage+normalize together.** For thousands of
-   studies, a single HTTP request doing all of that synchronously (per
-   `IngestionController.ingestClinicalTrials`) may be slow or time out. Options if this
-   becomes a problem: raise the HTTP timeout, split fetch/stage from normalize into two
-   calls (`normalizePending` already accepts a `maxRows` independent of the ingest call),
-   or make ingestion asynchronous. Not designed yet — decide when it's actually hit.
-4. **No `filter.overallStatus` support.** If the goal is "thousands of *relevant*
-   trials" rather than literally all trials ever registered for a condition (including
-   long-completed/withdrawn ones), consider wiring up `filter.overallStatus` to narrow
-   the pull rather than just raising `maxStudies`.
-5. **Consider `countTotal=true`.** Requesting this would tell you up front how many
-   studies actually match a given condition/term/location combination, which is useful
-   for deciding realistic `maxStudies` values before firing off a large pull.
+Recorded because the reasoning still matters, not because action is needed:
+
+1. ~~**`maxStudies` capped at 500.**~~ **Fixed** — `@Max` is now 50000. The cap was never a
+   client limitation; the paging loop already followed `nextPageToken` correctly.
+2. ~~**Staging never dedups.**~~ **Fixed** — `staging_raw_trial` has a composite unique
+   constraint on `(trial_source_id, source_trial_id)` (`uq_staging_raw_trial_source` in
+   `010-staging-raw-trial.yaml`). `ClinicalTrialsGovIngestJob.run()` checks
+   `findByTrialSourceIdAndSourceTrialId` before staging: a pending duplicate is skipped
+   (counted as `stagingRowsSkipped`); an already-normalized one is refreshed in place via
+   `refreshForRenormalization`, which clears `normalizedAt`/`normalizationError` so the
+   next `normalizePending` pass reprocesses it.
+3. ~~**No `filter.overallStatus` support.**~~ **Fixed** — the client had not been sending
+   the parameter at all. Now supported and defaulting to `RECRUITING`, which matters: a
+   corpus of mostly COMPLETED/TERMINATED trials is the wrong corpus for a discovery tool.
+4. ~~**No way to size a query first.**~~ **Fixed** — `countStudies()` uses `countTotal=true`.
+   Live counts as of 2026-08-07: cancer+RECRUITING 18,773; cancer any status 122,393;
+   breast cancer+RECRUITING 2,456.
+
+**Still open:** one synchronous request does fetch+stage+normalize together. At the measured
+normalization rate a full 18,773-trial pull is ~110 minutes and **will not survive an HTTP
+timeout** — an async job endpoint becomes necessary at that scale, not merely nice to have.
 
 ## Related documentation
 
-- `datafetcher-module.md` (same directory) — generic module architecture
-- `INGESTION_PLAN.md` — original build plan and design decisions for this
-  feature
+- `datafetcher-module.md` (same directory) — module architecture, data flow, dedup
+  behaviour, performance measurements, and the Epic/FHIR source
 - `.claude/CURRENT_STATE.md` — overall project status, including the join-table gaps
   that limit what's linked once trials are normalized
-- `_archive/database/clinical-trials-tables.md` — schema design and the authoritative
+- `_archive/clinical-trials/clinical-trials-tables.md` — schema design and the authoritative
   field-mapping table

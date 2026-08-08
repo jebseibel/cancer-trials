@@ -2,13 +2,13 @@
 
 Snapshot of where the project stands, what's deliberately left unfinished, and what
 that blocks. Companion to `PROJECT_PLAN.md` (overall plan) and
-`_archive/database/clinical-trials-tables.md` (schema design) — this doc is the "where are we right now"
+`_archive/clinical-trials/clinical-trials-tables.md` (schema design) — this doc is the "where are we right now"
 view, meant to be updated as things change rather than kept as history.
 
 ## What's built
 
 **Backend** — full layered scaffold (domain → entity → repository → db/service →
-service → controller) for all core entities from `_archive/database/clinical-trials-tables.md`: Trial,
+service → controller) for all core entities from `_archive/clinical-trials/clinical-trials-tables.md`: Trial,
 TrialSource, StagingRawTrial, Sponsor, Condition, Medication, Location, ArmGroup,
 Intervention, Outcome, OverallOfficial, EligibilityRule, Keyword, AppUser, TrialStatus.
 Standard CRUD + pagination on each, following the project's REST API template.
@@ -50,7 +50,7 @@ should follow the same pattern from the start.
 
 ## What's deliberately left off — join tables / foreign keys
 
-The many-to-many join tables designed in `_archive/database/clinical-trials-tables.md` were never
+The many-to-many join tables designed in `_archive/clinical-trials/clinical-trials-tables.md` were never
 scaffolded at all — no domain, entity, repository, service, or controller layer exists
 for any of them yet:
 
@@ -73,7 +73,7 @@ This is intentional, not an oversight — these are being added later. Until the
 
 **When these land**, expect: new domain/entity/repository/service/controller layers per
 join table (thin — these are pure link tables, no `BaseDb` fields per
-`_archive/database/clinical-trials-tables.md`'s conventions section), a Trial Detail section for each,
+`_archive/clinical-trials/clinical-trials-tables.md`'s conventions section), a Trial Detail section for each,
 and Trial Search filter controls for condition/sponsor/phase. Follow the extid-only rule
 above for any new endpoint that exposes a trial/condition/sponsor reference.
 
@@ -88,7 +88,7 @@ doc for the detailed design/decisions). Summary:
   - `ClinicalTrialsGovIngestJob` — fetches studies, writes `StagingRawTrial` rows.
   - `TrialSourceParser` interface + `ClinicalTrialsGovParser` — parses a staging row's
     raw JSON into a `NormalizedTrial` (Trial + child records + condition/sponsor names),
-    per the field-mapping table in `_archive/database/clinical-trials-tables.md`.
+    per the field-mapping table in `_archive/clinical-trials/clinical-trials-tables.md`.
   - `TrialNormalizationService` + `TrialRowNormalizer` — reads pending staging rows,
     upserts `Trial` by `nctId`, delete-and-reinserts child records
     (Location/ArmGroup/Intervention/Outcome/OverallOfficial) on re-normalization,
@@ -126,8 +126,8 @@ doc for the detailed design/decisions). Summary:
 
 ## UCHealth / Epic FHIR ingestion — working end to end against Epic's sandbox
 
-Design and build plan live in `UCHEALTH_INGESTION_PLAN.md`; the schema is in
-`epic-tables.md`. This section is the "where did we stop" view.
+Design and build plan live in `epic-integration/UCHEALTH_INGESTION_PLAN.md`; the schema is in
+`epic-integration/epic-tables.md`. This section is the "where did we stop" view.
 
 **Verified working against Epic's real sandbox** (test patient Camila Lopez):
 OAuth authorize → MyChart login → consent → callback → token stored → authenticated
@@ -198,7 +198,7 @@ FHIR R4 call → payload staged verbatim → re-run dedups (0 written, 1 skipped
 
 ## What's deliberately left off — join tables / foreign keys
 
-The many-to-many join tables designed in `_archive/database/clinical-trials-tables.md` were never
+The many-to-many join tables designed in `_archive/clinical-trials/clinical-trials-tables.md` were never
 scaffolded at all — no domain, entity, repository, service, or controller layer exists
 for any of them yet:
 
@@ -221,7 +221,7 @@ This is intentional, not an oversight — these are being added later. Until the
 
 **When these land**, expect: new domain/entity/repository/service/controller layers per
 join table (thin — these are pure link tables, no `BaseDb` fields per
-`_archive/database/clinical-trials-tables.md`'s conventions section), a Trial Detail section for each,
+`_archive/clinical-trials/clinical-trials-tables.md`'s conventions section), a Trial Detail section for each,
 Trial Search filter controls for condition/sponsor/phase, and the ingestion normalizer
 updated to link parsed conditions/sponsors/phases to the trial instead of just
 upserting the lookup rows. Follow the extid-only rule above for any new endpoint that
@@ -233,11 +233,11 @@ exposes a trial/condition/sponsor reference.
   and `criterionId` (polymorphic — points at either `Condition` or `Medication`
   depending on `criterionType`) make the extid conversion more involved than the other
   child entities, and the table's own design is still marked "open questions" in
-  `_archive/database/clinical-trials-tables.md`. Its `/by-trial/` endpoint was deliberately *not* added
+  `_archive/clinical-trials/clinical-trials-tables.md`. Its `/by-trial/` endpoint was deliberately *not* added
   this session — skip it until the rule-tree design is settled, then convert it
   alongside adding that endpoint. The ingestion pipeline also does not populate
   `EligibilityRule` — it only writes `trial.eligibility_criteria` as raw narrative text,
-  per `_archive/database/clinical-trials-tables.md`'s note that rule population is manual.
+  per `_archive/clinical-trials/clinical-trials-tables.md`'s note that rule population is manual.
 - **No AppUser-seeding UI.** Creating an `AppUser` row (and making its username match a
   login `User`) is a manual step, not something the app does for you.
 - **Pre-existing test failure**, unrelated to this session's work:

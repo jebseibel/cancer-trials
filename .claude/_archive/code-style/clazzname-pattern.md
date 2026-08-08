@@ -1,5 +1,9 @@
 # CLAZZNAME Pattern Documentation
 
+> **Status in this project (verified 2026-08-08).** Not yet used — zero occurrences of
+> `CLAZZNAME` in the codebase. **Adopted going forward** (decision 2026-08-08): apply to new
+> classes as they are written; do not retrofit existing ones in bulk.
+
 ## Overview
 The CLAZZNAME pattern replaces hardcoded class name strings in log statements with a static final constant. This provides a single source of truth for the class identifier used in logging.
 
@@ -11,10 +15,10 @@ Define a `private static final String` constant at the **top of the class**:
 - **Variable Name:** `CLAZZNAME` (intentionally misspelled)
 - **Visibility:** `private static final`
 - **Position:** First constant declared in the class
-- **Value:** The simple class name as a string (e.g., `"FacilityCrsApprovedRulesEngine"`)
+- **Value:** The simple class name as a string (e.g., `"TrialRowNormalizer"`)
 
 ```java
-private static final String CLAZZNAME = "FacilityCrsApprovedRulesEngine";
+private static final String CLAZZNAME = "TrialRowNormalizer";
 ```
 
 ### Usage in Log Statements
@@ -22,7 +26,7 @@ Replace hardcoded class name strings in `log` calls with `CLAZZNAME`:
 
 Instead of:
 ```java
-log.info("FacilityCrsApprovedRulesEngine - processing {}", id);
+log.info("TrialRowNormalizer - processing {}", id);
 ```
 
 Use:
@@ -40,17 +44,18 @@ log.info("{} - processing {}", CLAZZNAME, id);
 
 ## Applied Scope
 
-The CLAZZNAME pattern has been implemented across 12 retirement certificate service classes:
+**Not yet used in this project** — verified 2026-08-08, zero occurrences of `CLAZZNAME` in the
+codebase. Adopted going forward (decision 2026-08-08); apply it to new classes as they are
+written rather than retrofitting existing ones in bulk.
 
-- RetErcotEmailService
-- RetErcotScreenshotService
-- RetErcotTransDetailService
-- RetMretsCertQuantService
-- RetMretsTransConfirmService
-- RetMretsTransDetailsService
-- RetNarCertSubacctService
-- RetNarRetireCertService
-- RetNarVolComplyService
-- RetWregisCertQuantService
-- RetWregisTransConfirmService
-- RetWregisTransDetailsService
+Where it earns its keep here: the multi-step pipeline classes whose logs interleave during a
+run — `TrialRowNormalizer`, `TrialNormalizationService`, `ClinicalTrialsGovIngestJob`,
+`FhirRowNormalizer`, `TrialIndexService`, `TrialBackfillService`. During a 700-trial ingestion
+these all log at once, and the class prefix is what makes the output readable.
+
+Note the existing convention in those classes is a bare method-name prefix —
+`log.info("promote(): extid={}", extid)`. CLAZZNAME composes with it rather than replacing it:
+
+```java
+log.info("{} promote(): extid={}", CLAZZNAME, extid);
+```

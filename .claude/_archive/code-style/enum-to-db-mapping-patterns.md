@@ -17,26 +17,36 @@ Handled by a custom JPA converter — no manual conversion needed in service cod
 
 ## Pattern 2: String-backed domain enums (current standard)
 
-All domain enums (`FacStatus`, `CrsStatus`, `CrsTrackingAttestationStatus`, etc.) use this pattern.
 Entity fields are plain `String`. No JPA converter. Conversion is manual at the module boundary.
+**Verified 2026-08-08: there is not a single `@Enumerated` in `database/.../db/entity/`** — this
+is universally the pattern here.
 
-- DB column stores `name()` — e.g. `"LOADED"`, `"PENDING_REVIEW"`
+- DB column stores `name()` — e.g. `"RECRUITING"`, `"RULED_OUT"`
 - App module receives raw `String` from the DB module domain object
 - Controller `toResponse()` passes `name()` as-is to the FE — no conversion to `displayValue`
 - Controller inbound receives `name()` from FE, validates with `Enum.valueOf()`, stores `name()`
-- FE resolves `displayValue` for rendering via `GET /api/enums/{name}`
+- FE resolves `displayValue` for rendering
 
-Reference implementations:
-- `src/main/java/com/seibel/cancer/web/controller/FacilityOutputController.java` — `toResponse()`, `create()`, `update()`
-- `common/src/main/java/com/seibel/cancer/common/enums/FacStatus.java` — `valueOf()`
+Note the last step: **`GET /api/enums/{name}` does not exist yet.** Today the frontend hardcodes
+its vocabularies as `as const` arrays in `frontend/src/types/api.ts` (`TRIAL_STATUS_VALUES`,
+`STAGE_VALUES`, `RECEPTOR_STATUS_VALUES`, and others) and renders them with
+`.replaceAll('_', ' ')`. That is the de facto display mechanism until an enum endpoint is built.
 
-### Load tables vs production tables
+Current String-backed enum-ish columns include `status` (on `TrialStatusDb`, `LocationDb`,
+`LabResultDb`, `PatientMedicationDb`), `type` (on `InterventionDb`, `ArmGroupDb`), and `role`
+(on `OverallOfficialDb`, `UserDb`).
 
-Load tables (`facility_load`, `crs_approved`, `crs_pending`) store values exactly as received —
-they may not be valid enum `name()` values. Use a try/catch fallback in `toResponse()` for these.
-Production tables (`facility_output`, etc.) always contain valid `name()` values.
+⚠️ Because the field is a bare `String` and all 27 mappers are ModelMapper with no enum
+validation, nothing prevents one enum's value being written into another's column. See
+`enum-data-issue.md`.
 
-Reference: `src/main/java/com/seibel/cancer/web/controller/FacilityLoadController.java` — `toDisplayValue()` helper
+### Staging tables vs production tables
+
+Staging tables (`staging_raw_trial`, `staging_raw_fhir_resource`) hold payloads exactly as
+received from an external source — any status-like value in them may not be a valid enum
+`name()`. Use a try/catch fallback when converting these. Normalized tables (`trial`,
+`trial_status`, etc.) are written by our own code and should always contain valid `name()`
+values.
 
 ---
 

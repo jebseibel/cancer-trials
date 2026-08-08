@@ -31,9 +31,9 @@ Database layer with JPA entities, repositories, and Liquibase migrations
 - Uses Spring Data JPA
 - Liquibase for database version control
 - Connects to AWS RDS MySQL
-- String cleanup: Empty strings and whitespace automatically converted to NULL
-    - Liquibase loads: `clean_empty_strings()` stored procedure
-    - JPA saves: `StringCleanupListener` entity listener on `BaseDb`
+- No automatic string cleanup. Empty strings are stored as-is — a blank CSV cell loaded by
+  Liquibase lands as `''`, not NULL. (A `clean_empty_strings()` procedure and a
+  `StringCleanupListener` were documented here previously; neither exists in this project.)
 
 ### :ai-provider
 AI provider functionality and integrations

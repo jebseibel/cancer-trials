@@ -1,5 +1,18 @@
 # AI Prompt Lifecycle
 
+> **Status in this project (verified 2026-08-08).** The lifecycle model and the `promote()`
+> logic below are **real and live** — `AiLifecycle` is in `:common` and the `promote()` methods
+> are implemented in `AiPromptDbService`, `AiPromptEnvelopeDbService`, and
+> `AiPromptGangDbService` in `:database`. Both modules are in the build.
+>
+> **But there is no REST or UI layer.** The `/promote` endpoints and the promotion modal
+> described below **do not exist here** — no `Ai*Controller`, no frontend page. The promote
+> logic is reachable only from Java. The endpoint paths and UI flow are retained as the
+> intended design if this is ever surfaced.
+>
+> Inherited from the ViroTrade project along with the prompt tables (changeset
+> `004-ai-tables.yaml`). Nothing in this project uses it yet.
+
 ## Lifecycle States
 
 | State | Meaning |
@@ -95,7 +108,7 @@ When a record is promoted, the backend finds the other record of the same entity
 
 ---
 
-## Promotion Flow (UI)
+## Promotion Flow (UI) — design only, not built here
 
 1. User clicks "Promote to Production" on a Gang, Envelope, or Prompt detail page
 2. Confirmation modal: *"This will retire the current IN_PRODUCTION record and replace it. Continue?"*
@@ -106,7 +119,8 @@ When a record is promoted, the backend finds the other record of the same entity
    - Moves the selected record to `IN_PRODUCTION`
 4. Page refreshes to reflect the new lifecycle state
 
-**Backend endpoints:**
+**Backend endpoints — NOT present in this project.** No `Ai*Controller` exists. These are the
+paths to use if the layer is ever built:
 - `POST /api/ai-prompt-gang/{extid}/promote`
 - `POST /api/ai-prompt-envelope/{extid}/promote`
 - `POST /api/ai-prompt-template/{extid}/promote`

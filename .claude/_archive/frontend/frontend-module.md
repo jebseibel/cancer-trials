@@ -1,139 +1,102 @@
-# Frontend Description
+# Frontend
 
-## Overview
-The frontend is a modern React application built with TypeScript and Vite. It provides a user interface for managing customers, purchases, and users with authentication and form handling capabilities.
+React + TypeScript + Vite single-page app in `frontend/`, served standalone in dev and bundled
+into the Spring Boot jar for deployment.
+
+> **Verified 2026-08-08** against `frontend/src` and `package.json`.
 
 ## Technology Stack
-- **React 19.1.1**: Core UI framework with hooks
-- **TypeScript 5.9.3**: Type-safe JavaScript
-- **Vite 7.1.7**: Fast build tool and development server
-- **React Router DOM 7.9.5**: Client-side routing and navigation
-- **Tailwind CSS 4.1.16**: Utility-first CSS framework
-- **TanStack React Query 5.90.6**: Server state management and data fetching
-- **Axios 1.13.1**: HTTP client for API requests
-- **React Hook Form 7.66.0**: Efficient form state management
-- **Zod 4.1.12**: Schema validation and parsing
-- **Lucide React 0.552.0**: Icon library
-- **Recharts 3.3.0**: Charting and visualization library
-- **clsx 2.1.1**: Conditional CSS class composition
-- **tailwind-merge 3.3.1**: Tailwind CSS class merging utility
-- **@hookform/resolvers 5.2.2**: Form validation resolver integration
 
-## Project Structure
+React 19.1, TypeScript, Vite, React Router DOM 7.9, Tailwind CSS 4.1, TanStack React Query 5.90,
+Axios 1.13, Lucide icons.
 
-### Pages
-- **Login**: Authentication page with login form
-- **Dashboard**: Home page displaying overview cards and statistics
-  - Shows customer count, purchase count, and user count
-  - Quick action links to management pages
-- **Customers**: Customer management interface for CRUD operations
-- **Purchases**: Purchase management interface for CRUD operations (renamed from Orders)
-- **Users**: User management interface for CRUD operations
+Also declared but **not currently used** by any page: React Hook Form + `@hookform/resolvers`,
+Zod, Recharts. The Diagnosis form is hand-rolled `useState`, not React Hook Form — worth knowing
+before assuming a form library is in play.
 
-### Components
-- **Layout**: Main application layout wrapper with navigation
-- **ProtectedRoute**: Route guard component for authenticated pages
+## Structure
 
-### Services
-- **api.ts**: Centralized API client with Axios configuration
-  - Axios interceptors for JWT token attachment
-  - Auto-redirect to login on 401/403 errors
-  - API endpoints for Company, Customer, Purchase, and User resources
-  - Authentication endpoints for login and registration
-  - Auth helper functions for token management
+```
+frontend/src/
+├── App.tsx                      routes
+├── main.tsx
+├── components/
+│   ├── Layout.tsx               nav bar + <Outlet/>, logout button
+│   ├── ProtectedRoute.tsx       redirects to /login when no token
+│   └── JobResultModal.tsx       shared job-result modal (title + label/value lines)
+├── pages/
+│   ├── Login.tsx
+│   ├── Dashboard.tsx
+│   ├── TrialSearch.tsx          filter trials already in the DB
+│   ├── TrialDetail.tsx          full record + personal tracking + Tier 1 checks
+│   ├── SavedTrials.tsx          the user's tracked trials, filtered by status
+│   ├── Diagnosis.tsx            single-page patient diagnosis form
+│   └── Ingestion.tsx            triggers CT.gov ingestion
+├── lib/
+│   ├── useCurrentAppUser.ts     matches login User -> AppUser by username
+│   ├── receptorSubtype.ts       derives receptor subtype; derives age from DOB
+│   ├── tier1Matching.ts         deterministic age/sex/recruiting eligibility checks
+│   └── utils.ts
+├── services/api.ts              axios client + all endpoint groups
+└── types/api.ts                 response/request interfaces + enum value arrays
+```
 
-### Types
-- **api.ts**: TypeScript interfaces for all API entities
-  - Profile, Company, Customer, Purchase, User types
-  - Request and Response DTO interfaces
-  - Authentication types (LoginRequest, RegisterRequest, AuthResponse)
-  - Pagination types (PageResponse)
+## Routes
 
-### Utilities
-- **lib/utils.ts**: Common utility functions
+| Route | Page | Access |
+| --- | --- | --- |
+| `/login` | Login | public |
+| `/` | Dashboard | protected |
+| `/trials` | Trial Search | protected |
+| `/trials/:extid` | Trial Detail | protected |
+| `/saved-trials` | Saved Trials | protected |
+| `/diagnosis` | Diagnosis | protected |
+| `/ingestion` | Ingestion | protected |
 
-## Features
+Everything except `/login` is wrapped in `ProtectedRoute` inside a `Layout`.
 
-### Authentication
-- Login with username and password
-- JWT token-based authentication stored in localStorage
-- Automatic token attachment to API requests via interceptor
-- Session protection via ProtectedRoute component
-- Auto-logout on 401/403 responses
+## API layer
 
-### Entity Management
-All entities support CRUD operations through dedicated pages:
-- List all entities with search/filter capabilities
-- Create new entities via modal forms
-- Update existing entities
-- Delete entities with confirmation dialogs
+`services/api.ts` exports one object per resource group: `trialApi`, `trialSourceApi`,
+`trialStatusApi`, `appUserApi`, `locationApi`, `armGroupApi`, `interventionApi`, `outcomeApi`,
+`overallOfficialApi`, `conditionApi`, `sponsorApi`, `patientDiagnosisApi`, `ingestionApi`,
+`ragApi`, `authApi`, plus `authHelpers`.
 
-### Core Entities
-1. **Customers**: Code, name, contact information, email, phone
-2. **Purchases**: Customer reference, items, status
-3. **Users**: Username, email, role-based access
-4. **Company**: Code, name, description
+- Base URL from `VITE_API_URL`, defaulting to `/api`.
+- Request interceptor attaches `Authorization: Bearer <token>` from `localStorage`.
+- Response interceptor clears the token and redirects to `/login` on 401/403 — **except** on
+  `/auth/` endpoints, so the login form can show its own error.
 
-### Data Management
-- React Query for server state caching and synchronization
-- Axios for HTTP communication with the backend
-- Form validation with basic input validation
-- Automatic refetch and cache invalidation on mutations
-- Error and success message handling
+**Everything on the wire is an `extid`.** No numeric id ever crosses the API boundary, including
+FK-like references (`trialExtid`, `appUserExtid`). Controllers resolve extid → internal id.
 
-### UI/UX
-- Responsive design with Tailwind CSS (mobile-first)
-- Dashboard with quick action cards
-- Lucide icons for visual indicators
-- Professional card-based layout
-- Navigation menu for main sections
-- Modal forms for create/edit operations
-- Real-time search and filtering
-- Toast-style success/error messages
-- Loading states for async operations
+## Two things that surprise people
 
-## Development Commands
-- `npm run dev`: Start development server with Vite hot reload
-- `npm run build`: TypeScript build followed by production build
-- `npm run lint`: Run ESLint for code quality
-- `npm run preview`: Preview production build locally
+**`User` and `AppUser` are different tables with no FK.** Login identity is `user`; personal
+tracking is `app_user`. `useCurrentAppUser` fetches `/api/appuser` and matches **by username**.
+Every login account needs a matching `AppUser` row seeded manually — there is no UI for it.
+Without one, Trial Detail tracking, Saved Trials, and Diagnosis all show "no app-user profile
+linked to your login."
 
-## API Integration
-- Base URL configured via `VITE_API_URL` environment variable
-- Defaults to `/api` for production deployments
-- All requests include JWT Bearer token in Authorization header
-- Response error handling with automatic login redirect on auth failures
-- Paginated responses handled with content property extraction
+**Enum vocabularies are hardcoded on the frontend.** There is no `GET /api/enums/{name}`
+endpoint. `types/api.ts` declares `as const` arrays (`TRIAL_STATUS_VALUES`, `STAGE_VALUES`,
+`RECEPTOR_STATUS_VALUES`, `MENOPAUSAL_STATUS_VALUES`, and others) and pages render them with
+`.replaceAll('_', ' ')`. Adding a value to a backend enum will **not** surface it in the UI —
+the array must be updated too. See `../code-style/enum-lifecycle-rules.md`.
 
-## Authentication Flow
-1. User enters credentials on Login page
-2. API returns JWT token
-3. Token stored in localStorage
-4. Token automatically added to all subsequent API requests
-5. Protected routes redirect unauthenticated users to login
-6. Invalid/expired tokens trigger automatic logout and redirect
+## Commands
 
-## Routing Structure
-- `/login` - Public login page
-- `/` - Protected dashboard (home)
-- `/customers` - Customer management
-- `/purchases` - Purchase management
-- `/users` - User management
+- `npm run dev` — Vite dev server (only start this if explicitly asked)
+- `npm run build` — `tsc -b && vite build`
+- `npm run lint` — ESLint
+- `./gradlew buildDeployment` (repo root) — builds the frontend and bundles it into the jar
 
-## Code Quality
-- ESLint configuration for code linting
-- TypeScript strict mode for type safety
-- React hooks best practices
+Note `npm run lint` currently reports one pre-existing error in `Login.tsx`
+(`@typescript-eslint/no-explicit-any`).
 
-## State Management
-- React Query for server-side data caching and synchronization
-- Local state (useState) for form data and modal visibility
-- localStorage for authentication token persistence
-- React Router for navigation state
+## Related
 
-## Form Handling
-- Modal-based forms for create and edit operations
-- Inline validation with required field checks
-- Form reset on successful submission or cancel
-- Error messages displayed in red callout boxes
-- Success notifications with auto-dismiss after 3 seconds
+- `../../CURRENT_STATE.md` — overall status
+- `../diagnosis/DIAGNOSIS_MATCHING_DESIGN.md` — what the Diagnosis page and Tier 1
+  checks implement, and why no eligibility verdict is ever rendered
+- `../clinical-trials-rag/FRONTEND_JOB_TRIGGER_PLAN.md` — job-trigger button patterns

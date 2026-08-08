@@ -5,6 +5,17 @@
 Defines how enums flow through the system. For implementation patterns and code examples,
 see `enum-to-db-mapping-patterns.md`.
 
+> **Status (verified 2026-08-08).** `DisplayableEnum` and `InternalEnum` are real, live
+> interfaces in `:common`, and `DisplayableEnum`'s javadoc cites these rule numbers directly —
+> the doc and the code are coupled, so keep them in step.
+>
+> **The `GET /api/enums/{name}` endpoint referenced in Rules 1, 8, and 12 does not exist yet.**
+> No `EnumController` or `EnumService` is present. Those rules describe the intended contract
+> for when enum-driven dropdowns are added; nothing serves them today.
+>
+> Only three enums currently implement `DisplayableEnum`: `TrackingSystem`, `AiModel`, and
+> `AiLifecycle`.
+
 ---
 
 ## Enum Types
@@ -14,25 +25,26 @@ Used exclusively for the `active` column on `BaseDb`. Stores `1`/`0`.
 `common/src/main/java/com/seibel/cancer/common/enums/ActiveEnum.java`
 
 ### Type 2: DisplayableEnum (Domain enums)
-All domain enums implement `DisplayableEnum`. Current domain enums:
+Domain enums that appear in the UI implement `DisplayableEnum`
+(`common/src/main/java/com/seibel/cancer/common/enums/DisplayableEnum.java`), which supplies
+`normalize()` and `matchesDisplayValue()` and requires `isActive()`.
 
-Example: `FacStatus` — see `common/src/main/java/com/seibel/cancer/common/enums/crsfac/FacStatus.java`
+Current implementors: `TrackingSystem`, `AiModel`, `AiLifecycle`.
 
+Note that most status-like values in this project are **not** yet enums — they are plain
+`String` columns (`Trial.overallStatus`, `TrialStatus.status`, `Location.status`, and others)
+with the vocabulary enforced only by convention, or by `as const` arrays on the frontend. Adding
+`DisplayableEnum` implementations for those is the natural next step, and these rules are what
+they should follow.
 
-#### FacStatus vs CrsTrackingAttestationStatus — Do Not Confuse
+#### Enums with similar values — do not confuse
 
-Two separate enums, two separate columns, two completely different concerns:
+When two enums carry overlapping-looking constants, keep straight which column each belongs to.
+Because entity fields are plain `String` (Pattern 2), nothing in the compiler, the mapper, or
+the database will stop a value from one being written into the other's column — the failure
+surfaces later as an `IllegalArgumentException` from `valueOf()` on read.
 
-| Enum | Column | Purpose |
-|------|--------|---------|
-| `FacStatus` | `facility_output.status` | Lifecycle of the FacilityOutput record in the data pipeline |
-| `CrsTrackingAttestationStatus` | `facility_output.crs_tracking_attestation_status` | The facility's standing with the CRS registry |
-
-See the class Javadocs for the full value lists:
-- `common/src/main/java/com/seibel/cancer/common/enums/crsfac/FacStatus.java`
-- `common/src/main/java/com/seibel/cancer/common/enums/crsfac/CrsTrackingAttestationStatus.java`
-
-Mixing these two enums causes runtime `IllegalArgumentException` in `toResponse()`.
+See `enum-data-issue.md` for the full mechanism and how to avoid it.
 
 ### Type 3: Simple enums
 Internal processing flags. Do not implement `DisplayableEnum`. Not subject to these rules.

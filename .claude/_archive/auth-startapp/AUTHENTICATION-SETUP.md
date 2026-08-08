@@ -1,167 +1,112 @@
-# Authentication Implementation Summary
+# Authentication — how login works in this project
 
-## What Was Implemented
+Verified against the code 2026-08-08. JWT auth is **live and working** — every class below
+exists and the login flow is what the frontend uses today.
 
-### Backend (Spring Boot)
-1. **Dependencies Added** (build.gradle)
-   - Spring Security Starter
-   - JWT (jjwt-api, jjwt-impl, jjwt-jackson) v0.12.6
+> ⚠️ **Enforcement is currently switched OFF.** `SecurityConfig` has
+> `.anyRequest().permitAll()`, so no endpoint requires a token. The original JWT-protected
+> rule set is preserved commented-out directly beneath it in the same file. See
+> *Before deployment* at the bottom — this is a blocker for QA/Prod, not a detail.
 
-2. **Database**
-   - Created `UserDb` entity with username, password, email, role
-   - Created `UserRepository` for database operations
-   - Added Liquibase migration (110-create-default-user.yaml) to create users table
+## Backend
 
-3. **Security Components**
-   - `JwtUtil` - JWT token generation and validation
-   - `UserDetailsServiceImpl` - Spring Security user details service
-   - `JwtAuthenticationFilter` - JWT authentication filter for requests
-   - `SecurityConfig` - Spring Security configuration with JWT
+| Piece | Location |
+| --- | --- |
+| `UserDb` entity | `database/.../db/entity/UserDb.java` |
+| `UserRepository` | `database/.../db/repository/UserRepository.java` |
+| `JwtUtil` — token generation/validation | `src/main/java/com/seibel/cancer/security/JwtUtil.java` |
+| `CustomUserDetailsService` | `src/main/java/com/seibel/cancer/security/CustomUserDetailsService.java` |
+| `JwtAuthenticationFilter` | `src/main/java/com/seibel/cancer/security/JwtAuthenticationFilter.java` |
+| `SecurityConfig` | `src/main/java/com/seibel/cancer/config/SecurityConfig.java` |
+| `AuthController` | `src/main/java/com/seibel/cancer/web/controller/AuthController.java` |
+| Request/response DTOs | `web/request/RequestLogin.java`, `RequestRegister.java`, `web/response/ResponseAuth.java` |
+| Users table changeset | `database/src/main/resources/db/changelog/changes/002-user.yaml` |
 
-4. **API Endpoints** (AuthController)
-   - `POST /api/auth/login` - Login with username/password
-   - `POST /api/auth/register` - Register new user
+Dependencies: Spring Security starter + JWT (`jjwt-api`, `jjwt-impl`, `jjwt-jackson`).
 
-### Frontend (React + TypeScript)
-1. **Types** (src/types/api.ts)
-   - User, LoginRequest, RegisterRequest, AuthResponse interfaces
+**Endpoints:** `POST /api/auth/login`, `POST /api/auth/register`.
 
-2. **API Service** (src/services/api.ts)
-   - `authApi.login()` - Login API call
-   - `authApi.register()` - Register API call
-   - Axios interceptor to automatically attach JWT token to requests
-   - Auth helper functions (saveToken, getToken, removeToken, isAuthenticated)
+## Frontend
 
-3. **Components**
-   - `Login` page with login/register form
-   - `ProtectedRoute` wrapper to protect authenticated routes
-   - Logout button in Layout component
+- `frontend/src/pages/Login.tsx` — login/register form
+- `frontend/src/components/ProtectedRoute.tsx` — wraps authenticated routes
+- `frontend/src/services/api.ts` — `authApi.login()` / `authApi.register()`, an axios request
+  interceptor that attaches the bearer token, a response interceptor that clears the token and
+  redirects to `/login` on 401/403, and `authHelpers` (`saveToken`, `getToken`, `removeToken`,
+  `isAuthenticated`, `saveUsername`, `getUsername`, `removeUsername`)
+- `frontend/src/App.tsx` — `/login` public, everything else behind `ProtectedRoute`
+- Logout button lives in `Layout.tsx`
 
-4. **Routing** (App.tsx)
-   - `/login` - Public login page
-   - All other routes wrapped with ProtectedRoute
+Token is stored in `localStorage` under `token`; the username under `username`.
 
-## How to Test
+## The `user` table
 
-### 1. Start the Backend
-```bash
-./gradlew bootRun
+**Table name is `user`, singular** — defined in `002-user.yaml`:
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | bigint | auto-increment PK |
+| `extid` | varchar(36) | unique, defaults to `(UUID())` |
+| `username` | varchar(50) | unique, not null |
+| `password` | varchar(255) | BCrypt hash |
+| `email` | varchar(100) | |
+| `role` | varchar(20) | not null, defaults to `USER` |
+| `created_at` | datetime | not null, defaults to `CURRENT_TIMESTAMP` |
+| `updated_at` / `deleted_at` | datetime | |
+| `active` | int | defaults to 1 |
+
+### `User` vs `AppUser` — two different tables
+
+Login identity (`user`, changeset `002`) and personal trial tracking (`app_user`, changeset
+`006`) are **separate tables with no foreign key between them**. The frontend matches them **by
+username** via the `useCurrentAppUser` hook, which fetches `/api/appuser` and finds the row
+whose username equals the logged-in user's.
+
+Consequence: every login account needs an `AppUser` row seeded with a matching username, and
+there is no UI to create that link. Without it, Saved Trials, Trial Detail tracking, and the
+Diagnosis page all show "no app-user profile linked to your login."
+
+## JWT configuration
+
+There is **no `jwt:` block in `application.yml`**, so `JwtUtil`'s inline defaults are what run:
+
+```java
+@Value("${jwt.secret:mySecretKeyForJWTGenerationThatIsLongEnoughFor256BitHS256Algorithm}")
+@Value("${jwt.expiration:86400000}")  // 24 hours
 ```
 
-### 2. Start the Frontend
-```bash
-cd frontend
-npm run dev
-```
+**The signing secret is currently a hardcoded literal committed to the repo.** Fine for local
+single-user dev; not acceptable anywhere else. To override:
 
-### 3. Access the Application
-- Open browser to `http://localhost:5173` (or your Vite port)
-- You'll be redirected to `/login`
-
-### 4. Register a New User
-- Click "Create an account"
-- Enter username (3-50 chars), password (6+ chars), optional email
-- Click "Register"
-- You'll be logged in and redirected to the dashboard
-
-### 5. Test Protected Routes
-- After login, all routes should work normally
-- JWT token is stored in localStorage
-- Token is automatically attached to all API requests
-
-### 6. Test Logout
-- Click the logout icon (🔓) in the top right
-- You'll be redirected to login page
-- Token is removed from localStorage
-
-## Configuration
-
-### JWT Settings (application.yml)
-Add these optional settings to customize JWT:
 ```yaml
 jwt:
-  secret: YourSecretKeyHere (min 256 bits)
-  expiration: 86400000  # 24 hours in milliseconds
+  secret: ${JWT_SECRET}        # min 256 bits
+  expiration: 86400000
 ```
 
-If not specified, defaults are used.
+## Before deployment (QA or Prod)
 
-## Security Notes
+1. **Restore endpoint security.** Remove `.anyRequest().permitAll()` in `SecurityConfig` and
+   uncomment the preserved rule set below it. Note `/api/uchealth/callback` must stay
+   `permitAll` — Epic's OAuth redirect cannot carry a JWT.
+2. **Move the JWT secret to an environment variable** and generate a fresh random value. The
+   committed default must not reach a deployed environment.
+3. **Serve over HTTPS.** Tokens in `localStorage` over plain HTTP are trivially stolen.
+4. Consider: refresh tokens, rate limiting on `/api/auth/login`, and whether
+   `POST /api/auth/register` should be open at all on a single-patient app.
 
-**IMPORTANT for Production:**
-1. Change the JWT secret in application.yml to a strong, random value
-2. Store JWT secret in environment variables, not in code
-3. Use HTTPS in production
-4. Consider adding refresh tokens for longer sessions
-5. Add rate limiting to prevent brute force attacks
-6. Consider adding email verification for registration
-
-## Database Schema
-
-Users table structure:
-```sql
-CREATE TABLE users (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  extid VARCHAR(36) NOT NULL UNIQUE,
-  username VARCHAR(50) NOT NULL UNIQUE,
-  password VARCHAR(255) NOT NULL,  -- BCrypt hashed
-  email VARCHAR(100),
-  role VARCHAR(20) NOT NULL DEFAULT 'USER',
-  created_at DATETIME NOT NULL,
-  updated_at DATETIME,
-  deleted_at DATETIME,
-  active INT DEFAULT 1
-);
-```
-
-## Files Created/Modified
-
-### Backend
-- `build.gradle` - Added dependencies
-- `database/src/main/java/com/seibel/cancer/database/db/entity/UserDb.java`
-- `database/src/main/java/com/seibel/cancer/database/db/repository/UserRepository.java`
-- `src/main/java/com/seibel/cancer/security/JwtUtil.java`
-- `src/main/java/com/seibel/cancer/security/UserDetailsServiceImpl.java`
-- `src/main/java/com/seibel/cancer/security/JwtAuthenticationFilter.java`
-- `src/main/java/com/seibel/cancer/config/SecurityConfig.java`
-- `src/main/java/com/seibel/cancer/web/request/RequestLogin.java`
-- `src/main/java/com/seibel/cancer/web/request/RequestRegister.java`
-- `src/main/java/com/seibel/cancer/web/response/ResponseAuth.java`
-- `src/main/java/com/seibel/cancer/web/controller/AuthController.java`
-- `database/src/main/resources/db/changelog/changes/110-create-default-user.yaml`
-
-### Frontend
-- `frontend/src/types/api.ts` - Added auth types
-- `frontend/src/services/api.ts` - Added auth API and interceptor
-- `frontend/src/pages/Login.tsx`
-- `frontend/src/components/ProtectedRoute.tsx`
-- `frontend/src/components/Layout.tsx` - Added logout button
-- `frontend/src/App.tsx` - Added login route and protected routes
-
-## Next Steps
-
-1. **Test the authentication flow thoroughly**
-2. **Create your first user via the register form**
-3. **Consider adding:**
-   - Password reset functionality
-   - Email verification
-   - Remember me functionality
-   - User profile management
-   - Role-based access control for different features
+Related: `UcHealthOAuthTokenController` exposes full CRUD over the Epic token table, including
+reading refresh tokens back over HTTP. Restrict or remove it before any deployment.
 
 ## Troubleshooting
 
-### "Unauthorized" on all requests
-- Check that JWT secret matches between token creation and validation
-- Verify token is being sent in Authorization header
-- Check browser console for network errors
+**"Unauthorized" on every request** — confirm the JWT secret is identical between token
+creation and validation (a changed `JWT_SECRET` invalidates all existing tokens), and that the
+`Authorization: Bearer …` header is actually being sent.
 
-### Can't login after registration
-- Check database to ensure user was created
-- Verify password is being hashed with BCrypt
-- Check backend logs for errors
+**Can't log in after registering** — check the `user` table for the row and confirm the
+password stored is a BCrypt hash, not plaintext.
 
-### Redirected to login even when logged in
-- Check localStorage for 'token' key
-- Verify token hasn't expired
-- Check browser console for JavaScript errors
+**Redirected to login while logged in** — check `localStorage.token` exists and hasn't expired
+(24h default). The axios response interceptor clears the token and redirects on any 401/403,
+so a single unrelated 403 will log you out.

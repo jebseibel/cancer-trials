@@ -35,7 +35,7 @@ skill run per target":
 
 **Example: scaffold every remaining entity in one go.**
 
-> "Using `../_archive/database/clinical-trials-tables.md` as the source of table names and the file
+> "Using `../_archive/clinical-trials/clinical-trials-tables.md` as the source of table names and the file
 > listing at `common/src/main/java/com/seibel/cancer/common/domain/` to see which
 > Domain POJOs already exist, identify every core (non-join) table that has a Domain
 > POJO but has not yet been scaffolded (no matching `{Entity}Db` in
@@ -46,6 +46,24 @@ skill run per target":
 
 No separate "master agent" layer is needed — the main assistant is already the
 orchestrator when you ask for a parallel fan-out in one message.
+
+---
+
+## `entity-full-stack` — all three, in one pass
+
+Chains the three skills below in order: table spec → Domain POJO → 9-file scaffold + changeset →
+tests. Collects every input up front so it runs without stopping, and compiles between stages so a
+failure is attributed to the stage that caused it.
+
+> "Run entity-full-stack on PatientDiagnosis, from
+> .claude/clinical-trials-rag/DIAGNOSIS_MATCHING_DESIGN.md, extends BaseDomain, keep appUserId."
+
+Give it the entity, the source doc, the base class, and any FK fields to keep. Missing anything, it
+asks once for all of them and then runs clean — the base-class question in particular is one
+`domain-pojo-from-tables-doc` **always** asks, so pre-answering it is what makes the chain
+uninterrupted.
+
+Use a single skill directly when you only want that stage, or when the entity already exists.
 
 ---
 
@@ -67,7 +85,7 @@ generate tests — that's `database-restapi-testing`'s job, run as a separate st
 
 **Fan out, one agent per remaining entity:**
 
-> "Using `../_archive/database/clinical-trials-tables.md` as the source of table names and the file
+> "Using `../_archive/clinical-trials/clinical-trials-tables.md` as the source of table names and the file
 > listing at `common/src/main/java/com/seibel/cancer/common/domain/` to see which
 > Domain POJOs already exist, identify every core (non-join) table that has a Domain
 > POJO but has not yet been scaffolded (no matching `{Entity}Db` in

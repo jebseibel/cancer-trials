@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This guide covers the **one-time setup** for provisioning a new QA/demo VPS environment. For day-to-day operations on a running environment, see `qa-hosting.md`.
+This guide covers the **one-time setup** for provisioning a new QA/demo VPS environment. Day-to-day deployment operations are not documented — the previous `qa-deployment.md` was inherited from another project (wrong host, wrong paths, and a `DROP DATABASE`) and has been removed rather than half-corrected.
 
 ---
 
@@ -357,13 +357,13 @@ Your environment should now be accessible at:
 | API | http://YOUR_IP/api/ |
 | Swagger | http://YOUR_IP/swagger-ui.html |
 
-For ongoing operations (deployments, troubleshooting, etc.), see **`qa-hosting.md`**.
+There is no deployment runbook yet. Write one from a real deploy rather than adapting another project's.
 
 ---
 
 ## Security Checklist
 
-Before going live:
+### Infrastructure
 
 - [ ] Changed default MySQL root password
 - [ ] Set strong password in `/opt/cancer/.env`
@@ -372,3 +372,30 @@ Before going live:
 - [ ] MySQL port (3306) not exposed to internet
 - [ ] SSH key authentication enabled (password auth disabled)
 - [ ] SSL/TLS configured (if domain available)
+
+### Application — blockers, verified in code 2026-08-08
+
+These are not hypothetical hardening suggestions. Each is a live condition in the codebase
+today and each one alone is sufficient reason not to expose this beyond localhost.
+
+- [ ] **Restore endpoint security.** `SecurityConfig` currently ends
+      `.anyRequest().permitAll()` — **no endpoint requires a token**. The original
+      JWT-protected rule set is preserved commented-out directly beneath it. Restore it, but
+      keep `/api/uchealth/callback` as `permitAll`: Epic's OAuth redirect cannot carry a JWT.
+- [ ] **Replace the JWT signing secret.** There is no `jwt:` block in `application.yml`, so
+      `JwtUtil`'s inline default is live — a hardcoded literal committed to the repo. Anyone
+      with repo access can forge a valid token. Move it to `JWT_SECRET` in `.env` and generate
+      a fresh random value (min 256 bits).
+- [ ] **Restrict or remove `UcHealthOAuthTokenController`.** It exposes full CRUD over the
+      Epic token table, including reading refresh tokens back over HTTP.
+- [ ] **Decide whether `POST /api/auth/register` should be reachable at all.** This is a
+      single-patient application; an open registration endpoint is a liability, not a feature.
+- [ ] **Confirm Swagger should be public.** The setup above exposes
+      `http://YOUR_IP/swagger-ui.html`, which publishes the full API surface.
+
+### Before it holds real patient data
+
+This application is designed around one real person's medical record. Beyond the checklist
+above, decide deliberately: who can reach the host, whether the disk is encrypted, what the
+backup story is and where backups live, and whether the Epic integration is pointed at the
+sandbox or at a real record. None of that is configured by the steps in this guide.

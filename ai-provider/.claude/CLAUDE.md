@@ -1,61 +1,44 @@
-# AI Provider Module
+# AI Provider Module — shelved
 
-## Current Module Context
-You are currently working in the **:ai-provider** module of the Viro project.
+## Status
+
+**This module is not part of the build.** `settings.gradle` has
+`// include 'ai-provider'` commented out. The code below exists in the tree but does not
+compile or run as part of the application.
+
+Full context, including the ViroTrade cleanup needed before reviving it, is in
+`.claude/_archive/ai-processing/ai-provider-module.md` at the repo root. **Read that first.**
 
 ## Module Overview
-The ai-provider module is a document intelligence and vision API library that extracts text and structured data from documents and images. It provides unified access to multiple AI providers (OpenAI, Anthropic, Google Gemini, and OpenRouter) with both internal Java API and external REST API.
 
-For detailed documentation, see `.claude/ai-provider-module.md` in the root directory.
-
-## Module Purpose
-Document intelligence and AI workflow orchestration
-- Java library module (java-library)
-- Extracts text and structured data from documents and images
-- Provides multi-step AI workflow orchestration
-- AI function calling with MCP-compatible tools
-- REST API for n8n and external integrations
-- Internal Java API for main application
-- Supports OpenAI, Anthropic, Google Gemini, and OpenRouter providers
+Document intelligence and vision library: extracts text and structured data from documents
+and images through a unified interface over OpenAI, Anthropic, Google Gemini, and OpenRouter.
+Built on Spring AI. Java library module (`java-library`) — no main class.
 
 ## Key Locations
-- `build.gradle` - Module dependencies and Gradle configuration
-- `src/main/java/com/viro/app/aiprovider/` - Main source code
-  - `service/AiService.java` - Core AI operations
-  - `orchestration/AiWorkflowService.java` - Multi-step workflows
-  - `controller/AiController.java` - REST API endpoints
-  - `config/` - Configuration and ChatClient beans
-  - `tools/` - AI function calling registry
-  - `observability/` - Metrics, audit logging, cost tracking
-- AI configuration lives in the main app's `src/main/resources/application.yaml` (no separate `application-ai.yml`)
+
+Source root is `src/main/java/com/seibel/cancer/aiprovider/`:
+
+- `service/AiService.java` — core AI operations
+- `orchestration/AiWorkflowService.java` — multi-step workflows
+- `controller/AiController.java` — REST endpoints under `/api/ai/*`
+- `config/` — configuration properties and ChatClient beans
+- `tools/` — AI function calling registry
+- `observability/` — metrics, audit logging, cost tracking
+- `build.gradle` — module dependencies
+
+Provider enums live in `:common`, not here:
+`common/src/main/java/com/seibel/cancer/common/enums/ai/`.
+
+The module has no `src/main/resources/` and no tests.
+
+## ⚠️ Before changing anything here
+
+The configuration classes still bind to the **`viro.ai`** prefix, and `OpenApiConfig` still
+carries Viro branding. The docs were renamed during the project rename; the code was not.
+See the debt table in the archive doc linked above.
 
 ## Module Dependencies
-This module depends on:
-- `:common` - Shared utilities (if needed)
-- Spring AI framework - OpenAI and Anthropic integration
-- DOES NOT depend on `:fileloader`, `:docstorage`, or other business modules
 
-## Module Isolation
-This module is isolated from other application modules:
-- Main app orchestrates interactions between modules
-- Other modules (fileloader, docstorage) MUST NOT access ai-provider
-- Clean separation of concerns
-
-## API Access Patterns
-**Internal Use (Main App):**
-- Uses `AiService` and `AiWorkflowService` via dependency injection
-- Direct Java method calls (type-safe, zero network overhead)
-
-**External Use (n8n, webhooks):**
-- MUST use REST API only (`/api/ai/*` endpoints)
-- NEVER direct access to Java services
-- Includes authentication, rate limiting, audit logging
-
-## Development Notes
-- Uses Spring AI framework for provider abstraction
-- Built-in observability: Prometheus metrics, audit logging, cost tracking
-- Supports workflow orchestration for complex multi-step AI operations
-- AI function calling with MCP-compatible tools (ToolRegistry)
-- OpenAPI/Swagger documentation at `/swagger-ui.html`
-- ~2,047 lines of code across 23 Java files
-
+Depends on `:common` and the Spring AI framework. Does not depend on other business modules —
+`fileloader` and `docstorage` are referenced in older docs but do not exist in this project.

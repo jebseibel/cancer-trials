@@ -1,6 +1,11 @@
 # AI Provider Module
 
-Industry-standard AI integration module using Spring AI with comprehensive observability.
+> **Shelved — not part of the build.** `settings.gradle` has `include 'ai-provider'`
+> commented out, so nothing here compiles or runs. See
+> `.claude/_archive/ai-processing/ai-provider-module.md` for status and the cleanup needed
+> before reviving it.
+
+AI integration module using Spring AI with observability.
 
 ## Overview
 

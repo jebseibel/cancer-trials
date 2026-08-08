@@ -66,7 +66,7 @@ DataLoader-then-link pattern. Both the ClinicalTrials.gov ingestion job and any
 Playwright scraper write into source-specific raw/staging tables first (JSON blob +
 minimal identifying fields). A separate normalization service reads staging rows and
 upserts into the shared, fully-normalized core schema (full table design in
-[`_archive/database/clinical-trials-tables.md`](_archive/database/clinical-trials-tables.md)). This means:
+[`_archive/clinical-trials/clinical-trials-tables.md`](_archive/clinical-trials/clinical-trials-tables.md)). This means:
 - Adding a new source later = write a scraper that inserts into a new staging table +
   a small normalizer, without touching the core schema or the UI.
 - Nothing is lost even if a source's fields don't map cleanly yet — the raw payload is
@@ -95,7 +95,7 @@ upserts into the shared, fully-normalized core schema (full table design in
 ## 5. Database schema (MySQL, Liquibase-managed)
 
 Full schema design (tables, columns, field mappings, open questions) lives in
-[`_archive/database/clinical-trials-tables.md`](_archive/database/clinical-trials-tables.md), tracked and iterated on separately from this plan.
+[`_archive/clinical-trials/clinical-trials-tables.md`](_archive/clinical-trials/clinical-trials-tables.md), tracked and iterated on separately from this plan.
 
 ## 6. Backend package layout
 
@@ -134,7 +134,7 @@ com.seibel.clinicaltrials
 
 The `TrialSourceParser` interface is the seam for the Playwright integration: each
 source (ClinicalTrials.gov, a future scraper) implements it and is registered against
-the source registry (see `_archive/database/clinical-trials-tables.md`). The normalization job doesn't care where a
+the source registry (see `_archive/clinical-trials/clinical-trials-tables.md`). The normalization job doesn't care where a
 staging row came from.
 
 ## 7. Playwright scraper integration
@@ -142,7 +142,7 @@ staging row came from.
 - Scrapers live outside this repo (or in a `scrapers/` folder, Node + Playwright, not
   part of the Gradle build).
 - They connect directly to the same local MySQL database and insert rows into the
-  staging table (schema in `_archive/database/clinical-trials-tables.md`) with a JSON payload shaped however is natural
+  staging table (schema in `_archive/clinical-trials/clinical-trials-tables.md`) with a JSON payload shaped however is natural
   for that source (doesn't need to match CT.gov's shape).
 - Spring Boot's normalization job polls the staging table for unprocessed rows,
   dispatches to the right `TrialSourceParser` by source, and upserts into the core
@@ -183,7 +183,7 @@ Core screens for phase 1:
 
 **Phase 1 — Foundation & ClinicalTrials.gov ingestion (this plan's scope)**
 1. Project scaffold: Gradle, Spring Boot, MySQL/Docker, Liquibase master changelog
-2. Core schema as Liquibase changesets (see `_archive/database/clinical-trials-tables.md` for the table design)
+2. Core schema as Liquibase changesets (see `_archive/clinical-trials/clinical-trials-tables.md` for the table design)
 3. `ClinicalTrialsGovClient` + ingestion job (fetch by condition/location search terms
    you configure, page through results, write to staging)
 4. `TrialNormalizationService` + `ClinicalTrialsGovParser` — staging → core tables

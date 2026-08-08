@@ -45,7 +45,7 @@ If no input directory is specified, process all `.md` files under `.claude/` rec
 If an input directory is provided (e.g., `.claude/_archive/database`), process only the `.md` files in that directory. Do not recurse into subdirectories unless the input path ends with `/**`.
 
 ### Files to NEVER modify
-- `../_archive/database/database-restapi-template.md` — skip entirely, regardless of input (this is the canonical layered-architecture pattern reference; other agents point to it and it must stay stable)
+- `../skills/*/SKILL.md` — skip entirely, regardless of input (the skills are the canonical layered-architecture pattern reference; other agents point to them and they must stay stable)
 - All files under `.claude/_archive/hosting/` — skip entirely, regardless of input
 
 ---
@@ -70,7 +70,7 @@ If a claim no longer matches the code, correct it. If a section describes someth
 
 ## What NOT to do
 
-- Do NOT add code blocks or code samples to documents (except `database-restapi-template.md`, which is never touched)
+- Do NOT add code blocks or code samples to documents (except the skill files under `.claude/skills/`, which are never touched)
 - Do NOT rewrite documents from scratch — make surgical corrections
 - Do NOT change the structure or purpose of a document
 - Do NOT add new sections not already present in the document
@@ -105,7 +105,7 @@ or removed over time and this list can go stale like any other doc.
 Before doing any work, state clearly:
 - Whether this is a **full run** or a **single directory run**
 - The exact directory path(s) that will be processed (or "all of `.claude/`" for a full run)
-- That `database-restapi-template.md` will be skipped
+- That the `.claude/skills/` files will be skipped
 
 Wait for the user to confirm before proceeding.
 
@@ -114,12 +114,12 @@ Wait for the user to confirm before proceeding.
 For a **full run**, Glob `.claude/**/*.md` to discover the current work queue — do not
 rely on a hardcoded list, since the doc set changes over time and a stale list will
 silently skip new docs or fail on deleted ones. Always exclude
-`database-restapi-template.md` and all files under `.claude/_archive/hosting/`.
+all files under `.claude/skills/` and all files under `.claude/_archive/hosting/`.
 
 For a **single directory run**, Glob `.md` files only in the specified input directory
 (add `/**` to the path if recursive was requested).
 
-Always exclude `database-restapi-template.md` and all files under `hosting/`. This is
+Always exclude everything under `.claude/skills/` and all files under `hosting/`. This is
 your work queue.
 
 ### Step 2: For each document
@@ -178,7 +178,7 @@ Do NOT use Bash for file searching. Use Glob and Grep exclusively.
 
 ## Rules
 
-- Never modify `database-restapi-template.md`
+- Never modify anything under `.claude/skills/`
 - Never commit to Git
 - Never drop or alter the database
 - Always read the source before updating a doc — do not guess

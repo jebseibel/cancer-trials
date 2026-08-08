@@ -28,7 +28,7 @@ whatever doc they're using.
 
 ## Input
 
-- A markdown file path (e.g. `../../_archive/database/clinical-trials-tables.md`) and a table name/section
+- A markdown file path (e.g. `../../_archive/clinical-trials/clinical-trials-tables.md`) and a table name/section
   within it — OR a pasted column block directly, if there is no doc yet.
 - The table's own column list, e.g.:
   ```

@@ -11,6 +11,18 @@ Controller → Service → (Database module)
 
 Controllers handle HTTP only. Services handle business logic. Controllers never contain business logic.
 
+> **Status (verified 2026-08-08).** The layering below is accurate and actively followed —
+> every controller in `src/main/java/com/seibel/cancer/web/controller/` has its package-private
+> `Converter` in the same file, and `BaseService` supplies `requireNonNull()` /
+> `requireNonBlank()` in both one-arg and named-field forms.
+>
+> One exception to the text below: **no controller declares
+> `throws DatabaseFailureException`.** `GlobalExceptionHandler` handles it centrally instead.
+>
+> For the full file-by-file scaffold, use the `database-restapi-template` skill — it is the
+> maintained version of this pattern. This doc covers the style rules; the skill generates
+> the code.
+
 ---
 
 ## Layer Responsibilities
@@ -21,7 +33,8 @@ Controllers handle HTTP only. Services handle business logic. Controllers never 
 - Converts Domain → Response DTO via a package-private `Converter` class in the same file
 - Converts Request DTO → Domain via the same `Converter`
 - No business logic, no filtering, no sorting, no data transformation
-- Declares `throws DatabaseFailureException` and lets Spring handle it
+- Lets `DatabaseFailureException` propagate to `GlobalExceptionHandler` — controllers in this
+  project do **not** declare it in their `throws` clause
 - Only explicit error handling: null checks and false return values
 
 ### Service
@@ -39,105 +52,20 @@ Controllers handle HTTP only. Services handle business logic. Controllers never 
 
 ---
 
-## Enum-Specific Pattern
+## Enum endpoints — not built here
 
-Enum endpoints are a special case — they have no DB entity, no repository, no mapper.
-Their data comes entirely from Java enum constants in `:common`.
+An `EnumController`/`EnumService` pair serving enum vocabularies to the frontend
+(`GET /api/enums/{name}`) is assumed by `enum-lifecycle-rules.md` Rules 1, 8, and 12.
+**Neither class exists in this project** — verified 2026-08-08.
 
-### Rule: No Business Logic in EnumController
+Today the frontend hardcodes its vocabularies as `as const` arrays in
+`frontend/src/types/api.ts` and renders them with `.replaceAll('_', ' ')`.
 
-`EnumController` must delegate all logic to `EnumService`. The controller does HTTP routing only.
-
-`EnumController` is fully refactored — all filtering, sorting, and mapping live in `EnumService`. Each controller endpoint is a one-liner delegating to the service.
-
-### EnumService
-
-**Location:** `src/main/java/com/seibel/cancer/service/EnumService.java`
-**Package:** `com.seibel.cancer.service`
-
-Responsibilities:
-- Filtering (`isActive()`)
-- Sorting by `sortOrder`
-- Mapping enum constants → response maps
-- Special-field handling (e.g. `promotable` on `RetCertEligibilityStatus`)
-
-**Pattern:**
-```java
-@Service
-public class EnumService {
-
-    public List<Map<String, Object>> toResponse(DisplayableEnum[] values) {
-        return Arrays.stream(values)
-                .filter(DisplayableEnum::isActive)
-                .sorted(Comparator.comparingInt(DisplayableEnum::getSortOrder))
-                .map(v -> Map.<String, Object>of(
-                        "name", v.name(),
-                        "displayValue", v.getDisplayValue(),
-                        "sortOrder", v.getSortOrder(),
-                        "preferred", v.preferred(),
-                        "displayable", v.isDisplayable()
-                ))
-                .toList();
-    }
-
-    public List<Map<String, Object>> toResponseEligibility() {
-        return Arrays.stream(RetCertEligibilityStatus.values())
-                .filter(RetCertEligibilityStatus::isActive)
-                .sorted(Comparator.comparingInt(RetCertEligibilityStatus::getSortOrder))
-                .map(v -> {
-                    Map<String, Object> map = new LinkedHashMap<>();
-                    map.put("displayValue", v.getDisplayValue());
-                    map.put("sortOrder", v.getSortOrder());
-                    map.put("preferred", v.preferred());
-                    map.put("displayable", v.isDisplayable());
-                    map.put("promotable", v.isPromotable());
-                    return map;
-                })
-                .toList();
-    }
-
-    public Map<String, Object> getAll() {
-        return Map.of(
-                "crsStatus", toResponse(CrsStatus.values()),
-                "crsTrackingAttestationStatus", toResponse(CrsTrackingAttestationStatus.values()),
-                "facStatus", toResponse(FacStatus.values()),
-                "facNercRegion", toResponse(FacNercRegion.values()),
-                "facRenewableType", toResponse(FacRenewableType.values()),
-                "retCertRecordStatus", toResponse(RetCertRecordStatus.values()),
-                "retCertUploadStatus", toResponse(RetCertUploadStatus.values()),
-                "eligibilityStatus", toResponseEligibility()
-        );
-    }
-}
-```
-
-**EnumController (current implementation):**
-```java
-@RestController
-@RequestMapping("/api/enums")
-public class EnumController {
-
-    private final EnumService enumService;
-
-    public EnumController(EnumService enumService) {
-        this.enumService = enumService;
-    }
-
-    @GetMapping("/all")
-    public Map<String, Object> getAll() {
-        return enumService.getAll();
-    }
-
-    @GetMapping("/crs-status")
-    public List<Map<String, Object>> getCrsStatus() {
-        return enumService.toResponse(CrsStatus.values());
-    }
-
-    // ... etc — each endpoint is a one-liner delegating to enumService
-}
-```
-
-**Status:** Implemented. `EnumService` exists at `src/main/java/com/seibel/cancer/service/EnumService.java`. `EnumController` delegates all logic to `EnumService`.
+If that endpoint is built later, it is a special case worth noting: enum endpoints have no DB
+entity, no repository, and no mapper, since the data comes entirely from Java enum constants in
+`:common`. The layering rules still apply — the controller does HTTP routing only, and all
+filtering (`isActive()`), sorting (`sortOrder`), and mapping to response shape belong in the
+service.
 
 ---
 

@@ -1,5 +1,22 @@
 # AI Prompt Structure
 
+> **Status in this project (verified 2026-08-08).** The four-entity model below is **real**:
+> domain classes (`AiPrompt`, `AiPromptGang`, `AiPromptEnvelope`) are in `:common`, entities,
+> repositories, mappers, and DbServices are in `:database`, and the tables are created by
+> changeset `004-ai-tables.yaml`. Both modules are in the build, so this code compiles today.
+>
+> Three caveats:
+> - **No REST or UI layer exists** — no `Ai*Controller`, no frontend pages.
+> - **`AiSoul` is only half-scaffolded** — `AiSoulDb` entity and `AiSoulRepository` exist, but
+>   there is no `AiSoul` domain class, mapper, or DbService.
+> - **The *Prompt Assembly* section describes `PromptLoaderService`, which lives in the shelved
+>   `:ai-provider` module** — that code is not on the classpath. See
+>   `../ai-processing/ai-provider-module.md`.
+>
+> Inherited from the ViroTrade project. Nothing in this project uses these tables yet;
+> `RAG_PLAN.md` §2 notes they are prompt-management tables, unrelated to embeddings, and that
+> the RAG work does not touch them.
+
 A pure conceptual prompt and component model with no implementation details.
 
 ---
@@ -81,7 +98,7 @@ Once the form is settled, the implementation (entities, relationships, annotatio
 
 **Soul → PromptGang (one-to-many)** — One Soul, inherited by many PromptGangs. Every PromptGang must have a Soul.
 
-**PromptGang → PromptEnvelope (one-to-many)** — A PromptGang owns many PromptEnvelopes (e.g., ERCOT owns Email, Screenshot, TransDetail).
+**PromptGang → PromptEnvelope (one-to-many)** — A PromptGang owns many PromptEnvelopes (e.g., a "TrialSummary" gang owning Eligibility, PlainLanguage, and Comparison envelopes).
 
 **PromptEnvelope → Prompt (one-to-many)** — A PromptEnvelope owns one or many Prompts containing the actual content.
 

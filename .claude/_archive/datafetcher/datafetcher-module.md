@@ -2,12 +2,15 @@
 
 ## What It Is
 
-The **datafetcher** module fetches clinical trial data from external sources and
-normalizes it into the core schema. Its first (and currently only) source is the
-ClinicalTrials.gov v2 REST API. It follows the staging-table-then-normalize pattern
-described in `PROJECT_PLAN.md` (sections 4, 6, 10): fetch raw payloads into a staging
-table first, then a separate normalization step upserts them into the real schema. This
-is the seam a future non-CT.gov source (e.g. a Playwright scraper) would plug into.
+The **datafetcher** module fetches data from external sources and normalizes it into the
+core schema. It has **two** sources: the ClinicalTrials.gov v2 REST API (trials) and
+UCHealth's Epic FHIR R4 API (patient clinical data). Both follow the
+staging-table-then-normalize pattern described in `PROJECT_PLAN.md` (sections 4, 6, 10):
+fetch raw payloads into a staging table first, then a separate normalization step upserts
+them into the real schema. That seam is where a future source (e.g. a Playwright scraper)
+would plug in.
+
+> **Verified 2026-08-08.** Structure below reflects the 20 source files actually present.
 
 ## Module Structure
 
@@ -17,23 +20,41 @@ datafetcher/
 │   ├── clinicaltrials/
 │   │   ├── ClinicalTrialsGovClient.java       REST client for GET /studies (paged)
 │   │   └── ClinicalTrialsGovIngestJob.java    fetch -> write StagingRawTrial rows
+│   ├── config/
+│   │   ├── ClinicalTrialsIngestProperties.java  cancer.ingestion.clinicaltrials.* defaults
+│   │   └── DatafetcherConfig.java
+│   ├── uchealth/                              Epic FHIR R4 source
+│   │   ├── UcHealthOAuthProperties.java       config from .env
+│   │   ├── UcHealthOAuthClient.java           authorize URL, code exchange, refresh, ensureValidToken()
+│   │   ├── PkceChallengeStore.java            in-memory state->verifier, 15-min TTL, single use
+│   │   ├── UcHealthFhirClient.java            Bearer auth, Bundle next-link pagination
+│   │   └── UcHealthIngestJob.java             fetch -> write StagingRawFhirResource rows
 │   └── normalization/
 │       ├── TrialSourceParser.java             interface: raw payload -> NormalizedTrial
-│       ├── ClinicalTrialsGovParser.java        implements TrialSourceParser for CT.gov's JSON
-│       ├── NormalizedTrial.java                bundles Trial + child records + condition/sponsor names
-│       ├── TrialNormalizationService.java      reads pending staging rows, loops, collects results
-│       └── TrialRowNormalizer.java             normalizes ONE row in its own transaction
-├── src/test/java/com/seibel/cancer/datafetcher/normalization/
-│   ├── ClinicalTrialsGovParserTest.java        fixture-based parser test
-│   └── TrialRowNormalizerTest.java             mocked-DbService normalizer test
+│       ├── ClinicalTrialsGovParser.java       implements TrialSourceParser for CT.gov's JSON
+│       ├── NormalizedTrial.java               bundles Trial + child records + condition/sponsor names
+│       ├── TrialNormalizationService.java     reads pending staging rows, loops, collects results
+│       ├── TrialRowNormalizer.java            normalizes ONE row in its own transaction
+│       ├── NormalizationCache.java            per-run cache for TrialSource + condition/sponsor lookups
+│       ├── FhirSourceParser.java              interface (deliberately NOT TrialSourceParser)
+│       ├── EpicObservationParser.java         Epic Observation -> NormalizedLabResult
+│       ├── NormalizedLabResult.java
+│       ├── FhirNormalizationService.java
+│       └── FhirRowNormalizer.java             per-row transaction, upsert by fhirResourceId
+├── src/test/java/...                          6 test classes:
+│   ClinicalTrialsGovParserTest, TrialRowNormalizerTest, EpicObservationParserTest,
+│   UcHealthFhirClientTest, UcHealthOAuthClientTest, PkceChallengeStoreTest
 └── build.gradle
 ```
+
+Note `FhirSourceParser` is a **separate interface** from `TrialSourceParser` — FHIR
+resources are not trials and forcing them through one interface would have distorted both.
 
 ## Data Flow
 
 ```
 POST /api/ingestion/clinicaltrials  (root module, IngestionController)
-        │  { condition, term, location, maxStudies }
+        │  { condition, term, location, overallStatus, maxStudies }
         ▼
 ClinicalTrialsGovIngestJob.run(...)
         │  ClinicalTrialsGovClient pages GET /studies (pageSize 100, cursor pageToken)
@@ -69,26 +90,45 @@ separate bean forces the proxy to apply.
 
 ## Trigger
 
-**On-demand only**, via `POST /api/ingestion/clinicaltrials` (root module,
-`IngestionController`) — no `@Scheduled` job. Request body
-(`RequestClinicalTrialsIngest`): `condition` (→ `query.cond`), `term` (→ `query.term`),
-`location` (→ `query.locn`), `maxStudies` (default 50, min 1, max 500). Frontend trigger:
-`frontend/src/pages/Ingestion.tsx` (route `/ingestion`) calls this endpoint and shows the
-result counts/errors.
+**On-demand only** — no `@Scheduled` job. Three endpoints on `IngestionController` (root
+module):
 
-**`maxStudies` is the actual cap on a single call** — it is not a hard limit in the
-client. `ClinicalTrialsGovClient.searchStudies` pages in batches of 100 (`PAGE_SIZE`)
-via the cursor-based `pageToken`, and keeps paging until either `maxStudies` is reached
-or CT.gov runs out of results (`nextPageToken` missing). A default-50 pull only returns
-50 because that's what was requested — raising `maxStudies` (up to the DTO's 500 max)
-pulls more in one call; pulling more than 500 in one shot means either raising that
-`@Max` or calling the endpoint multiple times.
+| Endpoint | Source |
+| --- | --- |
+| `POST /api/ingestion/clinicaltrials` | CT.gov — fetch, stage, normalize |
+| `POST /api/ingestion/uchealth/observation` | Epic Observation → `lab_result` |
+| `POST /api/ingestion/uchealth/medicationrequest` | Epic MedicationRequest (blocked, see below) |
 
-`normalizePending`'s `maxRows` is currently passed the same `maxStudies` value from the
-controller — it processes at most that many *pending* staging rows per call, which is
-usually fine since ingest and normalize run back-to-back synchronously in the same
-request, but if staging ever gets ahead of normalization (e.g. a call fails partway),
-pending rows beyond that count wait for the next call.
+Request body for the CT.gov call (`RequestClinicalTrialsIngest`): `condition`
+(→ `query.cond`), `term` (→ `query.term`), `location` (→ `query.locn`), `overallStatus`
+(→ `filter.overallStatus`; send `"ALL"` to clear it), `maxStudies` (min 1, **max 50000**).
+Frontend trigger: `frontend/src/pages/Ingestion.tsx` (route `/ingestion`).
+
+Defaults come from `cancer.ingestion.clinicaltrials.*` in `application.yml`
+(`ClinicalTrialsIngestProperties`) and are overridable per request:
+
+```yaml
+condition: cancer
+overall-status: RECRUITING
+max-studies: 1000
+max-normalize-rows: 5000
+```
+
+**`maxStudies` is the cap on a single call, not a client limit.**
+`ClinicalTrialsGovClient.searchStudies` pages in batches of 100 via the cursor
+`pageToken` until `maxStudies` is reached or CT.gov runs out (`nextPageToken` missing).
+`countStudies()` uses `countTotal=true` to size a query before committing to the pull.
+
+**Normalization is bounded independently** by `max-normalize-rows`. This was a real bug:
+the controller previously passed `maxStudies` as the normalization limit, but staging
+rows accumulate across runs, so the two numbers drift and rows get silently left pending.
+
+⚠️ **Normalization is the bottleneck, not fetching.** Measured on 736 staging rows: fetch
+~1.1s (0.4%), staging ~0.7s (0.3%), **normalization ~257s (99.3%)** — about 349ms and ~38
+DB round trips per trial. Extrapolated, a full recruiting-only cancer pull (~18,773
+trials) is ~110 minutes, which **will not survive an HTTP request timeout**. Batching the
+~25 child INSERTs is blocked by `BaseDb`'s `GenerationType.IDENTITY`, which disables
+Hibernate JDBC batching outright.
 
 ## Dedup / Re-ingestion Behavior
 
@@ -116,13 +156,35 @@ pending rows beyond that count wait for the next call.
   but nothing associates them with the trial they came from. See `CURRENT_STATE.md`.
 - **EligibilityRule is not populated.** Only raw narrative text lands in
   `trial.eligibility_criteria`; parsing into the structured rule tree is manual, by
-  design, per `_archive/database/clinical-trials-tables.md`.
+  design, per `_archive/clinical-trials/clinical-trials-tables.md`.
 - **No rate-limit/backoff logic.** CT.gov has no documented hard limit; the client pages
   conservatively (100/page) but does not back off or retry on failure.
-- **Not yet pulling the full available result set.** Verified working end-to-end for a
-  50-study pull; CT.gov has thousands of matching studies for real conditions. Next step
-  is deciding how to pull the full set (raise `maxStudies` per call vs. multiple calls
-  vs. raising the `@Max(500)` cap) — see Suggested next steps in `CURRENT_STATE.md`.
+- **Memory on large pulls.** `ClinicalTrialsGovClient` accumulates every study in a
+  `List<JsonNode>` before staging any of them, so an 18,773-trial pull holds ~280MB of
+  parsed JSON in heap at once. The fix is streaming (stage each page as it arrives), not
+  a bigger page size.
+- **Ingestion does not update the vector store.** `POST /api/rag/backfill` is a separate,
+  deliberate second step — newly ingested trials are not semantically searchable until it
+  runs. See `../clinical-trials-rag/RAG_SESSION_STATE.md`.
+
+### Epic / UCHealth specific
+
+- **No refresh token.** Epic granted `patient/*.read fhirUser launch/patient openid` but
+  silently dropped `offline_access`. The access token dies in ~1 hour with no way to renew
+  it — every run past that needs a fresh interactive browser login. The refresh code path
+  exists and is unit-tested but has **never executed against Epic**.
+- **MedicationRequest fetch is blocked.** Epic rejects the patient search with *"Combination
+  of parameters is not valid for any authorized sub-resource."* The app was registered for
+  `MedicationRequest.*(Order Template Medication)` — a formulary catalog, not patient
+  prescriptions. Re-registered for `Signed Medication Order` (R4); grant had not propagated.
+  The whole `patient_medication` stack sits unused until this clears.
+- **`DiagnosticReport` returns 403** despite `.Read/.Search (Results) (R4)` being registered.
+  Not investigated — not needed for the current slice.
+- **Panel handling is untested against real data.** `lab_result_component` and the parser's
+  component logic are exercised only by a hand-built CBC payload; the sandbox patient has one
+  lab (an A1C) and no panels.
+- **`UcHealthOAuthTokenController` exposes full CRUD over the token table**, including reading
+  refresh tokens back over HTTP. Restrict or remove before any deployment.
 
 ## Dependencies
 
@@ -162,13 +224,26 @@ they only serve the REST API's own CRUD endpoints.
 ./gradlew :datafetcher:test --tests "*TrialRowNormalizerTest"
 ```
 
+Six test classes, 34 tests, all passing:
+
 - **`ClinicalTrialsGovParserTest`** — fixture-based (`src/test/resources/sample-clinicaltrials-study.json`),
   asserts a captured-shape CT.gov payload parses into the expected `NormalizedTrial` fields.
 - **`TrialRowNormalizerTest`** — mocks the `*DbService` collaborators, covers the
   new-trial-vs-existing-trial branch and the delete-and-reinsert-children behavior.
-- No live-network test against the real CT.gov API in the automated suite — verified
-  manually instead (a 50-study pull has been run successfully; see Known Gaps above for
-  what's still outstanding at larger volumes).
+- **`EpicObservationParserTest`** — 11 tests against a real captured Epic payload
+  (`src/test/resources/sample-epic-observation.json`).
+- **`UcHealthFhirClientTest`**, **`UcHealthOAuthClientTest`**, **`PkceChallengeStoreTest`**.
+
+⚠️ **The CT.gov fixture is misleading about real data.** Measured across 50 real trials:
+escaped markdown (`\*`, `\<`) survives ingestion in 23/50; bullet markers are `*` (632
+lines) and numbered (163) with **hyphen never used**; 2/50 have no eligibility headers at
+all; eligibility text runs to 13,771 chars at the longest. A parser written against the
+hand-built fixture alone matches little in production — see
+`../clinical-trials-rag/RAG_SESSION_STATE.md`.
+
+No live-network test against either API in the automated suite. Both are verified
+manually: CT.gov end-to-end repeatedly (most recently 49/50 normalized), Epic against the
+sandbox patient.
 
 ## Module Type
 
@@ -179,20 +254,20 @@ via `implementation project(':datafetcher')`).
 ## Integration with Other Modules
 
 ### Used By
-- **Root module** — `IngestionController` (`POST /api/ingestion/clinicaltrials`)
+- **Root module** — `IngestionController` (all three `/api/ingestion/*` endpoints) and
+  `UcHealthAuthController` (`GET /api/uchealth/authorize`, `GET /api/uchealth/callback`)
 
 ### Uses
 - **`:common`** — `Trial`, `StagingRawTrial`, `TrialSource`, `Location`, `ArmGroup`,
-  `Intervention`, `Outcome`, `OverallOfficial`, `Condition` domain objects
+  `Intervention`, `Outcome`, `OverallOfficial`, `Condition`, `LabResult`,
+  `StagingRawFhirResource`, `UcHealthOAuthToken` domain objects
 - **`:database`** — `*DbService` classes, called directly (see architectural note above)
 
 ## Related Documentation
 
 - `PROJECT_PLAN.md` — sections 4 (CT.gov API), 6 (package layout), 10 (phased roadmap)
-- `INGESTION_PLAN.md` — the original build plan for this feature, with the
-  verification checklist
 - `.claude/CURRENT_STATE.md` — current overall project status, including join-table gaps
-- `_archive/database/clinical-trials-tables.md` — schema design + CT.gov field-mapping reference
+- `_archive/clinical-trials/clinical-trials-tables.md` — schema design + CT.gov field-mapping reference
 
 ## History
 
