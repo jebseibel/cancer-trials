@@ -1,275 +1,224 @@
 # Current State — Clinical Trials Finder
 
-Snapshot of where the project stands, what's deliberately left unfinished, and what
-that blocks. Companion to `PROJECT_PLAN.md` (overall plan) and
-`_archive/clinical-trials/clinical-trials-tables.md` (schema design) — this doc is the "where are we right now"
-view, meant to be updated as things change rather than kept as history.
+Where the project stands, what is deliberately unfinished, and what that blocks. Companion to
+`PROJECT_PLAN.md` (the overall plan) and `_archive/clinical-trials/clinical-trials-tables.md`
+(schema design). This is the "where are we right now" view — update it as things change rather
+than keeping it as history.
+
+**Last verified against the code: 2026-08-08.**
+
+---
+
+## Do this first when picking the project back up
+
+The working tree is clean and everything is committed, but the running environment is not ready:
+
+1. **Start the backend** (you do this — never the assistant).
+2. **Ingest trials.** The database was rebuilt, so `trial` is empty:
+   `POST /api/ingestion/clinicaltrials` with `{"condition": "breast cancer", "maxStudies": 50}`.
+3. **Backfill the vector store.** Qdrant is at **0 points** — semantic search returns nothing
+   until this runs: `curl -X POST http://localhost:8080/api/rag/backfill` (~15s for 50 trials).
+   Confirm Qdrant is up first: `docker compose up -d`.
+4. **Seed an `AppUser` row** whose username matches your login. Without it, Trial Detail
+   tracking, Saved Trials, and the Diagnosis page all show "no app-user profile linked".
+   There is still no UI for this.
+
+Then `bash rag/src/test/resources/eval/run-evaluation.sh` should be back to 8/8.
+
+---
 
 ## What's built
 
-**Backend** — full layered scaffold (domain → entity → repository → db/service →
-service → controller) for all core entities from `_archive/clinical-trials/clinical-trials-tables.md`: Trial,
-TrialSource, StagingRawTrial, Sponsor, Condition, Medication, Location, ArmGroup,
-Intervention, Outcome, OverallOfficial, EligibilityRule, Keyword, AppUser, TrialStatus.
-Standard CRUD + pagination on each, following the project's REST API template.
+### Backend
 
-Every entity that references a Trial (Location, ArmGroup, Intervention, Outcome,
-OverallOfficial, TrialStatus) now also exposes a `GET /api/{entity}/by-trial/{trialExtid}`
-(or `/by-appuser/{appUserExtid}` for TrialStatus) endpoint, so the frontend can fetch
-"everything for this one trial" without a numeric id ever crossing the API boundary.
+Full layered scaffold (domain → entity → repository → db service → service → controller) for
+every core entity: Trial, TrialSource, StagingRawTrial, Sponsor, Condition, Medication,
+Location, ArmGroup, Intervention, Outcome, OverallOfficial, EligibilityRule, Keyword, AppUser,
+TrialStatus, PatientDiagnosis, plus the Epic/FHIR tables (UcHealthOAuthToken,
+StagingRawFhirResource, PatientMedication, LabResult, LabResultComponent). Standard CRUD with
+pagination on each.
 
-**Frontend** — old jobhunting-template pages (Customers/Purchases/Users) removed.
-Three real pages now exist:
-- **Trial Search** (`/trials`) — filters trials already in the DB by title/NCT
-  number/summary text and overall status.
-- **Trial Detail** (`/trials/:extid`) — full normalized record (summary, eligibility
-  text, interventions, arm groups, outcomes, locations, contacts) plus a personal
-  tracking control (status dropdown + notes) for the logged-in user.
-- **Saved Trials** (`/saved-trials`) — the logged-in user's tracked trials, filterable
-  by status (SAVED/INTERESTED/CONTACTED/RULED_OUT/ENROLLED).
+Every entity referencing a Trial also exposes `GET /api/{entity}/by-trial/{trialExtid}`
+(or `/by-appuser/{appUserExtid}` for TrialStatus and PatientDiagnosis).
 
-Login still uses the original `User`/JWT auth (unchanged). Since `User` (login) and
-`AppUser` (personal tracking) are separate tables with no FK between them, the frontend
-matches them **by username** — a `useCurrentAppUser` hook fetches `/api/appuser` and
-finds the row whose username matches the logged-in user. This requires one `AppUser` row
-seeded per login account with a matching username; there's no UI for creating that link
-yet, it has to be seeded directly.
+### Frontend
 
-## Hard rule adopted this session: extid only, everywhere
+Seven pages: Login, Dashboard, Trial Search, Trial Detail, Saved Trials, **Diagnosis**,
+Ingestion. Structure and gotchas in `_archive/frontend/frontend-module.md`.
 
-The app deliberately never exposes internal numeric ids to the frontend, and the
-frontend never sends one back — every cross-entity reference on the wire is an `extid`
-(UUID string), including what would naturally be a numeric foreign key (e.g. a
-Location's trial, or a TrialStatus's trial and app user). Domain objects and JPA
-entities still use numeric ids/FKs internally; the translation to/from extid happens in
-each controller's converter, which resolves `trialExtid` → internal `Long trialId` via
-`TrialRepository` before building the domain object, and the reverse when building a
-response. Everything touched this session (Location, ArmGroup, Intervention, Outcome,
-OverallOfficial, TrialStatus) follows this. Anything scaffolded *after* this session
-should follow the same pattern from the start.
+### CT.gov ingestion — verified working
 
-## What's deliberately left off — join tables / foreign keys
+Fetch → stage → normalize, on demand via `POST /api/ingestion/clinicaltrials`. Run repeatedly
+against the live API including multi-page pulls of 1,000+ studies; re-runs dedup correctly by
+`nctId`. Defaults live in `cancer.ingestion.clinicaltrials.*` and default to RECRUITING only.
 
-The many-to-many join tables designed in `_archive/clinical-trials/clinical-trials-tables.md` were never
-scaffolded at all — no domain, entity, repository, service, or controller layer exists
-for any of them yet:
+### UCHealth / Epic FHIR — working against Epic's sandbox
 
-- `trial_condition` — which conditions a trial studies
-- `trial_sponsor` — which sponsors/collaborators back a trial, with role (LEAD/COLLABORATOR)
-- `trial_phase` — which phase(s) a trial is in (a trial can have more than one)
-- `trial_std_age` — standardized age groups (CHILD/ADULT/OLDER_ADULT)
-- `trial_keyword` — free-text keywords
+OAuth (PKCE, no client secret) → MyChart login → callback → token stored → authenticated FHIR
+call → payload staged → re-run dedups. Observation normalizes into `lab_result`.
 
-This is intentional, not an oversight — these are being added later. Until they exist:
+### RAG — steps 1–7 of `RAG_PLAN.md` complete
 
-- **Trial Search cannot filter by condition, sponsor, or phase.** The current search
-  only filters on fields that live directly on the `trial` row itself (title, NCT
-  number, summary text, overall status).
-- **Trial Detail cannot show which conditions/sponsors/phases apply to a trial.** Those
-  sections simply aren't in the page yet.
-- The `Condition` and `Sponsor` entities/endpoints exist (full CRUD, needed as the
-  lookup tables the join rows will eventually point at) but nothing links them to a
-  `Trial` yet.
+Qdrant in Docker, local ONNX embeddings (all-MiniLM-L6-v2, 384 dims — clinical text never
+leaves the machine), criterion-level chunking, indexing, backfill, retrieval, and an evaluation
+set that passed 8/8 on a 1,289-chunk corpus. Generation (§9) is deliberately deferred.
 
-**When these land**, expect: new domain/entity/repository/service/controller layers per
-join table (thin — these are pure link tables, no `BaseDb` fields per
-`_archive/clinical-trials/clinical-trials-tables.md`'s conventions section), a Trial Detail section for each,
-and Trial Search filter controls for condition/sponsor/phase. Follow the extid-only rule
-above for any new endpoint that exposes a trial/condition/sponsor reference.
+### Diagnosis matching — Tier 1 of 3
 
-## ClinicalTrials.gov ingestion — built, not yet manually verified
+`PatientDiagnosis` (21 fields) plus deterministic age/sex/recruiting checks surfaced on Trial
+Detail and Trial Search. Tier 2 (retrieval-driven) and Tier 3 (rule tree) are not built.
 
-Full ingestion pipeline built this session per `_archive/datafetcher/INGESTION_PLAN.md` (read that
-doc for the detailed design/decisions). Summary:
+---
 
-- **`datafetcher` module** now has real content and is wired into the root app
-  (`implementation project(':datafetcher')` added to root `build.gradle`):
-  - `ClinicalTrialsGovClient` — pages through CT.gov's `GET /studies` v2 API.
-  - `ClinicalTrialsGovIngestJob` — fetches studies, writes `StagingRawTrial` rows.
-  - `TrialSourceParser` interface + `ClinicalTrialsGovParser` — parses a staging row's
-    raw JSON into a `NormalizedTrial` (Trial + child records + condition/sponsor names),
-    per the field-mapping table in `_archive/clinical-trials/clinical-trials-tables.md`.
-  - `TrialNormalizationService` + `TrialRowNormalizer` — reads pending staging rows,
-    upserts `Trial` by `nctId`, delete-and-reinserts child records
-    (Location/ArmGroup/Intervention/Outcome/OverallOfficial) on re-normalization,
-    dedup-upserts `Condition`/`Sponsor` by name, marks each staging row
-    normalized-or-errored. Each row normalizes in its own transaction
-    (`TrialRowNormalizer`, a separate bean from `TrialNormalizationService` — needed
-    because a self-invoked `@Transactional` call is silently ignored by Spring's proxy).
-- **New endpoint:** `POST /api/ingestion/clinicaltrials` (root module,
-  `IngestionController`) — takes `{condition, term, location, maxStudies}` in the
-  request body, runs fetch → stage → normalize synchronously, returns a summary. No
-  scheduled/automatic ingestion — on-demand only, per your call. No frontend trigger
-  button yet either — that's a later task; for now it's called directly (Swagger/curl).
-- **Design correction mid-build:** `TrialService`/`ConditionService`/`SponsorService`
-  (root module) got `upsertByNctId`/`findOrCreateByName`-style additions early in the
-  build, but `datafetcher` can't actually call them — `datafetcher` depends on
-  `:database`, and root depends on `datafetcher`, so `datafetcher` calling into root's
-  `service` package would be circular. Resolution: `TrialNormalizationService`/
-  `TrialRowNormalizer` call the `*DbService` classes in `:database` directly, bypassing
-  root's Service layer entirely for ingestion. The root Service-layer additions are
-  harmless but currently unused by ingestion — they just sit there as normal
-  REST-facing service methods.
-- **Tests:** `ClinicalTrialsGovParserTest` (fixture-based, a captured-shape sample
-  payload at `datafetcher/src/test/resources/sample-clinicaltrials-study.json`) and
-  `TrialRowNormalizerTest` (mocked `*DbService` collaborators, covers new-trial vs.
-  existing-trial-with-children-refreshed paths) — both passing. `./gradlew build`
-  succeeds project-wide.
-- **Not yet done:** manual end-to-end verification against the live ClinicalTrials.gov
-  API (start the backend, call the endpoint with a real condition, confirm rows land
-  correctly and re-running dedupes by nctId) — this needs you to start the backend
-  yourself per project convention, hasn't happened yet this session.
-- **Not committed.** Everything above (`datafetcher/src/**`, `IngestionController` +
-  its DTOs, the `*DbService` additions, `build.gradle`/`datafetcher/build.gradle`
-  changes, the `100-load-init-data.yaml` seed row, `_archive/datafetcher/INGESTION_PLAN.md`) is
-  sitting as uncommitted changes in the working tree.
+## Hard rules this project follows
 
-## UCHealth / Epic FHIR ingestion — working end to end against Epic's sandbox
+**extid only, everywhere.** No internal numeric id is ever exposed to the frontend, and the
+frontend never sends one back — every cross-entity reference on the wire is an `extid`,
+including what would naturally be a numeric foreign key. Domain objects and JPA entities use
+numeric ids internally; each controller's converter translates at the boundary.
 
-Design and build plan live in `epic-integration/UCHEALTH_INGESTION_PLAN.md`; the schema is in
-`epic-integration/epic-tables.md`. This section is the "where did we stop" view.
+**No eligibility verdicts.** Per `_archive/diagnosis/DIAGNOSIS_MATCHING_DESIGN.md` §5: no fit
+score or percentage, no auto-exclusion of trials, and "unknown" is a first-class result. A
+failed check renders amber and never removes a trial from a list — a parsing failure must not
+silently take away an option. The tool surfaces what to look into and ask about; the judgement
+stays with the patient, family, and oncology team.
 
-**Verified working against Epic's real sandbox** (test patient Camila Lopez):
-OAuth authorize → MyChart login → consent → callback → token stored → authenticated
-FHIR R4 call → payload staged verbatim → re-run dedups (0 written, 1 skipped).
+**Ingestion and indexing are two separate steps.** `POST /api/ingestion/clinicaltrials` writes
+MySQL; `POST /api/rag/backfill` makes it searchable. Deliberate — the two have very different
+costs (staging 1,000 trials is quick; embedding them is ~26,000 local inferences) and keeping
+them apart keeps that visible.
 
-**What's built:**
+**Module dependency direction.** `:datafetcher` and `:rag` depend on `:common`/`:database`, and
+root depends on them — so neither can call root's `service` package without creating a cycle.
+Both call `*DbService` classes directly. This has been hit twice; when a lower module must
+trigger something upward, use a Spring event with the type declared in `:database`.
 
-- **OAuth (public client + PKCE, no client secret).** `UcHealthOAuthProperties` (config
-  from `.env`), `PkceChallengeStore` (in-memory state→verifier, 15-min TTL, single use),
-  `UcHealthOAuthClient` (authorize URL, code exchange, refresh, `ensureValidToken()`),
-  and `UcHealthAuthController` (`GET /api/uchealth/authorize`, `GET /api/uchealth/callback`).
-- **Fetch + stage.** `UcHealthFhirClient` (Bearer auth, Bundle next-link pagination,
-  filters entries by `resourceType`), `UcHealthIngestJob` (dedup-before-insert from day
-  one, matching the CT.gov pattern).
-- **Normalization.** `FhirSourceParser` (interface, deliberately *not* `TrialSourceParser`),
-  `EpicObservationParser`, `NormalizedLabResult`, `FhirRowNormalizer` (per-row
-  transaction, upsert by `fhirResourceId`, delete-and-reinsert components),
-  `FhirNormalizationService`.
-- **Endpoint.** `POST /api/ingestion/uchealth/observation` — fetch → stage → normalize
-  in one call. **Never yet run against a live backend** (added after the last successful
-  pull, which was staging-only).
-- **Entities scaffolded + tested:** `UcHealthOAuthToken`, `StagingRawFhirResource`,
-  `PatientMedication`, `LabResult`, `LabResultComponent` (changesets `018`–`022`).
-- **Tests:** 34 in `datafetcher` (11 for the parser, against a real captured payload at
-  `datafetcher/src/test/resources/sample-epic-observation.json`), 67 for the
-  LabResult/LabResultComponent DB layers, 34 for PatientMedication. All passing.
+---
 
-**Pick up here tomorrow:**
+## Blockers and known gaps, worst first
 
-1. Start the backend, **re-authorize** (`http://localhost:8080/api/uchealth/authorize`,
-   logging in as Epic's sandbox test patient — Camila Lopez; credentials are in Epic's
-   sandbox docs, not recorded here), then
-   `POST /api/ingestion/uchealth/observation` and confirm a row actually lands in
-   `lab_result`. This is the one untested link in the chain.
-2. Retry `POST /api/ingestion/uchealth/medicationrequest` — the Epic grant may have
-   propagated overnight (see blocker below).
+### Security — must be resolved before any deployment
 
-**Blockers / open issues, worst first:**
+- **All endpoint security is disabled.** `SecurityConfig` line 55 is
+  `.anyRequest().permitAll()`. The original JWT rule set is preserved commented-out directly
+  below it. On restore, `/api/uchealth/callback` must stay `permitAll` — Epic's OAuth redirect
+  cannot carry a JWT.
+- **The JWT signing secret is a hardcoded literal in the repo.** There is no `jwt:` block in
+  `application.yml`, so `JwtUtil`'s inline default is live. Anyone with repo access can forge a
+  token. Move it to `JWT_SECRET` in `.env`.
+- **`UcHealthOAuthTokenController` exposes full CRUD over the token table**, including reading
+  refresh tokens back over HTTP.
+
+Full checklist in `_archive/hosting/qa-setup.md`.
+
+### Epic / UCHealth
 
 - **No refresh token.** Epic granted `patient/*.read fhirUser launch/patient openid` but
-  silently dropped `offline_access`. The access token dies in ~1 hour and there is no way
-  to renew it — every ingestion run past that needs a fresh interactive browser login.
-  The refresh code path exists and is unit-tested but has **never executed against Epic**.
-  Fine for sandbox; defeats the purpose against a real record. Resolve before the
-  production authorization.
-- **MedicationRequest fetch is blocked.** Epic rejects the patient search with
-  *"Combination of parameters is not valid for any authorized sub-resource."* The app was
-  registered for `MedicationRequest.*(Order Template Medication)` — a formulary catalog,
-  not patient prescriptions. Re-registered for **`Signed Medication Order` (R4)**; the
-  grant hadn't propagated by end of session. The whole `patient_medication` stack
-  (changeset `020`, scaffolded + tested) sits unused until this clears.
-- **`DiagnosticReport` returns 403** despite `.Read/.Search (Results) (R4)` being
-  registered. Not investigated — not needed for the current slice.
-- **`MedicationStatement` is unavailable in R4.** Epic's catalog offers it only in
-  DSTU2/STU3. Dropped from scope; `MedicationRequest` covers prescriptions.
-- **`spring.liquibase.drop-first` was turned off** (`application.yml`) so the OAuth token
-  survives a restart — it was being wiped on every boot. Trade-off: edits to an
-  *already-applied* changeset no longer take effect on startup; rebuild the DB (n8n
-  `clear-db` webhook) for those. New changesets still apply normally.
-- **Panel handling is untested against real data.** `lab_result_component` and the
-  parser's component logic are exercised only by a hand-built CBC payload — Camila's
-  sandbox record has exactly one lab (an A1C) and no panels.
-- **`UcHealthOAuthTokenController` exposes full CRUD over the token table**, including
-  reading refresh tokens back over HTTP. Harmless for sandbox; remove or restrict before
-  real credentials.
-- **Nothing is committed.** All 88 changed/untracked files are sitting in the working
-  tree, including everything above.
+  silently dropped `offline_access`. The access token dies in ~1 hour with no way to renew it —
+  every run past that needs a fresh interactive browser login. The refresh code path exists and
+  is unit-tested but has never executed against Epic. Resolve before production authorization.
+- **MedicationRequest fetch is blocked.** Epic rejects the patient search: *"Combination of
+  parameters is not valid for any authorized sub-resource."* The app was registered for
+  `MedicationRequest.*(Order Template Medication)` — a formulary catalog, not patient
+  prescriptions. Re-registered for `Signed Medication Order` (R4); grant had not propagated.
+  The whole `patient_medication` stack sits unused until it clears.
+- **`DiagnosticReport` returns 403** despite the scope being registered. Not investigated.
+- **Panel handling is untested against real data** — `lab_result_component` is exercised only
+  by a hand-built CBC payload. The sandbox patient has one lab (an A1C) and no panels.
 
-## What's deliberately left off — join tables / foreign keys
+### Schema
 
-The many-to-many join tables designed in `_archive/clinical-trials/clinical-trials-tables.md` were never
-scaffolded at all — no domain, entity, repository, service, or controller layer exists
-for any of them yet:
+- **The join tables were never scaffolded**: `trial_condition`, `trial_sponsor`, `trial_phase`,
+  `trial_std_age`, `trial_keyword`, and `intervention_arm_group`. Deliberate, but it means
+  **Trial Search cannot filter by condition, sponsor, or phase**, Trial Detail cannot show them,
+  and they cannot be RAG retrieval filters. The normalizer populates the `Condition`/`Sponsor`
+  lookup tables but links nothing to a trial. Adding them requires a full re-backfill, since
+  filters live in chunk metadata.
+- **`EligibilityRule` is scaffolded but never populated.** Ingestion writes only
+  `trial.eligibility_criteria` as raw narrative text. Its extid conversion is also unresolved —
+  `parentRuleId` is self-referencing and `criterionId` is polymorphic.
+- **The tables doc has drifted from the schema** (found 2026-08-08, not yet fixed): the doc says
+  `condition`, but the table is `medical_condition` (reserved word); `intervention_arm_group` is
+  missing from the doc's own gap list; and two changesets share the number `014`
+  (`014-eligibility-rule.yaml` and `014-outcome.yaml`).
+- **`spring.liquibase.drop-first` is off** so the Epic OAuth token survives a restart.
+  Consequence: **edits to an already-applied changeset do not take effect on startup** — rebuild
+  the DB via the n8n `clear-db` webhook. New changesets still apply normally.
 
-- `trial_condition` — which conditions a trial studies
-- `trial_sponsor` — which sponsors/collaborators back a trial, with role (LEAD/COLLABORATOR)
-- `trial_phase` — which phase(s) a trial is in (a trial can have more than one)
-- `trial_std_age` — standardized age groups (CHILD/ADULT/OLDER_ADULT)
-- `trial_keyword` — free-text keywords
+### Performance
 
-This is intentional, not an oversight — these are being added later. Until they exist:
+**Normalization is the ingestion bottleneck** — measured on 736 rows: fetch ~1.1s (0.4%),
+staging ~0.7s (0.3%), normalization ~257s (**99.3%**). About 349ms and ~38 DB round trips per
+trial. A full recruiting-only cancer pull (~18,773 trials) is **~110 minutes and will not
+survive an HTTP request timeout**; an async job endpoint becomes necessary at that scale.
 
-- **Trial Search cannot filter by condition, sponsor, or phase.** The current search
-  only filters on fields that live directly on the `trial` row itself (title, NCT
-  number, summary text, overall status).
-- **Trial Detail cannot show which conditions/sponsors/phases apply to a trial.** Those
-  sections simply aren't in the page yet.
-- The `Condition` and `Sponsor` entities/endpoints exist (full CRUD, needed as the
-  lookup tables the join rows will eventually point at), and the new ingestion pipeline
-  now populates them (dedup by name) — but nothing links them to a `Trial` yet.
+Batching the ~25 child INSERTs per trial is **blocked by `BaseDb`'s
+`GenerationType.IDENTITY`**, which disables Hibernate JDBC batching entirely. Two ways forward,
+both needing your decision: change the id generation strategy (schema-wide, affects every
+entity) or write native bulk-insert queries (bypasses `BaseDb`'s extid/timestamp handling).
+Cheap and unblocked meanwhile: bulk `deleteByTrialId` instead of find-then-delete-per-child.
 
-**When these land**, expect: new domain/entity/repository/service/controller layers per
-join table (thin — these are pure link tables, no `BaseDb` fields per
-`_archive/clinical-trials/clinical-trials-tables.md`'s conventions section), a Trial Detail section for each,
-Trial Search filter controls for condition/sponsor/phase, and the ingestion normalizer
-updated to link parsed conditions/sponsors/phases to the trial instead of just
-upserting the lookup rows. Follow the extid-only rule above for any new endpoint that
-exposes a trial/condition/sponsor reference.
+Also: `ClinicalTrialsGovClient` accumulates every study in a `List<JsonNode>` before staging any
+of them, so an 18,773-trial pull holds ~280MB of parsed JSON in heap. The fix is streaming per
+page, not a bigger page size.
 
-## Other known gaps
+### Other
 
-- **EligibilityRule is not extid-converted.** Its `parentRuleId` (self-referencing tree)
-  and `criterionId` (polymorphic — points at either `Condition` or `Medication`
-  depending on `criterionType`) make the extid conversion more involved than the other
-  child entities, and the table's own design is still marked "open questions" in
-  `_archive/clinical-trials/clinical-trials-tables.md`. Its `/by-trial/` endpoint was deliberately *not* added
-  this session — skip it until the rule-tree design is settled, then convert it
-  alongside adding that endpoint. The ingestion pipeline also does not populate
-  `EligibilityRule` — it only writes `trial.eligibility_criteria` as raw narrative text,
-  per `_archive/clinical-trials/clinical-trials-tables.md`'s note that rule population is manual.
-- **No AppUser-seeding UI.** Creating an `AppUser` row (and making its username match a
-  login `User`) is a manual step, not something the app does for you.
-- **Pre-existing test failure**, unrelated to this session's work:
-  `BasicApplicationTests.contextLoads()` fails with a Liquibase changelog parse error
-  (`Error parsing db/changelog/changes/005-trial.yaml : Unexpected node: 2`). Confirmed
-  via `git log` that this file wasn't touched this session — flagged, not fixed.
+- **No AppUser-seeding UI.** `User` (login) and `AppUser` (tracking) are separate tables with no
+  FK, matched by username. Creating the row is manual.
+- **No enum endpoint.** Frontend vocabularies are hardcoded `as const` arrays in
+  `types/api.ts`; adding a backend enum value will not surface in the UI on its own.
+- **`BasicApplicationTests.contextLoads()`** — status unconfirmed. It previously failed on a
+  Liquibase parse error (unquoted `decimal(x,y)`) that has since been fixed; re-check.
+- **Retrieval is weak on conceptual queries.** Measured: clinical terminology scores 0.66–0.99,
+  but "BRCA mutation" scores 0.388 and colloquial phrasing 0.526. Partly a corpus gap rather
+  than a model limit — try a larger recruiting-only corpus before considering a model upgrade.
+- **Six of eight files in `.claude/agents/` lack YAML frontmatter** and therefore cannot be
+  invoked as subagents. They work only as prompts referenced by path.
 
-## Suggested next steps (not yet decided/scheduled)
+---
 
-1. Manually verify the ingestion endpoint end to end (start backend, call
-   `POST /api/ingestion/clinicaltrials` with a real condition, confirm DB rows and
-   re-run dedup behavior) — see checklist in `_archive/datafetcher/INGESTION_PLAN.md`. Then commit
-   the ingestion work.
-2. Add a frontend button to trigger ingestion — **done**: `frontend/src/pages/Ingestion.tsx`
-   (route `/ingestion`, "Ingest" nav link) calls `POST /api/ingestion/clinicaltrials` and
-   shows result counts/errors.
-3. Design and scaffold the join tables (`trial_condition`, `trial_sponsor`,
-   `trial_phase`, `trial_std_age`, `trial_keyword`), extid-only from the start, and
-   update the normalizer to link parsed data through them.
-4. Add condition/sponsor/phase filters to Trial Search and display sections to Trial
-   Detail once the above lands.
-5. Decide how `EligibilityRule`'s extid conversion should work given the polymorphic
-   `criterionId`, then add its `/by-trial/` endpoint and a Trial Detail section for it.
-6. ~~Fix the `005-trial.yaml` Liquibase parse error~~ — **done**: unquoted
-   `decimal(x,y)` column types break Liquibase's YAML flow-mapping parser (the comma
-   reads as a map separator). Fixed in `005-trial.yaml` (`paid_amount`) and
-   `015-location.yaml` (`latitude`/`longitude`) by quoting the type string, e.g.
-   `type: "decimal(10,2)"`. Watch for this pattern in any future decimal/numeric column.
-7. **TODO — re-enable endpoint security before deployment.** All Spring Security
-   authorization was temporarily disabled in `SecurityConfig.java`
-   (`authorizeHttpRequests` now `.anyRequest().permitAll()`) to simplify local dev.
-   The original JWT-protected rule set is preserved commented-out directly below it in
-   the same file — restore that block (and remove the permit-all override) before any
-   deployment or any exposure beyond localhost. JWT filter/login/register endpoints
-   themselves were not removed, only the enforcement that requires a token on `/api/**`.
+## Candidate next steps
+
+Nothing here is decided.
+
+1. **Re-run the evaluation against a recruiting-only corpus.** Ingestion now defaults to
+   RECRUITING, but that has not been exercised end-to-end followed by a backfill and eval run.
+   That tells you whether the weak queries were a corpus problem — do this before considering a
+   bigger embedding model.
+2. **Tier 2 matching** — use diagnosis fields to build retrieval queries against indexed
+   criteria, reusing the existing `isExclusion` chunk metadata so a high-scoring exclusion match
+   is shown as a concern rather than a fit. `DIAGNOSIS_MATCHING_DESIGN.md` §4.
+3. **The after-commit event hook** so new ingestions index themselves — `datafetcher` publishes
+   a Spring event (type declared in `:database`), `:rag` consumes it after commit. Avoids the
+   `datafetcher` → `:rag` cycle and keeps a Qdrant outage from rolling back ingested data.
+   `RAG_PLAN.md` §3 and §6 settle the design.
+4. **The join tables**, extid-only from the start, then condition/sponsor/phase filters on Trial
+   Search and sections on Trial Detail.
+5. **Generation** (`RAG_PLAN.md` §9) — the grounded "why might this fit" answer with citations.
+   Deferred until retrieval was proven; it now is. The chunk-per-criterion strategy is what
+   makes line-level citation possible.
+6. **Restore endpoint security** before this goes anywhere but localhost.
+
+---
+
+## Git state
+
+Branch `uchealth-fhir-ingestion`, working tree clean. Seven commits on top of the FHIR
+baseline (`4de3ef1`):
+
+| Commit | What |
+| --- | --- |
+| `a95729b` | `.claude` docs cleanup — removed inherited ViroTrade/jobhunting content, corrected the rest |
+| `41355a5` | `:rag` module — chunking, embedding, Qdrant indexing, retrieval |
+| `0b1a94e` | CT.gov ingestion made configurable; `filter.overallStatus`; normalize-limit bug fixed |
+| `43b72ff` | `LocationRepositoryTest` latitude truncation fix |
+| `db7347c` | `PatientDiagnosis` entity, full stack, 34 tests |
+| `c621dce` | Backfill button + `JobResultModal` on the Ingest page |
+| `0f55855` | Diagnosis page + Tier 1 eligibility matching |
+
+Test counts: `:database` 688, `:datafetcher` 34, `:rag` 25 (1 skipped — needs a running
+backend). All passing. Frontend typecheck and build clean; one pre-existing lint error in
+`Login.tsx`.
+
+Not merged to `main`; this work is still on the branch.
