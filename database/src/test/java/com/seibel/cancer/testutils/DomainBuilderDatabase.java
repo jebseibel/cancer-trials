@@ -562,8 +562,8 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
         item.setZip(getCodeRandom("ZIP_"));
         item.setCountry(getNameRandom("Country_"));
         item.setStatus(status != null ? status : getStatusRandom("Sta_"));
-        item.setLatitude(getDecimalRandom());
-        item.setLongitude(getDecimalRandom());
+        item.setLatitude(getLatitudeRandom());
+        item.setLongitude(getLongitudeRandom());
         setBaseSyncFields(item);
         return item;
     }

@@ -275,6 +275,26 @@ public class DomainBuilderUtils {
         return BigDecimal.valueOf(value).setScale(scale, RoundingMode.HALF_UP);
     }
 
+    /**
+     * Range-bounded variant. Needed wherever the column has fewer integer digits than
+     * {@link #getDecimalRandom(int)}'s 0..10000 range assumes - a value of 1000+ does not fit
+     * decimal(9,6), which allows only three digits before the point.
+     */
+    public static BigDecimal getDecimalRandom(double minInclusive, double maxExclusive, int scale) {
+        double value = ThreadLocalRandom.current().nextDouble(minInclusive, maxExclusive);
+        return BigDecimal.valueOf(value).setScale(scale, RoundingMode.HALF_UP);
+    }
+
+    /** Valid latitude, -90..90, at decimal(9,6) scale. */
+    public static BigDecimal getLatitudeRandom() {
+        return getDecimalRandom(-90.0, 90.0, 6);
+    }
+
+    /** Valid longitude, -180..180, at decimal(9,6) scale. */
+    public static BigDecimal getLongitudeRandom() {
+        return getDecimalRandom(-180.0, 180.0, 6);
+    }
+
     // ===== Integer =====
     public static Integer getIntegerRandom() {
         return getIntegerRandom(0, 100);
