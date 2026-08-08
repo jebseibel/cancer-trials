@@ -144,3 +144,38 @@ columns). Always asks whether the entity extends `BaseDomain` or `BaseUniqueDoma
 
 > "Run domain-pojo-from-tables-doc on every remaining core table in
 > .claude/clinical-trials-tables.md that doesn't have a Domain POJO yet."
+
+---
+
+## `database-column-change`
+
+The only skill that **modifies** an existing entity rather than creating one. Changes
+one or more columns on a single table — widen, narrow, rename, change nullability,
+add, or drop — and updates every layer that pins the column's shape.
+
+Table-scoped, not column-scoped, because the expensive parts (the database rebuild and
+the test run) are per-table. Batch all the changes for one table into a single run.
+
+**Only three layers actually constrain a column** — the Liquibase changeset, the
+entity's `@Column(length = ...)`, and `@Size`/`@NotEmpty` on the two request DTOs. The
+domain POJO, mapper, and response DTO carry no constraints. Changing only the changeset
+is the characteristic bug: the column goes wide while the app still rejects the value,
+which reads as "the schema change didn't work."
+
+**Single column:**
+
+> "Run database-column-change on location: widen zip from varchar(16) to varchar(64)."
+
+**Several columns on one table:**
+
+> "Run database-column-change on trial: widen brief_title to varchar(512), make
+> nct_id not null, and drop is_paid_study."
+
+**Expect it to stop partway.** Editing an already-applied changeset breaks its Liquibase
+checksum, and `drop-first` is off in this project — so the skill compiles, then stops and
+asks you to rebuild the database (n8n `clear-db` webhook) before tests can run. A failure
+before that rebuild is the checksum error, not a defect in the change.
+
+Note the tests run against the *same* database as the app, so the checksum failure shows
+up as a Spring context-load error across the whole `:database` suite, looking nothing
+like a column problem.
