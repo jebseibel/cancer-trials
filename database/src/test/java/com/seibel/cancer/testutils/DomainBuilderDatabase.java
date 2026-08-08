@@ -12,6 +12,7 @@ import com.seibel.cancer.common.domain.LabResultComponent;
 import com.seibel.cancer.common.domain.Location;
 import com.seibel.cancer.common.domain.Medication;
 import com.seibel.cancer.common.domain.Outcome;
+import com.seibel.cancer.common.domain.PatientDiagnosis;
 import com.seibel.cancer.common.domain.PatientMedication;
 import com.seibel.cancer.common.domain.OverallOfficial;
 import com.seibel.cancer.common.domain.Purchase;
@@ -24,6 +25,7 @@ import com.seibel.cancer.common.domain.User;
 import com.seibel.cancer.database.db.entity.AppUserDb;
 import com.seibel.cancer.database.db.entity.ArmGroupDb;
 import com.seibel.cancer.database.db.entity.MedicalConditionDb;
+import com.seibel.cancer.database.db.entity.PatientDiagnosisDb;
 import com.seibel.cancer.database.db.entity.PatientMedicationDb;
 import com.seibel.cancer.database.db.entity.CustomerDb;
 import com.seibel.cancer.database.db.entity.EligibilityRuleDb;
@@ -55,6 +57,7 @@ import com.seibel.cancer.database.db.mapper.LocationMapper;
 import com.seibel.cancer.database.db.mapper.MedicationMapper;
 import com.seibel.cancer.database.db.mapper.OutcomeMapper;
 import com.seibel.cancer.database.db.mapper.OverallOfficialMapper;
+import com.seibel.cancer.database.db.mapper.PatientDiagnosisMapper;
 import com.seibel.cancer.database.db.mapper.PatientMedicationMapper;
 import com.seibel.cancer.database.db.mapper.PurchaseMapper;
 import com.seibel.cancer.database.db.mapper.SponsorMapper;
@@ -750,6 +753,58 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
         item.setReferenceRangeHigh(getDecimalRandom(6));
         item.setReferenceRangeText(getNameRandom("Range_"));
         item.setDisplayText(getDescriptionRandom("Display_"));
+        setBaseSyncFields(item);
+        return item;
+    }
+
+    // ///////////////////////////////////////////////////////////////////
+    // PatientDiagnosis
+    public static PatientDiagnosis getPatientDiagnosis() {
+        PatientDiagnosisDb item = getPatientDiagnosisDb();
+        return new PatientDiagnosisMapper().toModel(item);
+    }
+
+    public static PatientDiagnosis getPatientDiagnosis(PatientDiagnosisDb item) {
+        return new PatientDiagnosisMapper().toModel(item);
+    }
+
+    public static PatientDiagnosisDb getPatientDiagnosisDb() {
+        return getPatientDiagnosisDb(null, null, null);
+    }
+
+    public static PatientDiagnosisDb getPatientDiagnosisDb(Long appUserId, String cancerType) {
+        return getPatientDiagnosisDb(appUserId, cancerType, null);
+    }
+
+    /**
+     * Full-override builder. Only the two identity-relevant fields plus extid are exposed
+     * positionally - the other 19 columns get type-matched random defaults, since a
+     * 21-parameter signature would be unreadable and easy to transpose.
+     */
+    public static PatientDiagnosisDb getPatientDiagnosisDb(Long appUserId, String cancerType, String extid) {
+        PatientDiagnosisDb item = new PatientDiagnosisDb();
+        item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
+        item.setAppUserId(appUserId != null ? appUserId : ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setCancerType(cancerType != null ? cancerType : getDescriptionRandom("Cancer_"));
+        item.setStage(getVersionRandom("Stg_"));
+        item.setStageSystem(getVersionRandom("Sys_"));
+        item.setIsMetastatic(getBooleanRandom());
+        item.setMetastasisSites(getDescriptionRandom("Mets_"));
+        item.setReceptorSubtype(getUniqueRandom("Receptor_"));
+        item.setErStatus(getVersionRandom("Er_"));
+        item.setPrStatus(getVersionRandom("Pr_"));
+        item.setHer2Status(getVersionRandom("Her2_"));
+        item.setBiomarkers(getDescriptionRandom("Biomarkers_"));
+        item.setEcogStatus(getIntegerRandom(0, 5));
+        item.setPriorChemoRegimens(getIntegerRandom(0, 10));
+        item.setLastChemoEndDate(getDateRandom());
+        item.setPriorTreatments(getDescriptionRandom("Prior_"));
+        item.setHasMeasurableDisease(getBooleanRandom());
+        item.setMenopausalStatus(getVersionRandom("Meno_"));
+        item.setDateOfBirth(getDateRandom());
+        item.setSex(getVersionRandom("Sex_"));
+        item.setDiagnosisDate(getDateRandom());
+        item.setNotes(getDescriptionRandom("Notes_"));
         setBaseSyncFields(item);
         return item;
     }

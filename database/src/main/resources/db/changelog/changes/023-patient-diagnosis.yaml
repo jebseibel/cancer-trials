@@ -1,0 +1,44 @@
+databaseChangeLog:
+  - changeSet:
+      id: create_patient_diagnosis_table
+      author: jeb
+      labels: diagnosis-matching
+      changes:
+
+        # PatientDiagnosis Table - one row per patient, the structured facts trial criteria test
+        - createTable:
+            tableName: patient_diagnosis
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: app_user_id, type: bigint }
+              - column: { name: cancer_type, type: varchar(255), constraints: { nullable: false } }
+              - column: { name: stage, type: varchar(16) }
+              - column: { name: stage_system, type: varchar(16) }
+              - column: { name: is_metastatic, type: "tinyint(1)" }
+              - column: { name: metastasis_sites, type: varchar(500) }
+              - column: { name: receptor_subtype, type: varchar(64) }
+              - column: { name: er_status, type: varchar(16) }
+              - column: { name: pr_status, type: varchar(16) }
+              - column: { name: her2_status, type: varchar(16) }
+              - column: { name: biomarkers, type: varchar(1000) }
+              - column: { name: ecog_status, type: int }
+              - column: { name: prior_chemo_regimens, type: int }
+              - column: { name: last_chemo_end_date, type: date }
+              - column: { name: prior_treatments, type: varchar(2000) }
+              - column: { name: has_measurable_disease, type: "tinyint(1)" }
+              - column: { name: menopausal_status, type: varchar(16) }
+              - column: { name: date_of_birth, type: date }
+              - column: { name: sex, type: varchar(16) }
+              - column: { name: diagnosis_date, type: date }
+              - column: { name: notes, type: longtext }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }
+
+        - createIndex:
+            tableName: patient_diagnosis
+            indexName: idx_patient_diagnosis_app_user_id
+            columns:
+              - column: { name: app_user_id }
