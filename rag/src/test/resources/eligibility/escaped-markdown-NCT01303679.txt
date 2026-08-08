@@ -1,0 +1,16 @@
+Inclusion Criteria:
+
+* Age \> 18 ans.
+* Metastatic breast cancer or locally advanced
+* RE+, HER2-
+* Patient receiving paclitaxel-bevacizumab first line chemotherapy
+
+Exclusion Criteria:
+
+* Previous treatment by exemestane (both in adjuvant or metastatic treatment).
+* 1st line of chemotherapy different thaan paclitaxel-bevacizumab.
+* Treatment by paclitaxel-bevacizumab \> 18 weeks.
+* HER2 positifs et/ou récepteurs aux oestrogènes négatifs.
+* Previous thrombosis event within the 6 months before inclusion .
+* Previous significant surgery within the 28 days before treatment start
+* Previuous coagulopathy.

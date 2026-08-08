@@ -22,6 +22,9 @@ ext {
     jakartaAnnotationVersion = '3.0.0'
     lombokVersion = '1.18.34'
     jjwtVersion = '0.12.6'
+    // Pinned here (not per-module) so :rag and a future revived :ai-provider can't drift
+    // onto different Spring AI versions.
+    springAiVersion = '1.1.2'
 }
 
 configurations {
@@ -48,6 +51,7 @@ dependencies {
     implementation project(':common')
     implementation project(':database')
     implementation project(':datafetcher')
+    implementation project(':rag')
 
     // --- Spring Boot Starters ---
     implementation 'org.springframework.boot:spring-boot-starter-web'

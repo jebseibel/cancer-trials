@@ -1,0 +1,15 @@
+Inclusion Criteria:
+
+* Patients who were treated in the above research centers between January 1, 2024 and October 31, 2025;
+* ≥18 years old, female, ECOG score ≤2;
+* Pathological biopsy confirmed invasive breast cancer;
+* AJCC (8th edition) stage I-III;
+* MRI imaging data before and after neoadjuvant therapy;
+* Planned mastectomy or breast-conserving surgery after neoadjuvant therapy, and postoperative pathological information obtained.
+
+Exclusion Criteria:
+
+* Bilateral breast cancer, multiple lesions, or occult breast cancer;
+* Poor MRI data quality;
+* Patients who had received other anti-tumor treatments before enrollment;
+* Patients with other malignant tumors

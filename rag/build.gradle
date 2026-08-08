@@ -1,0 +1,78 @@
+plugins {
+    id 'java-library'
+    // Spring Boot plugin declared but NOT applied - this is a library, not a bootable app.
+    // Same pattern as :database and :datafetcher.
+    id 'org.springframework.boot' version '3.5.7' apply false
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+repositories {
+    mavenCentral()
+    // Spring AI artifacts are published to the Spring repos as well as Maven Central.
+    maven { url "https://repo.spring.io/release" }
+    maven { url "https://repo.spring.io/milestone" }
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencyManagement {
+    imports {
+        mavenBom org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES
+        // springAiVersion is pinned in the root build.gradle ext block so this module and a
+        // future revived :ai-provider cannot end up on different Spring AI versions.
+        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+    }
+}
+
+dependencies {
+    // ---- Internal Modules ----
+    // :rag depends on :database and calls *DbService classes directly. It must NOT depend
+    // on the root module's service package - root depends on :rag, so that would be a
+    // circular dependency (see RAG_PLAN.md section 3).
+    implementation project(':common')
+    implementation project(':database')
+
+    // ---- Spring Core ----
+    implementation 'org.springframework.boot:spring-boot-starter'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+    // ---- Spring AI: vector store + embeddings ----
+    // Code is written against Spring AI's VectorStore / EmbeddingModel interfaces, never
+    // against Qdrant or model-provider classes directly, so either can be swapped via config.
+    implementation 'org.springframework.ai:spring-ai-starter-vector-store-qdrant'
+    // Local in-process ONNX embeddings - no cloud account, no API key, no per-chunk cost,
+    // and clinical text never leaves the machine. Default model is
+    // sentence-transformers/all-MiniLM-L6-v2 at 384 dimensions, which the Qdrant collection
+    // must match. Upgrade path is overriding onnx.model-uri / tokenizer.uri to a stronger
+    // model (see RAG_PLAN.md section 12) - that changes dimensions, so it also means
+    // recreating the collection and re-indexing.
+    implementation 'org.springframework.ai:spring-ai-starter-model-transformers'
+
+    // ---- Lombok ----
+    compileOnly "org.projectlombok:lombok:${lombokVersion}"
+    annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+
+    // ---- Testing ----
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.mockito:mockito-core:5.14.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testCompileOnly "org.projectlombok:lombok:${lombokVersion}"
+    testAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+
+    // Spring AI's ResourceCacheService reads the whole ONNX model into a byte[] before writing
+    // it to disk (readAllBytes), so caching the 440MB BGE-base model needs roughly that much
+    // contiguous heap. The default forked-test heap is far too small and fails with
+    // OutOfMemoryError inside afterPropertiesSet().
+    //
+    // Note this is NOT covered by org.gradle.jvmargs in gradle.properties - that sizes the
+    // Gradle daemon, not the forked test JVM.
+    maxHeapSize = '4g'
+}

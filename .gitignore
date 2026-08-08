@@ -53,3 +53,7 @@ frontend/yarn-debug.log*
 frontend/yarn-error.log*
 frontend/pnpm-debug.log*
 .aider*
+
+# Locally downloaded ONNX embedding models (~120MB+). Regenerable via
+# rag/src/test/resources/eval/precache-model.sh - never commit these.
+.models/

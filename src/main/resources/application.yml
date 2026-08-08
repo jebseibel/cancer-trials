@@ -26,6 +26,91 @@ spring:
     # rebuild the DB (n8n clear-db webhook) to pick those up.
     drop-first: false
 
+  ai:
+    # Local in-process ONNX embeddings - no cloud account, no API key, no per-chunk cost,
+    # and clinical text never leaves the machine.
+    model:
+      embedding: transformers
+    # No model-uri override: this uses Spring AI's default all-MiniLM-L6-v2 at 384 dimensions,
+    # which the Qdrant collection is created to match.
+    #
+    # An upgrade to BAAI/bge-base-en-v1.5 (768 dims) was attempted and reverted - it fails to
+    # load with OutOfMemoryError because Spring AI reads a remote model entirely into a byte[]
+    # before caching it (~440MB of contiguous heap). The fix is to download the model and point
+    # at it with a file: URI, which bypasses that path; see
+    # rag/src/test/resources/eval/precache-model.sh and RAG_PLAN.md section 12.
+    vectorstore:
+      qdrant:
+        host: ${QDRANT_HOST:localhost}
+        # 6334 is gRPC, which is what QdrantVectorStore speaks. 6333 is the REST/dashboard
+        # port and will not work here.
+        port: ${QDRANT_PORT:6334}
+        collection-name: ${QDRANT_COLLECTION:clinical_trial_chunks}
+        use-tls: false
+        # Left false deliberately: the collection is pre-created over REST with an explicit
+        # 384 dimensions (see docker-compose.yml / RAG_PLAN.md step 2). Letting Spring AI
+        # auto-create it would infer dimensions at first write, so a model/collection
+        # mismatch would surface as a confusing runtime failure instead of a known fact.
+        initialize-schema: false
+
+cancer:
+  ingestion:
+    clinicaltrials:
+      # Defaults for POST /api/ingestion/clinicaltrials. Any field the frontend omits falls back
+      # to these; the frontend sends explicit values for a targeted pull.
+      #
+      # Live CT.gov counts (2026-08-07), so the scale is not a surprise:
+      #   cancer + RECRUITING ......... 18,773   <- the default query
+      #   cancer, any status .......... 122,393
+      #   breast cancer + RECRUITING ... 2,456
+      #   breast cancer, any status ... 16,689
+      # Staging is cheap. EMBEDDING IS NOT - roughly 26 chunks per trial, so 18,773 trials is
+      # ~490,000 local ONNX inferences. Fetch and embed are separate calls
+      # (POST /api/ingestion/clinicaltrials, then POST /api/rag/backfill).
+      condition: ${INGEST_CONDITION:cancer}
+      # RECRUITING is ~15% of the corpus and the only part a patient can actually join. The RAG
+      # evaluation showed a corpus of mostly COMPLETED/TERMINATED trials is the wrong corpus for
+      # a discovery tool. Send overallStatus=ALL on a request to pull every status.
+      overall-status: ${INGEST_OVERALL_STATUS:RECRUITING}
+      # Per-run cap, so a routine run is a sensible corpus and the full pull is deliberate.
+      # Request-level @Max is 50000.
+      max-studies: ${INGEST_MAX_STUDIES:1000}
+      # Bounded independently of max-studies: staging rows accumulate across runs, so tying the
+      # normalize limit to one run's fetch size silently leaves earlier rows pending.
+      max-normalize-rows: ${INGEST_MAX_NORMALIZE_ROWS:5000}
+
+  rag:
+    # Empirically-chosen tuning values, surfaced here so they can be changed without a rebuild.
+    # All were set by inspecting real chunk output and real query results; the evaluation set
+    # (rag/src/test/resources/eval/run-evaluation.sh) is what makes changing them measurable.
+    chunking:
+      # NOTE: chunking values only affect chunks as they are CREATED. After changing any of
+      # these, re-run POST /api/rag/backfill or they have no effect on search results.
+      #
+      # Longest a parent criterion may be before it is abbreviated when prefixed onto a nested
+      # child. Some parents run 500+ chars; prefixing one whole made sibling chunks ~90%
+      # identical, and near-identical vectors mean one match crowds out the others.
+      max-parent-prefix-length: 160
+      # Text shorter than this is not worth embedding as its own chunk.
+      min-criterion-length: 3
+      # Target size for prose chunks. Tuned to the embedding model's usable window -
+      # all-MiniLM-L6-v2 handles ~256 word pieces (~1000 chars) and silently truncates past
+      # that. RAISE THIS when moving to a model with a longer window (a 768-dim -base model
+      # typically handles 512 tokens).
+      max-prose-chunk-chars: 900
+    retrieval:
+      # Chunks fetched per requested trial. Several chunks routinely belong to one trial, so
+      # fetching exactly topK would return far fewer than topK distinct trials.
+      chunk-fetch-multiplier: 6
+      # Default minimum similarity when a request does not specify one, 0..1. Left at 0
+      # deliberately: useful thresholds differ per query type (exact clinical terminology
+      # scores ~0.97, conceptual queries ~0.4), and silently dropping results makes weak
+      # retrieval look like an empty corpus.
+      default-similarity-threshold: 0.0
+    backfill:
+      # Trials per page. Bounds memory and the embedding batch size.
+      page-size: 25
+
 uchealth:
   # Epic / SMART on FHIR settings. Point at Epic's sandbox first; switch to UCHealth
   # production only after the sandbox round-trip works. Values live in .env.
@@ -41,3 +126,8 @@ logging:
   level:
     com.seibel.cancer.loader.DataLoader: INFO
     org.springframework.security.config.annotation.authentication.configuration: ERROR
+    # The DbService classes log every create/update at INFO. Normalizing one trial writes ~25
+    # child rows (13.6 locations and 7.2 outcomes on average), so a 736-trial run produced
+    # ~18,400 log lines of pure noise. WARN keeps the failures and drops the per-row chatter.
+    # Raise to INFO temporarily when debugging a specific persistence problem.
+    com.seibel.cancer.database.db.service: WARN

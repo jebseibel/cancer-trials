@@ -1,0 +1,31 @@
+# Local services for the clinical-trials RAG.
+#
+# Qdrant only. MySQL is deliberately NOT managed here - the user runs it (see
+# PROJECT_PLAN.md section 9, which tracks a MySQL compose file as a separate open item).
+#
+#   docker compose up -d      start Qdrant
+#   docker compose down       stop it (vectors survive - they live in the named volume)
+#   docker compose down -v    stop AND delete all vectors (forces a full re-index)
+#
+# Dashboard: http://localhost:6333/dashboard
+
+services:
+  qdrant:
+    # Pinned, not :latest - a silent engine upgrade under an existing collection is the
+    # kind of thing that fails confusingly months later.
+    image: qdrant/qdrant:v1.12.4
+    container_name: cancer-qdrant
+    restart: unless-stopped
+    ports:
+      # 6333 = HTTP/REST: dashboard, curl health checks, collection admin.
+      - "6333:6333"
+      # 6334 = gRPC: what Spring AI's QdrantVectorStore actually connects on
+      # (spring.ai.vectorstore.qdrant.port defaults to 6334).
+      - "6334:6334"
+    volumes:
+      # Named volume so embeddings survive a restart. Without this every `down` would
+      # silently discard the corpus and force re-embedding at real API cost.
+      - qdrant_storage:/qdrant/storage
+
+volumes:
+  qdrant_storage:
