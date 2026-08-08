@@ -36,8 +36,20 @@ public class ClinicalTrialsGovClient {
      * per study) - callers preserve this verbatim in staging.
      */
     public List<JsonNode> searchStudies(String condition, String term, String location, int maxStudies) {
+        return searchStudies(condition, term, location, null, maxStudies);
+    }
+
+    /**
+     * @param overallStatus CT.gov {@code filter.overallStatus} (e.g. RECRUITING). Blank for all
+     *                      statuses.
+     * @param maxStudies    hard cap on studies returned. Pass {@link Integer#MAX_VALUE} to page
+     *                      until the API runs out.
+     */
+    public List<JsonNode> searchStudies(String condition, String term, String location,
+                                        String overallStatus, int maxStudies) {
         List<JsonNode> studies = new ArrayList<>();
         String pageToken = null;
+        int pageCount = 0;
 
         while (studies.size() < maxStudies) {
             int remaining = maxStudies - studies.size();
@@ -45,7 +57,8 @@ public class ClinicalTrialsGovClient {
 
             String pageTokenFinal = pageToken;
             JsonNode page = restClient.get()
-                    .uri(uriBuilder -> buildSearchUri(uriBuilder, condition, term, location, pageSize, pageTokenFinal))
+                    .uri(uriBuilder -> buildSearchUri(uriBuilder, condition, term, location,
+                            overallStatus, pageSize, pageTokenFinal))
                     .retrieve()
                     .body(JsonNode.class);
 
@@ -58,6 +71,13 @@ public class ClinicalTrialsGovClient {
                 break;
             }
             pageStudies.forEach(studies::add);
+            pageCount++;
+
+            // Large pulls are long-running (18,773 trials for the default cancer+RECRUITING
+            // query = ~188 pages), so log progress rather than going silent for minutes.
+            if (pageCount % 10 == 0) {
+                log.info("searchStudies(): {} pages, {} studies so far", pageCount, studies.size());
+            }
 
             JsonNode nextPageToken = page.path("nextPageToken");
             if (nextPageToken.isMissingNode() || nextPageToken.isNull()) {
@@ -66,13 +86,36 @@ public class ClinicalTrialsGovClient {
             pageToken = nextPageToken.asText();
         }
 
-        log.info("searchStudies(): condition={}, term={}, location={}, fetched={}",
-                condition, term, location, studies.size());
+        log.info("searchStudies(): condition={}, term={}, location={}, status={}, pages={}, fetched={}",
+                condition, term, location, overallStatus, pageCount, studies.size());
         return studies.size() > maxStudies ? studies.subList(0, maxStudies) : studies;
     }
 
+    /**
+     * Total matches for a query, without fetching them. Uses {@code countTotal=true}.
+     *
+     * <p>Useful before a large pull - the caller can see "this will fetch 18,773 studies" rather
+     * than discovering it after the fact.
+     */
+    public int countStudies(String condition, String term, String location, String overallStatus) {
+        JsonNode page = restClient.get()
+                .uri(uriBuilder -> {
+                    UriBuilder b = uriBuilder.path("/studies")
+                            .queryParam("pageSize", 1)
+                            .queryParam("countTotal", true);
+                    if (StringUtils.hasText(condition)) b = b.queryParam("query.cond", condition);
+                    if (StringUtils.hasText(term)) b = b.queryParam("query.term", term);
+                    if (StringUtils.hasText(location)) b = b.queryParam("query.locn", location);
+                    if (StringUtils.hasText(overallStatus)) b = b.queryParam("filter.overallStatus", overallStatus);
+                    return b.build();
+                })
+                .retrieve()
+                .body(JsonNode.class);
+        return page == null ? 0 : page.path("totalCount").asInt(0);
+    }
+
     private URI buildSearchUri(UriBuilder uriBuilder, String condition, String term, String location,
-                                int pageSize, String pageToken) {
+                                String overallStatus, int pageSize, String pageToken) {
         uriBuilder = uriBuilder.path("/studies").queryParam("pageSize", pageSize);
         if (StringUtils.hasText(condition)) {
             uriBuilder = uriBuilder.queryParam("query.cond", condition);
@@ -82,6 +125,9 @@ public class ClinicalTrialsGovClient {
         }
         if (StringUtils.hasText(location)) {
             uriBuilder = uriBuilder.queryParam("query.locn", location);
+        }
+        if (StringUtils.hasText(overallStatus)) {
+            uriBuilder = uriBuilder.queryParam("filter.overallStatus", overallStatus);
         }
         if (StringUtils.hasText(pageToken)) {
             uriBuilder = uriBuilder.queryParam("pageToken", pageToken);

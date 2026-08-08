@@ -50,7 +50,14 @@ class TrialRowNormalizer {
 
     @Transactional
     void normalize(StagingRawTrial staging) {
-        TrialSource trialSource = trialSourceDbService.findById(staging.getTrialSourceId());
+        normalize(staging, new NormalizationCache());
+    }
+
+    @Transactional
+    void normalize(StagingRawTrial staging, NormalizationCache cache) {
+        // Cached: the same TrialSource row for every trial in a run.
+        TrialSource trialSource = cache.trialSource(
+                staging.getTrialSourceId(), trialSourceDbService::findById);
         if (trialSource == null) {
             throw new IllegalStateException("Unknown trialSourceId: " + staging.getTrialSourceId());
         }
@@ -73,7 +80,7 @@ class TrialRowNormalizer {
             deleteExistingChildren(persisted.getId());
         }
         insertChildren(persisted.getId(), normalized);
-        upsertConditionsAndSponsors(normalized);
+        upsertConditionsAndSponsors(normalized, cache);
 
         stagingRawTrialDbService.update(staging.getExtid(), null, null, null, null, LocalDateTime.now(), null);
     }
@@ -115,19 +122,22 @@ class TrialRowNormalizer {
         }
     }
 
-    private void upsertConditionsAndSponsors(NormalizedTrial normalized) {
+    private void upsertConditionsAndSponsors(NormalizedTrial normalized, NormalizationCache cache) {
         for (String name : normalized.getConditionNames()) {
             if (name == null || name.isBlank()) continue;
-            Condition existing = conditionDbService.findByName(name);
+            Condition existing = cache.condition(name, conditionDbService::findByName);
             if (existing == null) {
-                conditionDbService.create(name);
+                // Cache the created row so the next trial mentioning this condition does not
+                // re-query and does not attempt a duplicate insert.
+                cache.putCondition(name, conditionDbService.create(name));
             }
         }
         for (NormalizedTrial.NormalizedSponsor sponsor : normalized.getSponsors()) {
             if (sponsor.getName() == null || sponsor.getName().isBlank()) continue;
-            var existingSponsor = sponsorDbService.findByName(sponsor.getName());
+            var existingSponsor = cache.sponsor(sponsor.getName(), sponsorDbService::findByName);
             if (existingSponsor == null) {
-                sponsorDbService.create(sponsor.getName(), sponsor.getOrgClass());
+                cache.putSponsor(sponsor.getName(),
+                        sponsorDbService.create(sponsor.getName(), sponsor.getOrgClass()));
             }
         }
     }

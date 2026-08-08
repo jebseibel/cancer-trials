@@ -27,9 +27,19 @@ public class TrialNormalizationService {
         int normalizedCount = 0;
         List<String> errors = new ArrayList<>();
 
+        // Per-run caches for the two lookups that dominate the round-trip count. Measured on a
+        // 736-row run: ~3.9 findByName calls per trial for conditions and sponsors, and after the
+        // first hundred trials nearly all are repeat hits on the same handful of names. The
+        // TrialSource is the same row for every trial in a run, so it was being fetched once per
+        // row for no reason.
+        //
+        // Scoped to one call rather than a Spring @Cacheable bean deliberately: the cache cannot
+        // go stale mid-run, and nothing outside this loop can observe it.
+        NormalizationCache cache = new NormalizationCache();
+
         for (StagingRawTrial staging : pending) {
             try {
-                rowNormalizer.normalize(staging);
+                rowNormalizer.normalize(staging, cache);
                 normalizedCount++;
             } catch (Exception e) {
                 log.error("Failed to normalize staging row extid={}", staging.getExtid(), e);
@@ -38,8 +48,8 @@ public class TrialNormalizationService {
             }
         }
 
-        log.info("normalizePending(): pending={}, normalized={}, errors={}",
-                pending.size(), normalizedCount, errors.size());
+        log.info("normalizePending(): pending={}, normalized={}, errors={}, {}",
+                pending.size(), normalizedCount, errors.size(), cache.stats());
         return new NormalizationResult(pending.size(), normalizedCount, errors);
     }
 

@@ -1,6 +1,7 @@
 package com.seibel.cancer.web.controller;
 
 import com.seibel.cancer.datafetcher.clinicaltrials.ClinicalTrialsGovIngestJob;
+import com.seibel.cancer.datafetcher.config.ClinicalTrialsIngestProperties;
 import com.seibel.cancer.datafetcher.normalization.FhirNormalizationService;
 import com.seibel.cancer.datafetcher.normalization.TrialNormalizationService;
 import com.seibel.cancer.datafetcher.uchealth.UcHealthIngestJob;
@@ -12,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,6 +30,7 @@ public class IngestionController {
     private static final int MAX_NORMALIZE_ROWS = 500;
 
     private final ClinicalTrialsGovIngestJob ingestJob;
+    private final ClinicalTrialsIngestProperties ingestProperties;
     private final TrialNormalizationService normalizationService;
     private final UcHealthIngestJob ucHealthIngestJob;
     private final FhirNormalizationService fhirNormalizationService;
@@ -68,10 +71,26 @@ public class IngestionController {
     @PostMapping("/clinicaltrials")
     @Operation(summary = "Fetch trials from ClinicalTrials.gov, stage them, and normalize into the core schema")
     public ResponseIngestionResult ingestClinicalTrials(@Valid @RequestBody RequestClinicalTrialsIngest request) {
-        var ingestResult = ingestJob.run(
-                request.getCondition(), request.getTerm(), request.getLocation(), request.getMaxStudies());
+        // Any omitted field falls back to cancer.ingestion.clinicaltrials.* - the frontend sends
+        // explicit values for a targeted pull, and defaults cover the routine case.
+        String condition = StringUtils.hasText(request.getCondition())
+                ? request.getCondition() : ingestProperties.getCondition();
+        int maxStudies = request.getMaxStudies() != null
+                ? request.getMaxStudies() : ingestProperties.getMaxStudies();
 
-        var normalizationResult = normalizationService.normalizePending(request.getMaxStudies());
+        // "ALL" is the explicit opt-out from status filtering; blank means "use the default".
+        String requestedStatus = request.getOverallStatus();
+        String overallStatus = StringUtils.hasText(requestedStatus)
+                ? ("ALL".equalsIgnoreCase(requestedStatus.trim()) ? null : requestedStatus.trim())
+                : ingestProperties.getOverallStatus();
+
+        var ingestResult = ingestJob.run(
+                condition, request.getTerm(), request.getLocation(), overallStatus, maxStudies);
+
+        // Bounded independently of maxStudies. Staging rows accumulate across runs, so tying the
+        // normalize limit to this run's fetch size silently leaves earlier rows pending forever.
+        var normalizationResult = normalizationService.normalizePending(
+                ingestProperties.getMaxNormalizeRows());
 
         return ResponseIngestionResult.builder()
                 .studiesFetched(ingestResult.studiesFetched())

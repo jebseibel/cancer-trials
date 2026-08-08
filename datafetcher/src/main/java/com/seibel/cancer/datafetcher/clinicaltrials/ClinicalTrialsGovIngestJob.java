@@ -29,13 +29,22 @@ public class ClinicalTrialsGovIngestJob {
     private final StagingRawTrialDbService stagingRawTrialDbService;
 
     public IngestResult run(String condition, String term, String location, int maxStudies) {
+        return run(condition, term, location, null, maxStudies);
+    }
+
+    /**
+     * @param overallStatus CT.gov {@code filter.overallStatus} (e.g. RECRUITING). Blank for all
+     *                      statuses.
+     */
+    public IngestResult run(String condition, String term, String location, String overallStatus,
+                            int maxStudies) {
         TrialSource trialSource = trialSourceDbService.findByCode(TRIAL_SOURCE_CODE);
         if (trialSource == null) {
             throw new IllegalStateException(
                     "TrialSource '" + TRIAL_SOURCE_CODE + "' not seeded - check 100-load-init-data.yaml");
         }
 
-        List<JsonNode> studies = client.searchStudies(condition, term, location, maxStudies);
+        List<JsonNode> studies = client.searchStudies(condition, term, location, overallStatus, maxStudies);
         LocalDateTime fetchedAt = LocalDateTime.now();
 
         int stagedCount = 0;
