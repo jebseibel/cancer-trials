@@ -21,7 +21,7 @@ public class RequestLocationUpdate extends BaseRequest {
     @Size(max = 128, message = "The state must be at most 128 characters.")
     private String state;
 
-    @Size(max = 16, message = "The zip must be at most 16 characters.")
+    @Size(max = 64, message = "The zip must be at most 64 characters.")
     private String zip;
 
     @Size(max = 128, message = "The country must be at most 128 characters.")

@@ -15,7 +15,13 @@ databaseChangeLog:
               - column: { name: facility, type: varchar(255) }
               - column: { name: city, type: varchar(128) }
               - column: { name: state, type: varchar(128) }
-              - column: { name: zip, type: varchar(16) }
+              # Widened from 16. Real postal codes top out at 11 chars (measured across 1,804
+              # locations in 300 CT.gov cancer trials), but sites sometimes put two codes in the
+              # one field - NCT04680442 sends "90035903 / 90410000" at 19 chars. That overflow
+              # failed the Location insert, which aborted normalization for the whole trial and
+              # silently dropped it from the corpus. Losing a recruiting trial to a formatting
+              # quirk is the wrong trade, so the column absorbs the mess.
+              - column: { name: zip, type: varchar(64) }
               - column: { name: country, type: varchar(128) }
               - column: { name: status, type: varchar(32) }
               - column: { name: latitude, type: "decimal(9,6)" }

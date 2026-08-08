@@ -28,7 +28,8 @@ public class LocationDb extends BaseDb {
     @Column(name = "state", length = 128)
     private String state;
 
-    @Column(name = "zip", length = 16)
+    // 64, not 16: some CT.gov sites put two postal codes in one field. See 015-location.yaml.
+    @Column(name = "zip", length = 64)
     private String zip;
 
     @Column(name = "country", length = 128)
