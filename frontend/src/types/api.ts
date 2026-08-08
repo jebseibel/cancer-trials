@@ -171,11 +171,40 @@ export interface Sponsor {
 }
 
 // Ingestion (on-demand ClinicalTrials.gov fetch + normalize)
+// Every field is optional - omitting one falls back to the backend's configured default under
+// cancer.ingestion.clinicaltrials.* (condition "cancer", overallStatus RECRUITING,
+// maxStudies 1000).
 export interface IngestionRequest {
     condition?: string;
     term?: string;
     location?: string;
+    /** CT.gov filter.overallStatus. Send 'ALL' to clear the filter and pull every status. */
+    overallStatus?: string;
     maxStudies?: number;
+}
+
+/** CT.gov overall-status values worth exposing, plus the explicit opt-out. */
+export const OVERALL_STATUS_OPTIONS = [
+    { value: 'RECRUITING', label: 'Recruiting' },
+    { value: 'NOT_YET_RECRUITING', label: 'Not yet recruiting' },
+    { value: 'ACTIVE_NOT_RECRUITING', label: 'Active, not recruiting' },
+    { value: 'ENROLLING_BY_INVITATION', label: 'Enrolling by invitation' },
+    { value: 'COMPLETED', label: 'Completed' },
+    { value: 'TERMINATED', label: 'Terminated' },
+    { value: 'ALL', label: 'All statuses' },
+] as const;
+
+// RAG vector-store indexing. Separate from ingestion on purpose: ingestion writes MySQL,
+// backfill makes those trials searchable. See FRONTEND_JOB_TRIGGER_PLAN.md.
+export interface BackfillResult {
+    /** Trials that produced at least one chunk. */
+    trialsIndexed: number;
+    /** Total chunks embedded and written to the vector store. */
+    chunksWritten: number;
+    /** Trials that produced no chunks - e.g. no eligibility text. */
+    trialsSkipped: number;
+    /** Per-trial failures. The run continues past each one. */
+    errors: string[];
 }
 
 export interface IngestionResult {

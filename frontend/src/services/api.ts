@@ -19,6 +19,7 @@ import type {
     PageResponse,
     IngestionRequest,
     IngestionResult,
+    BackfillResult,
 } from '../types/api';
 
 // API Configuration
@@ -132,6 +133,17 @@ export const sponsorApi = {
 export const ingestionApi = {
     runClinicalTrials: (request: IngestionRequest) =>
         apiClient.post<IngestionResult>('/ingestion/clinicaltrials', request),
+};
+
+// Vector-store indexing. Deliberately separate from ingestion: ingestion writes to MySQL,
+// backfill chunks and embeds those trials so they become searchable. Ingesting alone leaves
+// search returning nothing for the new trials.
+export const ragApi = {
+    /** Chunk, embed, and index trials already in the database. Idempotent - safe to re-run. */
+    backfill: () => apiClient.post<BackfillResult>('/rag/backfill'),
+    /** Re-index a single trial by extid. */
+    reindexTrial: (trialExtid: string) =>
+        apiClient.post<BackfillResult>(`/rag/reindex/${trialExtid}`),
 };
 
 export const authApi = {
