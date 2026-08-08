@@ -9,21 +9,42 @@ than keeping it as history.
 
 ---
 
-## Do this first when picking the project back up
+## Picking the project back up
 
-The working tree is clean and everything is committed, but the running environment is not ready:
+**Everything is committed and the environment is fully working.** Verified 2026-08-08 at end
+of session:
 
-1. **Start the backend** (you do this — never the assistant).
-2. **Ingest trials.** The database was rebuilt, so `trial` is empty:
-   `POST /api/ingestion/clinicaltrials` with `{"condition": "breast cancer", "maxStudies": 50}`.
-3. **Backfill the vector store.** Qdrant is at **0 points** — semantic search returns nothing
-   until this runs: `curl -X POST http://localhost:8080/api/rag/backfill` (~15s for 50 trials).
-   Confirm Qdrant is up first: `docker compose up -d`.
-4. **Seed an `AppUser` row** whose username matches your login. Without it, Trial Detail
-   tracking, Saved Trials, and the Diagnosis page all show "no app-user profile linked".
-   There is still no UI for this.
+| | |
+| --- | --- |
+| Trials in MySQL | **50** (breast cancer, RECRUITING) |
+| Qdrant | **1,629 points**, collection green, 384 dims |
+| Retrieval evaluation | **8/8 passing** |
+| AppUser | 1 row, username `jeb` — matches the seeded login |
+| PatientDiagnosis | 1 **sample/placeholder** row (see below) |
+| Tests | `:database` 688, `:datafetcher` 34, `:rag` 25 — all passing |
+| Working tree | clean |
 
-Then `bash rag/src/test/resources/eval/run-evaluation.sh` should be back to 8/8.
+To resume: start the backend, `docker compose up -d` if Qdrant is down, and log in as `jeb`.
+Nothing else is needed — the ingest/backfill steps are already done.
+
+⚠️ **The `AppUser` and `PatientDiagnosis` rows are hand-seeded and will vanish on the next
+database rebuild.** The diagnosis is clearly marked placeholder (cancer type begins
+`SAMPLE DATA -`). Replace it with the real details when you are ready. Step 8 of
+`_archive/patient/PATIENT_MODEL_PLAN.md` makes both of these proper seed data.
+
+### Where the session stopped
+
+Mid-conversation about **deploying to QA on a Hostinger KVM**. Nothing was started. See
+"Deploying to QA" below for what that needs.
+
+### Suggested next move
+
+Do the two security items under *Deploying to QA* regardless — they are right anyway and
+they are step 0 of the patient plan.
+
+Then **use the tool** before building more. It works end to end now, but nobody has yet
+searched for a trial for a real person. That is the cheapest way to learn whether Tier 2
+matching matters more than the patient refactor — and it may reorder everything below.
 
 ---
 
@@ -165,7 +186,10 @@ page, not a bigger page size.
 ### Other
 
 - **No AppUser-seeding UI.** `User` (login) and `AppUser` (tracking) are separate tables with no
-  FK, matched by username. Creating the row is manual.
+  FK, matched by username. Creating the row is manual and it does not survive a rebuild. One
+  exists now for `jeb`, created via the API. The `passwordHash` field had to be supplied even
+  though `AppUser` never authenticates — that requirement is exactly the design flaw
+  `_archive/patient/PATIENT_MODEL_PLAN.md` removes.
 - **No enum endpoint.** Frontend vocabularies are hardcoded `as const` arrays in
   `types/api.ts`; adding a backend enum value will not surface in the UI on its own.
 - **`BasicApplicationTests.contextLoads()`** — status unconfirmed. It previously failed on a
@@ -175,6 +199,41 @@ page, not a bigger page size.
   than a model limit — try a larger recruiting-only corpus before considering a model upgrade.
 - **Six of eight files in `.claude/agents/` lack YAML frontmatter** and therefore cannot be
   invoked as subagents. They work only as prompts referenced by path.
+
+---
+
+## Deploying to QA (Hostinger KVM) — analysed 2026-08-08, not started
+
+QA on your own KVM is a reasonable next step and a **different risk profile from
+production**: your host, your data, and no real patient record required while the seeded
+diagnosis stays placeholder. `_archive/hosting/qa-setup.md` already covers VPS provisioning
+(Java 21, MySQL, Nginx, systemd) and is already renamed to this project.
+
+`./gradlew buildDeployment` exists and bundles the frontend into the jar. All config is
+env-var driven and `.env` is correctly gitignored.
+
+**Required before it is reachable on a public IP:**
+
+1. **Restore endpoint security.** `SecurityConfig` line 55 is `.anyRequest().permitAll()` —
+   on a KVM that means anyone who finds the IP reads everything. Uncomment the preserved rule
+   set; keep `/api/uchealth/callback` public (Epic's redirect cannot carry a JWT).
+2. **Move the JWT secret** to `JWT_SECRET` in the server's `.env` and generate a fresh value.
+   The committed default must not be what protects a public host.
+3. **Bind Qdrant to `127.0.0.1`.** `docker-compose.yml` currently publishes 6333/6334 on all
+   interfaces — fine locally, wrong on a public box.
+4. **Change `UCHEALTH_REDIRECT_URI`** to the server address and add that URI to Epic's app
+   registration, or the OAuth callback breaks.
+
+**Not needed for QA, but required before it holds a real record:** encryption at rest, an
+audit log of who read what, and a backup story. Be deliberate that QA stays sample-only until
+those exist.
+
+**Two things that will bite:**
+
+- The **Epic token dies in ~1 hour** with no refresh, so FHIR ingestion on QA needs an
+  interactive browser login each time.
+- **A large ingestion will not survive an HTTP timeout** — ~110 minutes for a full pull.
+  Behind Nginx you will hit `proxy_read_timeout` first. Keep pulls small, or raise it.
 
 ---
 
