@@ -9,6 +9,8 @@ import TrialDetail from './pages/TrialDetail';
 import SavedTrials from './pages/SavedTrials';
 import Ingestion from './pages/Ingestion';
 import Diagnosis from './pages/Diagnosis';
+import Variants from './pages/Variants';
+import PriorTreatment from './pages/PriorTreatment';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -39,6 +41,8 @@ function App() {
                         <Route path="trials/:extid" element={<TrialDetail />} />
                         <Route path="saved-trials" element={<SavedTrials />} />
                         <Route path="diagnosis" element={<Diagnosis />} />
+                        <Route path="variants" element={<Variants />} />
+                        <Route path="prior-treatment" element={<PriorTreatment />} />
                         <Route path="ingestion" element={<Ingestion />} />
                     </Route>
                 </Routes>

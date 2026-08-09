@@ -23,7 +23,7 @@ public class TrialDb extends BaseDb {
     @Column(name = "brief_title", length = 500, nullable = false)
     private String briefTitle;
 
-    @Column(name = "official_title", length = 500)
+    @Column(name = "official_title", length = 1000)
     private String officialTitle;
 
     @Column(name = "overall_status", length = 32)

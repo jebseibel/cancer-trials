@@ -17,8 +17,18 @@ public interface PatientDiagnosisRepository extends JpaRepository<PatientDiagnos
     Page<PatientDiagnosisDb> findByActive(ActiveEnum active, Pageable pageable);
     boolean existsByExtid(String extid);
 
-    /** One patient's diagnosis is looked up by user - realistically a single row. */
-    List<PatientDiagnosisDb> findByAppUserId(Long appUserId);
+    /**
+     * One patient's diagnosis is looked up by user - realistically a single row.
+     *
+     * Filters on active: soft-deleted diagnoses must not come back here. Without the
+     * filter, replacing a diagnosis leaves the deleted row in the list, and the Diagnosis
+     * page takes rows[0] - so it would display and edit the deleted record.
+     */
+    List<PatientDiagnosisDb> findByAppUserIdAndActive(Long appUserId, ActiveEnum active);
+
+    default List<PatientDiagnosisDb> findByAppUserId(Long appUserId) {
+        return findByAppUserIdAndActive(appUserId, ActiveEnum.ACTIVE);
+    }
 
     default List<PatientDiagnosisDb> findAllActive() {
         return findByActive(ActiveEnum.ACTIVE);

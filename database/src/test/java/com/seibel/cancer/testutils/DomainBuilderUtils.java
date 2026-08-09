@@ -285,6 +285,15 @@ public class DomainBuilderUtils {
         return BigDecimal.valueOf(value).setScale(scale, RoundingMode.HALF_UP);
     }
 
+    /**
+     * Cosine similarity score, 0..1, at decimal(6,4) scale. The unbounded
+     * {@link #getDecimalRandom(int)} would generate values up to 10000, which do not fit
+     * decimal(6,4) - only two digits are allowed before the point.
+     */
+    public static BigDecimal getScoreRandom() {
+        return getDecimalRandom(0.0, 1.0, 4);
+    }
+
     /** Valid latitude, -90..90, at decimal(9,6) scale. */
     public static BigDecimal getLatitudeRandom() {
         return getDecimalRandom(-90.0, 90.0, 6);

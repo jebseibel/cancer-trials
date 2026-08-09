@@ -11,6 +11,6 @@ import org.springframework.context.annotation.Configuration;
  * picked up by the app's component scan. Same pattern as {@code RagConfig} in :rag.
  */
 @Configuration
-@EnableConfigurationProperties(ClinicalTrialsIngestProperties.class)
+@EnableConfigurationProperties({ClinicalTrialsIngestProperties.class, ProgressTickerProperties.class})
 public class DatafetcherConfig {
 }

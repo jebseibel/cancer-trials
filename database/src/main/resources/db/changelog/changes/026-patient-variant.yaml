@@ -1,0 +1,48 @@
+databaseChangeLog:
+  - changeSet:
+      id: 026-patient-variant
+      author: jeb
+      changes:
+        - createTable:
+            tableName: patient_variant
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: app_user_id, type: bigint, constraints: { nullable: false } }
+              - column: { name: patient_diagnosis_id, type: bigint }
+              - column: { name: pik3ca_status, type: varchar(16) }
+              - column: { name: esr1_status, type: varchar(16) }
+              - column: { name: tp53_status, type: varchar(16) }
+              - column: { name: akt1_status, type: varchar(16) }
+              - column: { name: pten_status, type: varchar(16) }
+              - column: { name: erbb2_somatic_status, type: varchar(16) }
+              - column: { name: brca1_status, type: varchar(16) }
+              - column: { name: brca2_status, type: varchar(16) }
+              - column: { name: palb2_status, type: varchar(16) }
+              - column: { name: atm_status, type: varchar(16) }
+              - column: { name: chek2_status, type: varchar(16) }
+              - column: { name: hrd_status, type: varchar(16) }
+              - column: { name: pdl1_status, type: varchar(16) }
+              - column: { name: ki67_percent, type: int }
+              - column: { name: germline_test_done, type: varchar(16) }
+              - column: { name: somatic_test_done, type: varchar(16) }
+              - column: { name: test_date, type: date }
+              - column: { name: test_lab, type: varchar(255) }
+              - column: { name: other_variants, type: varchar(1000) }
+              - column: { name: notes, type: text }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }
+
+        - createIndex:
+            tableName: patient_variant
+            indexName: idx_patient_variant_app_user_id
+            columns:
+              - column: { name: app_user_id }
+
+        - createIndex:
+            tableName: patient_variant
+            indexName: idx_patient_variant_patient_diagnosis_id
+            columns:
+              - column: { name: patient_diagnosis_id }

@@ -1,0 +1,52 @@
+databaseChangeLog:
+  - changeSet:
+      id: 027-patient-prior-treatment
+      author: jeb
+      changes:
+        - createTable:
+            tableName: patient_prior_treatment
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: app_user_id, type: bigint, constraints: { nullable: false } }
+              - column: { name: patient_diagnosis_id, type: bigint }
+              - column: { name: cdk46_status, type: varchar(24) }
+              - column: { name: endocrine_status, type: varchar(24) }
+              - column: { name: serd_status, type: varchar(24) }
+              - column: { name: chemo_status, type: varchar(24) }
+              - column: { name: her2_therapy_status, type: varchar(24) }
+              - column: { name: her2_adc_status, type: varchar(24) }
+              - column: { name: trop2_adc_status, type: varchar(24) }
+              - column: { name: parp_status, type: varchar(24) }
+              - column: { name: pi3k_akt_mtor_status, type: varchar(24) }
+              - column: { name: immunotherapy_status, type: varchar(24) }
+              - column: { name: taxane_status, type: varchar(24) }
+              - column: { name: anthracycline_status, type: varchar(24) }
+              - column: { name: platinum_status, type: varchar(24) }
+              - column: { name: current_drug_names, type: varchar(1000) }
+              - column: { name: prior_drug_names, type: varchar(1000) }
+              - column: { name: lines_of_therapy_metastatic, type: int }
+              - column: { name: had_neoadjuvant, type: tinyint(1) }
+              - column: { name: had_adjuvant, type: tinyint(1) }
+              - column: { name: had_radiation, type: tinyint(1) }
+              - column: { name: had_surgery, type: tinyint(1) }
+              - column: { name: last_treatment_end_date, type: date }
+              - column: { name: currently_on_treatment, type: tinyint(1) }
+              - column: { name: other_treatments, type: varchar(1000) }
+              - column: { name: notes, type: text }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }
+
+        - createIndex:
+            tableName: patient_prior_treatment
+            indexName: idx_patient_prior_treatment_app_user_id
+            columns:
+              - column: { name: app_user_id }
+
+        - createIndex:
+            tableName: patient_prior_treatment
+            indexName: idx_patient_prior_treatment_diagnosis_id
+            columns:
+              - column: { name: patient_diagnosis_id }

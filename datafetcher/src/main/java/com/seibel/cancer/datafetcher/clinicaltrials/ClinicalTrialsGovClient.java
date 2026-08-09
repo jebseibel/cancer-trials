@@ -5,12 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriBuilder;
 
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * Thin REST client for ClinicalTrials.gov v2's GET /studies endpoint. No API key
@@ -22,6 +25,15 @@ public class ClinicalTrialsGovClient {
 
     private static final String BASE_URL = "https://clinicaltrials.gov/api/v2";
     private static final int PAGE_SIZE = 100;
+
+    /**
+     * CT.gov intermittently returns an nginx 5xx on an otherwise valid request. Observed
+     * 2026-08-08: a 2,456-trial pull died mid-paging on a single 500, and the endpoint was
+     * healthy again seconds later. Without a retry one blip discards every page already
+     * fetched, since studies only accumulate in memory until the whole call returns.
+     */
+    private static final int MAX_ATTEMPTS = 4;
+    private static final long INITIAL_BACKOFF_MS = 500L;
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -56,11 +68,10 @@ public class ClinicalTrialsGovClient {
             int pageSize = Math.min(PAGE_SIZE, remaining);
 
             String pageTokenFinal = pageToken;
-            JsonNode page = restClient.get()
-                    .uri(uriBuilder -> buildSearchUri(uriBuilder, condition, term, location,
-                            overallStatus, pageSize, pageTokenFinal))
-                    .retrieve()
-                    .body(JsonNode.class);
+            JsonNode page = getWithRetry(
+                    uriBuilder -> buildSearchUri(uriBuilder, condition, term, location,
+                            overallStatus, pageSize, pageTokenFinal),
+                    "page " + (pageCount + 1));
 
             if (page == null) {
                 break;
@@ -98,8 +109,8 @@ public class ClinicalTrialsGovClient {
      * than discovering it after the fact.
      */
     public int countStudies(String condition, String term, String location, String overallStatus) {
-        JsonNode page = restClient.get()
-                .uri(uriBuilder -> {
+        JsonNode page = getWithRetry(
+                uriBuilder -> {
                     UriBuilder b = uriBuilder.path("/studies")
                             .queryParam("pageSize", 1)
                             .queryParam("countTotal", true);
@@ -108,10 +119,48 @@ public class ClinicalTrialsGovClient {
                     if (StringUtils.hasText(location)) b = b.queryParam("query.locn", location);
                     if (StringUtils.hasText(overallStatus)) b = b.queryParam("filter.overallStatus", overallStatus);
                     return b.build();
-                })
-                .retrieve()
-                .body(JsonNode.class);
+                },
+                "count");
         return page == null ? 0 : page.path("totalCount").asInt(0);
+    }
+
+    /**
+     * GETs a URI, retrying on 5xx and I/O failures with exponential backoff.
+     *
+     * <p>Only transient failures are retried. A 4xx means the request itself is wrong - a bad
+     * query param or an expired pageToken - and retrying it just fails four times more slowly,
+     * so those propagate immediately.
+     */
+    private JsonNode getWithRetry(Function<UriBuilder, URI> uriFunction, String description) {
+        long backoffMs = INITIAL_BACKOFF_MS;
+
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return restClient.get()
+                        .uri(uriFunction)
+                        .retrieve()
+                        .body(JsonNode.class);
+            } catch (HttpServerErrorException | ResourceAccessException e) {
+                if (attempt >= MAX_ATTEMPTS) {
+                    log.error("getWithRetry(): {} failed after {} attempts", description, attempt);
+                    throw e;
+                }
+                log.warn("getWithRetry(): {} attempt {}/{} failed ({}), retrying in {}ms",
+                        description, attempt, MAX_ATTEMPTS, e.getClass().getSimpleName(), backoffMs);
+                sleep(backoffMs);
+                backoffMs *= 2;
+            }
+        }
+    }
+
+    private void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            // Restore the flag rather than swallowing it - a long pull should stay cancellable.
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while backing off between retries", e);
+        }
     }
 
     private URI buildSearchUri(UriBuilder uriBuilder, String condition, String term, String location,

@@ -1,0 +1,34 @@
+databaseChangeLog:
+  - changeSet:
+      id: create_trial_match_criterion_table
+      author: jeb
+      labels: diagnosis-matching
+      changes:
+
+        # TrialMatchCriterion Table - one row per matching chunk, the evidence for WHY a
+        # trial surfaced. Child of trial_match.
+        #
+        # is_exclusion is the important column: it lets a high-scoring exclusion render as
+        # a concern rather than a fit, per DIAGNOSIS_MATCHING_DESIGN.md section 5. A match
+        # against an exclusion criterion must never silently remove a trial from a list.
+        - createTable:
+            tableName: trial_match_criterion
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: trial_match_id, type: bigint, constraints: { nullable: false } }
+              - column: { name: chunk_text, type: text, constraints: { nullable: false } }
+              - column: { name: score, type: "decimal(6,4)", constraints: { nullable: false } }
+              - column: { name: is_exclusion, type: "tinyint(1)" }
+              - column: { name: source, type: varchar(64) }
+              - column: { name: ordinal, type: int }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }
+
+        - createIndex:
+            tableName: trial_match_criterion
+            indexName: idx_trial_match_criterion_trial_match_id
+            columns:
+              - column: { name: trial_match_id }

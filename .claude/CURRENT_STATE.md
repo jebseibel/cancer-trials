@@ -5,46 +5,186 @@ Where the project stands, what is deliberately unfinished, and what that blocks.
 (schema design). This is the "where are we right now" view — update it as things change rather
 than keeping it as history.
 
-**Last verified against the code: 2026-08-08.**
+**Last verified against the code: 2026-08-09.**
 
 ---
 
 ## Picking the project back up
 
-**Everything is committed and the environment is fully working.** Verified 2026-08-08 at end
-of session:
+Verified 2026-08-09 at end of session, immediately after a database rebuild:
 
 | | |
 | --- | --- |
-| Trials in MySQL | **50** (breast cancer, RECRUITING) |
-| Qdrant | **1,629 points**, collection green, 384 dims |
-| Retrieval evaluation | **8/8 passing** |
-| AppUser | 1 row, username `jeb` — matches the seeded login |
-| PatientDiagnosis | 1 **sample/placeholder** row (see below) |
-| Tests | `:database` 688, `:datafetcher` 34, `:rag` 25 — all passing |
-| Working tree | clean |
+| Trials in MySQL | **0** — the rebuild dropped 2,676. Re-ingest before anything works. |
+| Qdrant | **stale/empty** — must be cleared and re-backfilled, chunks reference dead extids |
+| AppUser | 1 row, `jeb`, extid `03c6958f-6a1f-46bf-96a7-330cf1bbe9ca` — **auto-seeded** |
+| PatientDiagnosis | 1 row, real data, extid `441591db-fddf-423a-8d74-845d1f2e89e4` — **auto-seeded** |
+| PatientVariant | 1 row, extid `a588da6c-2dd1-479c-a140-a1c279a02cdc` — **auto-seeded** |
+| PatientPriorTreatment | 1 row, extid `86f4de7d-f5e3-4864-8e6d-53e878d98129` — **auto-seeded** |
+| SavedTrialMatch | 0 — the 15 rows from 2026-08-08 were lost in the rebuild |
+| Tests | `:database` **818**, root 3 — all passing |
+| Working tree | large; being committed at end of this session |
 
-To resume: start the backend, `docker compose up -d` if Qdrant is down, and log in as `jeb`.
-Nothing else is needed — the ingest/backfill steps are already done.
+**To resume, in order:**
 
-⚠️ **The `AppUser` and `PatientDiagnosis` rows are hand-seeded and will vanish on the next
-database rebuild.** The diagnosis is clearly marked placeholder (cancer type begins
-`SAMPLE DATA -`). Replace it with the real details when you are ready. Step 8 of
-`_archive/patient/PATIENT_MODEL_PLAN.md` makes both of these proper seed data.
+1. `POST /api/ingestion/clinicaltrials` with
+   `{"condition":"breast cancer","overallStatus":"RECRUITING","maxStudies":2500}` — a few
+   minutes, and the new progress ticker shows both loops live.
+2. Clear the Qdrant collection, then `POST /api/rag/backfill`. The collection must be
+   **deleted**, not reused: its chunks reference trial extids that no longer exist.
+3. Log in as `jeb`. The patient data is already there — see below.
+
+### The patient rows now seed themselves
+
+**This is new and it is the fix for the worst repeat-pain of a rebuild.** `PatientSeedLoader`
+(root, `service/`) is a `CommandLineRunner` that recreates `AppUser`, `PatientDiagnosis`,
+`PatientVariant` and `PatientPriorTreatment` on startup from gitignored CSVs in
+`.claude/patient-data/`. **Verified working through a real rebuild on 2026-08-09** — all four
+rows came back automatically with correct values.
+
+Four rules it follows, each deliberate:
+
+- **Seed if absent, never sync.** An existing row is left completely alone, so edits made
+  through the UI survive a restart. The CSV is a floor, not a source of truth.
+- **Keyed on username, not extid** — extids regenerate on every rebuild.
+- **A missing file or directory is not an error**; the app boots fine without patient data.
+- **A malformed seed never blocks startup.**
+
+Settings live under `cancer.seed.patient.*` in `application.yml`; set `enabled: false` to skip.
+
+⚠️ **The CSVs are the source of truth now.** If you edit patient data through the UI, the
+change lives only in the database and the next rebuild reverts it to whatever the CSV says.
+Update the CSV too, or accept the loss.
+
+⚠️ **Vocabulary drift is the failure mode to watch.** The diagnosis CSV originally held
+`AJCC`, `POSTMENOPAUSAL` and `HR+/HER2-` where the frontend expects `AJCC_8`, `POST` and
+`HR_POSITIVE_HER2_NEGATIVE`. The backend stores plain varchars so it accepted them, but the
+dropdowns rendered blank and a save would have silently cleared the fields. Fixed 2026-08-09;
+check any new CSV value against `frontend/src/types/api.ts`.
+
+### New clinical data — 2026-08-09, from the real record
+
+A **UCHealth My Health Summary PDF** (generated 2026-08-08, 35,808 lines of extracted text)
+was read and mapped into all three patient tables. It is at
+`.claude/patient-data/my-health-summary.pdf`, gitignored, `600`.
+
+⚠️ **It arrived in `.claude/diagnosis/`, which is NOT gitignored, world-readable, and one
+`git add .` from being committed.** Moved on arrival. This is the second time a real medical
+record has landed in a tracked directory — the PET/CT report did the same on 2026-08-08.
+**Any new patient document goes straight to `.claude/patient-data/` before it is opened.**
+
+What the record established, beyond what was already recorded:
+
+- **Germline testing: a multi-gene panel, negative for pathogenic variants.**
+  BRCA1, BRCA2, PALB2, ATM and CHEK2 are therefore `NOT_DETECTED`, not blank. This is the
+  distinction the five-state vocabulary exists for: it moves PARP-inhibitor trials from
+  *open question* to *genuine mismatch*.
+- **Precise receptor values**, at the level of detail a pathology report carries.
+  HER2 IHC low-positive, DISH not amplified.
+- **Histology and stage**: invasive ductal carcinoma, with a full AJCC staging code.
+- **ECOG 0 → 1** per the recent oncology note.
+- **Palliative radiation** to named sites, left sacroiliac
+  joint, and right proximal femur. Not previously recorded.
+- **A bone-modifying agent, started several months into treatment.**
+- **Corrected drug start dates** — two different dates for the same drug (an earlier
+  note in the same record says 3/31 — unresolved).
+- **A follow-up scan showing mixed response.** Some sites resolved,
+  osseous lesions mixed, some larger and more avid. Progressive asymptomatic right femoral
+  neck metastasis, fracture risk.
+- **A documented decision to continue the current regimen rather than pivot to a PI3K
+  inhibitor.** So `pi3kAktMtorStatus` is `NEVER` *despite* the PIK3CA mutation — she is
+  PIK3CA-mutant and PI3K-inhibitor-naive, which is an inclusion criterion for a whole class
+  of trials.
+- **Confirmed: no cytotoxic chemotherapy, ever.** The neoadjuvant AC-then-taxane regimen was
+  planned early on and abandoned when staging found metastatic disease. Every "chemo"
+  mention in the record is supportive care or that abandoned plan.
+
+**Two unresolved conflicts, recorded in the notes fields rather than silently resolved:**
+
+- **A proliferation index (Ki-67) disagreed by several-fold between two notes in the oncology and
+  radiation notes.** A 4.5× discrepancy on a proliferation index is not rounding. The user
+  chose 45%; both values are in the notes. Worth asking the oncology team.
+- **A drug start date** appears as two different dates in the same record.
 
 ### Where the session stopped
 
-Mid-conversation about **deploying to QA on a Hostinger KVM**. Nothing was started. See
-"Deploying to QA" below for what that needs.
+Everything above is in the database and committed. The next step is re-ingesting the corpus
+(step 1 under "To resume") — it was dropped by the rebuild that proved the seed loader works.
 
-### Suggested next move
+**The tool was used for a real person for the first time (2026-08-08).** See
+"First real search" below — it worked, and it surfaced a concrete design gap that reorders
+the candidate list.
 
-Do the two security items under *Deploying to QA* regardless — they are right anyway and
-they are step 0 of the patient plan.
+### First real search — 2026-08-08
 
-Then **use the tool** before building more. It works end to end now, but nobody has yet
-searched for a trial for a real person. That is the cheapest way to learn whether Tier 2
-matching matters more than the patient refactor — and it may reorder everything below.
+The patient's real diagnosis is now in `patient_diagnosis`: de novo **stage IV invasive
+carcinoma of the left breast**, **ER+ / PR− / HER2−**, **PIK3CA mutation detected**,
+postmenopausal, ECOG 0, bone and extensive nodal metastases, on **abemaciclib (Verzenio) +
+letrozole** since April 2026 with **no prior cytotoxic chemotherapy**. Sourced from an MRI
+plus details supplied directly by the user.
+
+A semantic search over all 249 trials using that profile returned real, relevant matches —
+most notably **NCT05753657**, which matched at 0.717 on *"ER positive HER2 negative
+metastatic breast cancer, harboring an activating PIK3CA mutation"*. That is the patient's profile
+line for line, including the biomarker.
+
+**But the top-scoring hit was wrong, and the reason matters.** NCT06685796 scored highest
+(0.718) on the criterion *"HR-**negative**, HER2-negative"* — triple-negative disease. She
+is HR-**positive**. Two more of the top ten (NCT07045311 triple-negative, NCT06770296
+HER2-**positive**) got in the same way.
+
+**Embedding similarity cannot distinguish receptor polarity.** "HR-negative HER2-negative"
+and "HR-positive HER2-negative" differ by one token inside an otherwise identical phrase,
+and the model scores them as near-identical. This is a known weakness of embedding models
+around negation, not a tuning problem — no similarity threshold fixes it.
+
+Receptor status gates **36% of this corpus** (HER2) and **28%** (ER/PR). So pure retrieval
+is not sufficient for Tier 2, and the fix is already available: `er_status`, `pr_status`
+and `her2_status` are structured columns on `patient_diagnosis`. Tier 2 must combine
+retrieval with a structured receptor filter or re-rank rather than ranking on similarity
+alone. `DIAGNOSIS_MATCHING_DESIGN.md` §4 anticipated combining them; this run is the
+evidence that it is mandatory.
+
+Consistent with the no-verdicts rule: a receptor mismatch should **demote and flag** a
+trial, never silently remove it. Those three trials are wrong for her today, but receptor
+status can be re-tested and the tool should not make that call for her.
+
+### The unfinished task — pick this up first
+
+**The user was trying to answer a real question about a family member's trial options and did not
+get there.** The blocker was tooling, not design.
+
+What was in flight when the session ended:
+
+1. **Ingest the full recruiting breast-cancer corpus.** Only 249 of **2,456** are in MySQL
+   (~10%). The API call is
+   `POST /api/ingestion/clinicaltrials {"condition":"breast cancer","overallStatus":"RECRUITING","maxStudies":2500}`.
+   Measured rate: 250 trials in 9.5s, so the full pull should take ~2-4 minutes and fit in
+   one request. Re-runs dedup by `nctId`. **This does not need a RAG backfill** — the
+   deterministic filter reads `eligibility_criteria` straight from MySQL.
+2. **Re-run the match with two fixes the user approved:**
+   - **Strict receptor polarity.** The current filter accepts any trial whose criteria
+     mention "HER2-negative" anywhere, so NCT07371585 — a HER2-**positive** first-line
+     trial — scored 0.8333 against a HER2-negative patient. Reject trials *requiring*
+     HER2-positive or triple-negative disease.
+   - **US-wide location filter.** The user will travel anywhere in the USA. Geography was
+     not part of matching at all, and the top-ranked trial (NCT05753657) has exactly one
+     site, outside the US. `location` carries `trial_id` directly; no join table needed.
+
+**On the scoring, which the user correctly noticed never reached 100%:** `top_score` was
+`signals_matched / 6`, and 6/6 is unreachable by construction — a trial cannot be both
+"first-line treatment-naive" and "post-CDK4/6 progression". Worse, the score counts keyword
+co-occurrence in criteria text, not whether she qualifies. It is a reasonable *shortlist*
+and a poor *ranking*. A real percentage needs Tier 3 (parse each criterion into a testable
+predicate, evaluate against her structured fields, report pass/fail/unknown per criterion).
+
+### Suggested next move after that
+
+**Tier 2 matching with a structured receptor filter.** The data is real and the gap is
+measured rather than hypothetical — see "First real search" below.
+
+The two security items under *Deploying to QA* remain right regardless, and matter more
+now that the database holds a real medical record rather than sample data.
 
 ---
 
@@ -64,8 +204,66 @@ Every entity referencing a Trial also exposes `GET /api/{entity}/by-trial/{trial
 
 ### Frontend
 
-Seven pages: Login, Dashboard, Trial Search, Trial Detail, Saved Trials, **Diagnosis**,
-Ingestion. Structure and gotchas in `_archive/frontend/frontend-module.md`.
+Nine pages: Login, Dashboard, Trial Search, Trial Detail, Saved Trials, **Diagnosis**,
+**Variants**, **Prior Treatment**, Ingestion. Structure and gotchas in
+`_archive/frontend/frontend-module.md`.
+
+**Variants and Prior Treatment are new (2026-08-09)** and deliberately separate pages rather
+than sections of Diagnosis: three tables means three endpoints, so one Save button per page
+avoids inventing a partial-write problem. They also draw on different source documents — a
+pathology report, a genomic report, and a medication list — plausibly filled in on different
+days. Shared `Section`/`Field`/`Select`/`BooleanSelect` live in `components/FormControls.tsx`,
+extracted from `Diagnosis.tsx` so the three pages cannot drift apart.
+
+Each carries an amber callout explaining the one thing a person filling it in is most likely
+to get wrong: on Variants, that "not tested" is not "not detected"; on Prior Treatment, that
+*how* a drug was stopped decides which half of the corpus applies.
+
+### Patient variants and prior treatment — new 2026-08-09
+
+`PatientVariant` (21 fields) and `PatientPriorTreatment` (24 fields), changesets `026`/`027`,
+full layered stack plus 62 tests. Design and rationale in
+`diagnosis/patient-variant-and-treatment-tables.md`; the three research documents behind it
+are in `research/`.
+
+**Both use five-state vocabularies, not booleans**, and that is the whole point:
+
+- Variants: `DETECTED | NOT_DETECTED | VUS | NOT_TESTED | UNKNOWN`
+- Treatment: `NEVER | CURRENT | PROGRESSED | STOPPED_OTHER | UNKNOWN`
+
+The treatment case is concrete rather than theoretical. The patient is **on a CDK4/6 inhibitor now
+and has not progressed on it**. A boolean `priorCdk46 = true` is literally true and reads as
+post-CDK4/6 — matching her to the wrong half of the corpus. `CURRENT` vs `PROGRESSED` vs
+`NEVER` is one dropdown and it is the difference between a useful shortlist and a misleading
+one.
+
+**Named `PatientPriorTreatment`, not `PatientMedication`** — that name is taken by the FHIR
+prescription mirror (changeset `020`), which records what Epic *prescribed*, is keyed on a
+required unique `fhir_resource_id` so nothing can be hand-entered, and is still blocked and
+empty. Different table, different job.
+
+**Nothing reads these tables yet.** They are inputs waiting for Tier 2 matching.
+
+### Ingestion progress ticker — new 2026-08-09
+
+A character-per-record console bar on both ingestion loops: `*` inserted, `.` skipped, `!`
+error, wrapping every N records with the line's first record number in a left gutter and
+elapsed/rate/ETA at line end.
+
+```
+NORMALIZING
+     1 | ****.**!***.*********!**********.***************  2.6s 28.4/s ETA 3.9s
+```
+
+Class in `common/progress/ProgressTicker.java` (framework-free, so `:common` stays
+Spring-less); config in `datafetcher/config/ProgressTickerProperties.java` bound from
+`cancer.ingestion.progress.*`. Design record in `agents/progress-ticker.md`, and the pattern
+is now a skill at `skills/progress-ticker/`.
+
+**`enabled` defaults to `true`, not `auto`.** Ingestion is triggered from the frontend against
+a running backend, so the work happens on an HTTP request thread with no console — `auto`
+resolved to false and the bar never drew. Console detection describes how the *process* was
+launched, not whether anyone is watching.
 
 ### CT.gov ingestion — verified working
 
@@ -83,6 +281,27 @@ call → payload staged → re-run dedups. Observation normalizes into `lab_resu
 Qdrant in Docker, local ONNX embeddings (all-MiniLM-L6-v2, 384 dims — clinical text never
 leaves the machine), criterion-level chunking, indexing, backfill, retrieval, and an evaluation
 set that passed 8/8 on a 1,289-chunk corpus. Generation (§9) is deliberately deferred.
+
+### Persisted trial matches — new 2026-08-08
+
+`SavedTrialMatch` and `SavedTrialMatchCriterion` (tables `trial_match`,
+`trial_match_criterion`, changesets `024`/`025`), full layered stack plus 68 tests. Design
+and rationale in `diagnosis/trial-match-tables.md`.
+
+**Named `SavedTrialMatch`, not `TrialMatch`** — `rag.retrieve.TrialMatch` already exists as
+the in-memory search result. The persisted row and the ephemeral result are different
+things; the user chose to rename the new entity rather than touch working `:rag` code.
+
+**One run is stored**, `search_run_id = 22ccb562-b4a4-4acb-ae68-739896d837c1`: 15 ranked
+matches, 77 criterion rows, 8 of them flagged `is_exclusion` (all the same CNS-metastases
+concern — a skull-bone lesion rather than brain parenchyma,
+which is a question for her oncology team, not a disqualification). Those trials stayed in
+the ranked list, per the no-verdicts rule.
+
+**It was written directly through the REST API, not through `GET /api/rag/search`**, so the
+open question of what triggers persistence is untouched. `query_text` on every row states
+that this was a deterministic filter and that `top_score` is signals-matched/6, **not** a
+cosine similarity — do not compare these scores against a future semantic run.
 
 ### Diagnosis matching — Tier 1 of 3
 
@@ -183,8 +402,48 @@ Also: `ClinicalTrialsGovClient` accumulates every study in a `List<JsonNode>` be
 of them, so an 18,773-trial pull holds ~280MB of parsed JSON in heap. The fix is streaming per
 page, not a bigger page size.
 
+### Rebuilding the database — read before running the webhook
+
+**The n8n `clear-db` webhook left the schema half-built once this session.** It dropped the
+tables but not Liquibase's `databasechangelog`, so on restart Liquibase considered `001`-`023`
+already applied and created only the two new changesets. Result: `trial_match` existed while
+`app_user`, `user`, `trial_source` and everything else did not, and every endpoint except
+the new ones returned 500.
+
+`spring.liquibase.drop-first` is `false` (so a stored OAuth token survives a restart), which
+is what makes this failure mode possible. **The user updated the webhook and the second
+rebuild worked correctly** — but if a rebuild ever produces "Table 'cancer.X' doesn't exist"
+on some endpoints and not others, this is the cause. The fallback is to flip `drop-first`
+to `true`, restart, and flip it back.
+
+**A rebuild destroys the AppUser and the real PatientDiagnosis.** Both had to be recreated by
+hand this session. Her diagnosis is now saved at
+`.claude/patient-data/patient-diagnosis.csv` (gitignored, `600`, keyed on username `jeb`
+rather than extid since extids regenerate). **The startup loader that would read it does not
+exist yet** — the user asked for it, chose the gitignored-CSV approach over a committed
+Liquibase seed, and it was not built before the session ended. That is a small, self-contained
+task and it removes the worst repeat-pain of a rebuild.
+
+Rebuild also invalidates Qdrant: chunks reference trial extids that no longer exist, so the
+collection must be deleted and re-backfilled, not reused.
+
 ### Other
 
+- **Two single-item failures from the 2026-08-08 250-trial pull**, neither blocking:
+  `NCT06685796` failed to normalize (`Create operation failed for TrialDb`, generic message —
+  needs the staging row inspected), and `NCT07219277` failed to index (`Embeddings must have
+  the same number as that of the documents`). 249 of 250 normalized, 248 of 249 indexed.
+- **`findByAppUserId` returned soft-deleted rows — fixed 2026-08-08.**
+  `PatientDiagnosisRepository.findByAppUserId` had no `active` filter while the Diagnosis
+  page takes `rows[0]`, so after replacing a diagnosis the page displayed and edited the
+  **deleted** record. Now delegates to `findByAppUserIdAndActive(..., ACTIVE)`; callers
+  unchanged, `:database` tests pass. **`TrialStatusRepository.findByAppUserId` has the same
+  shape and has not been checked** — likely the same bug.
+- **`PatientDiagnosisDbService.update()` cannot clear a field.** Every assignment is
+  `if (item.getX() != null)`, so a null means "leave alone" and there is no way to unset a
+  populated column through the API. Hit this when the placeholder row's stale
+  `lastChemoEndDate` (2025-11-15, predating the real diagnosis) could not be cleared; the
+  row had to be deleted and recreated. Affects every `*DbService` following this template.
 - **No AppUser-seeding UI.** `User` (login) and `AppUser` (tracking) are separate tables with no
   FK, matched by username. Creating the row is manual and it does not survive a rebuild. One
   exists now for `jeb`, created via the API. The `passwordHash` field had to be supplied even
@@ -239,7 +498,18 @@ those exist.
 
 ## Candidate next steps
 
-Nothing here is decided.
+Nothing here is decided. **Steps 1-3 have a natural order and should be done first**: the
+corpus must exist before retrieval can be measured, and retrieval should be measured before
+matching logic is built on top of it. Building Tier 2 against an unmeasured corpus repeats
+the mistake that produced the misleading scores on 2026-08-08.
+
+The scope decision from `BREAST_FOCUS_PLAN.md` is also pending: narrowing the app to breast
+cancer only. The survey there found the schema and frontend are *already* breast-shaped, so
+the change is less about removing generality than about permission to hard-code clinical
+knowledge — which is what receptor-aware matching needs. Its one blocking question is whether
+matching logic lives in the backend or stays in the frontend, where Tier 1 currently sits
+(`frontend/src/lib/tier1Matching.ts`). Recommend backend: the frontend cannot be tested
+against the corpus in bulk, cannot inform ranking, and cannot be reused by Tier 3.
 
 1. **Re-run the evaluation against a recruiting-only corpus.** Ingestion now defaults to
    RECRUITING, but that has not been exercised end-to-end followed by a backfill and eval run.
@@ -276,8 +546,56 @@ baseline (`4de3ef1`):
 | `c621dce` | Backfill button + `JobResultModal` on the Ingest page |
 | `0f55855` | Diagnosis page + Tier 1 eligibility matching |
 
-Test counts: `:database` 688, `:datafetcher` 34, `:rag` 25 (1 skipped — needs a running
-backend). All passing. Frontend typecheck and build clean; one pre-existing lint error in
-`Login.tsx`.
+Test counts: `:database` **818** (was 756; +62 for `PatientVariant` and
+`PatientPriorTreatment`), root 3. All passing. Frontend typecheck and build clean; one
+pre-existing lint error in `Login.tsx`.
 
 Not merged to `main`; this work is still on the branch.
+
+The 2026-08-08 and 2026-08-09 work was committed together at the end of the 2026-08-09
+session — `SavedTrialMatch`/`SavedTrialMatchCriterion`, `PatientVariant`/
+`PatientPriorTreatment`, the progress ticker, the seed loader, the two new frontend pages,
+and the docs.
+
+### Files that must never be committed
+
+**`.claude/patient-data/`** — gitignored at directory level, `700`/`600`. Holds the real
+PET/CT and MRI reports, the full My Health Summary PDF, and the three seed CSVs. All real
+patient data.
+
+**`playwright/.auth/mychart-session.json`** — a live authenticated session to a real medical
+record. Gitignored; treat as a credential.
+
+⚠️ **This has nearly gone wrong twice.** On 2026-08-08 `.claude/diagnosis.md` (the PET/CT
+report) was `git add`-ed and staged before being caught. On 2026-08-09 the My Health Summary
+PDF arrived in `.claude/diagnosis/`, which is tracked and world-readable. Neither was ever
+committed or pushed. **Before any commit, confirm no patient file is in the index**, and put
+any new patient document in `.claude/patient-data/` before opening it.
+
+---
+
+## Playwright MyChart scraper — new 2026-08-08
+
+Standalone Gradle Java build at `playwright/` (NOT in root `settings.gradle`), modelled on
+the user's existing `~/projects/viro/viro-playwright`. Plan and findings in
+`.claude/playwright/PLAYWRIGHT_SCRAPE_PLAN.md`.
+
+**Step 1 is done and verified against the real portal:** login works, and **session reuse
+works** — a second run restored saved storage state and authenticated in ~3 seconds with no
+MFA prompt (`SESSION REUSED`). MFA fires on a first login from a new device and the code goes
+to the patient's phone, so the wait is 10 minutes. Repeatable scraping is viable; how long
+the device trust lasts is still unknown.
+
+**Why this exists at all:** Epic has **no MCP server** (their HIMSS 2026 "Agent Factory" is
+health-system tooling, not a patient-accessible server), and the third-party FHIR MCP servers
+are wrappers over the same SMART on FHIR API — same scopes, same blocked grants. More
+importantly, Epic's patient-facing API has **no messaging resource at all**, so portal
+messages and appointment notes are unreachable by any API. Scraping is not a workaround for
+slow grants; it is the only route to those categories.
+
+**Steps 2-6 are designed but not built.** The design questions were answered from real
+screenshots: the dedup key is `eorderid` from the detail URL (unverified whether it survives
+a session change — **confirm before step 4 writes to staging**), and a CBC panel confirmed
+the `lab_result` → `lab_result_component` parent/child split is correct. Three extraction
+hazards are documented, along with a provider comment that is per-encounter rather than
+per-result and has no column anywhere.

@@ -13,7 +13,11 @@ databaseChangeLog:
               - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
               - column: { name: nct_id, type: varchar(16), constraints: { unique: true } }
               - column: { name: brief_title, type: varchar(500), constraints: { nullable: false } }
-              - column: { name: official_title, type: varchar(500) }
+              # 1000, not 500: measured against all 2,456 recruiting breast-cancer trials on
+              # CT.gov, three exceed 500 (longest 581, NCT07646171). These are legitimately long
+              # titles, not malformed data. CT.gov does not cap this field, so 1000 is headroom
+              # rather than a fitted bound. brief_title stays at 500 - its measured max is 299.
+              - column: { name: official_title, type: varchar(1000) }
               - column: { name: overall_status, type: varchar(32) }
               - column: { name: study_type, type: varchar(32) }
               - column: { name: brief_summary, type: text }

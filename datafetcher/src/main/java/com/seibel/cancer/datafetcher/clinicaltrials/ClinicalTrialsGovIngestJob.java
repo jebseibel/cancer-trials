@@ -3,6 +3,8 @@ package com.seibel.cancer.datafetcher.clinicaltrials;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.seibel.cancer.common.domain.StagingRawTrial;
 import com.seibel.cancer.common.domain.TrialSource;
+import com.seibel.cancer.common.progress.ProgressTicker;
+import com.seibel.cancer.datafetcher.config.ProgressTickerProperties;
 import com.seibel.cancer.database.db.service.StagingRawTrialDbService;
 import com.seibel.cancer.database.db.service.TrialSourceDbService;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,7 @@ public class ClinicalTrialsGovIngestJob {
     private final ClinicalTrialsGovClient client;
     private final TrialSourceDbService trialSourceDbService;
     private final StagingRawTrialDbService stagingRawTrialDbService;
+    private final ProgressTickerProperties progressProperties;
 
     public IngestResult run(String condition, String term, String location, int maxStudies) {
         return run(condition, term, location, null, maxStudies);
@@ -51,32 +54,46 @@ public class ClinicalTrialsGovIngestJob {
         int skippedCount = 0;
         List<String> errors = new ArrayList<>();
 
-        for (JsonNode study : studies) {
-            try {
-                String nctId = client.extractNctId(study);
-                if (nctId == null) {
-                    errors.add("Study missing nctId, skipped");
-                    continue;
-                }
-                String rawJson = client.toRawJson(study);
+        // Errors are logged at debug rather than error here: a log line fired mid-loop lands in
+        // the middle of the progress bar and shreds it. Nothing is lost - every failure still
+        // goes into the errors list returned below and counted in the summary line.
+        try (ProgressTicker ticker = new ProgressTicker("STAGING",
+                progressProperties.getLineWidth(),
+                progressProperties.getFlushInterval(),
+                progressProperties.resolveEnabled(System.console() != null),
+                studies.size())) {
+            for (JsonNode study : studies) {
+                try {
+                    String nctId = client.extractNctId(study);
+                    if (nctId == null) {
+                        errors.add("Study missing nctId, skipped");
+                        ticker.error();
+                        continue;
+                    }
+                    String rawJson = client.toRawJson(study);
 
-                StagingRawTrial existing = stagingRawTrialDbService
-                        .findByTrialSourceIdAndSourceTrialId(trialSource.getId(), nctId);
+                    StagingRawTrial existing = stagingRawTrialDbService
+                            .findByTrialSourceIdAndSourceTrialId(trialSource.getId(), nctId);
 
-                if (existing == null) {
-                    stagingRawTrialDbService.create(trialSource.getId(), nctId, rawJson, fetchedAt, null, null);
-                    stagedCount++;
-                } else if (existing.getNormalizedAt() == null) {
-                    // Already staged and still pending normalization - avoid a duplicate row.
-                    skippedCount++;
-                } else {
-                    // Already normalized before - refresh with the latest payload and re-queue it.
-                    stagingRawTrialDbService.refreshForRenormalization(existing.getExtid(), rawJson, fetchedAt);
-                    stagedCount++;
+                    if (existing == null) {
+                        stagingRawTrialDbService.create(trialSource.getId(), nctId, rawJson, fetchedAt, null, null);
+                        stagedCount++;
+                        ticker.tick();
+                    } else if (existing.getNormalizedAt() == null) {
+                        // Already staged and still pending normalization - avoid a duplicate row.
+                        skippedCount++;
+                        ticker.skip();
+                    } else {
+                        // Already normalized before - refresh with the latest payload and re-queue it.
+                        stagingRawTrialDbService.refreshForRenormalization(existing.getExtid(), rawJson, fetchedAt);
+                        stagedCount++;
+                        ticker.tick();
+                    }
+                } catch (Exception e) {
+                    log.debug("Failed to stage study", e);
+                    errors.add("Failed to stage study: " + e.getMessage());
+                    ticker.error();
                 }
-            } catch (Exception e) {
-                log.error("Failed to stage study", e);
-                errors.add("Failed to stage study: " + e.getMessage());
             }
         }
 

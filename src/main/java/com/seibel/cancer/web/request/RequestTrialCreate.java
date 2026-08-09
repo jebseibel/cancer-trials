@@ -20,7 +20,7 @@ public class RequestTrialCreate extends BaseRequest {
     @Size(max = 500, message = "The briefTitle must be at most 500 characters.")
     private String briefTitle;
 
-    @Size(max = 500, message = "The officialTitle must be at most 500 characters.")
+    @Size(max = 1000, message = "The officialTitle must be at most 1000 characters.")
     private String officialTitle;
 
     @Size(max = 32, message = "The overallStatus must be at most 32 characters.")

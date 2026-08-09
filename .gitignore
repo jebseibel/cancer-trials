@@ -57,3 +57,35 @@ frontend/pnpm-debug.log*
 # Locally downloaded ONNX embedding models (~120MB+). Regenerable via
 # rag/src/test/resources/eval/precache-model.sh - never commit these.
 .models/
+
+# Real patient clinical data - radiology reports, pathology, oncology notes, anything
+# pulled from the portal. NEVER commit. Directory-level so a new file is protected the
+# moment it lands, without needing a pattern per filename.
+.claude/patient-data/
+
+### Playwright scraper (playwright/) - standalone Gradle build, Java Playwright ###
+playwright/.gradle/
+playwright/build/
+playwright/logs/
+playwright/.env
+playwright/.env.local
+
+# Playwright storage state is a LIVE AUTHENTICATED SESSION to a real medical
+# record - treat it exactly like a password. Never commit, never log.
+playwright/storage-state.json
+playwright/**/storage-state.json
+playwright/.auth/
+
+# Scraped payloads and captured fixtures contain real patient data. Test
+# fixtures that are safe to keep must be de-identified and committed
+# deliberately, not swept in by a glob.
+playwright/output/
+playwright/captured/
+playwright/screenshots/
+
+# Playwright's own run artifacts - traces and videos record the authenticated
+# session, including anything on screen after login.
+playwright/test-results/
+playwright/playwright-report/
+playwright/blob-report/
+playwright/.cache/

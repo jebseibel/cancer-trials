@@ -22,6 +22,10 @@ import type {
     BackfillResult,
     PatientDiagnosis,
     PatientDiagnosisRequest,
+    PatientVariant,
+    PatientVariantRequest,
+    PatientPriorTreatment,
+    PatientPriorTreatmentRequest,
 } from '../types/api';
 
 // API Configuration
@@ -157,6 +161,26 @@ export const patientDiagnosisApi = {
         apiClient.post<PatientDiagnosis>('/patientdiagnosis', diagnosis),
     update: (extid: string, diagnosis: Partial<PatientDiagnosisRequest>) =>
         apiClient.put<PatientDiagnosis>(`/patientdiagnosis/${extid}`, diagnosis),
+};
+
+// One variant row per patient, same list-and-edit-the-first-row flow as the diagnosis.
+export const patientVariantApi = {
+    getByAppUserExtid: (appUserExtid: string) =>
+        apiClient.get<PatientVariant[]>(`/patientvariant/by-appuser/${appUserExtid}`),
+    create: (variant: PatientVariantRequest) =>
+        apiClient.post<PatientVariant>('/patientvariant', variant),
+    update: (extid: string, variant: Partial<PatientVariantRequest>) =>
+        apiClient.put<PatientVariant>(`/patientvariant/${extid}`, variant),
+};
+
+// One prior-treatment row per patient, same flow again.
+export const patientPriorTreatmentApi = {
+    getByAppUserExtid: (appUserExtid: string) =>
+        apiClient.get<PatientPriorTreatment[]>(`/patientpriortreatment/by-appuser/${appUserExtid}`),
+    create: (treatment: PatientPriorTreatmentRequest) =>
+        apiClient.post<PatientPriorTreatment>('/patientpriortreatment', treatment),
+    update: (extid: string, treatment: Partial<PatientPriorTreatmentRequest>) =>
+        apiClient.put<PatientPriorTreatment>(`/patientpriortreatment/${extid}`, treatment),
 };
 
 export const authApi = {

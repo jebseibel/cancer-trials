@@ -1,6 +1,8 @@
 package com.seibel.cancer.datafetcher.normalization;
 
 import com.seibel.cancer.common.domain.StagingRawTrial;
+import com.seibel.cancer.common.progress.ProgressTicker;
+import com.seibel.cancer.datafetcher.config.ProgressTickerProperties;
 import com.seibel.cancer.database.db.service.StagingRawTrialDbService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +23,7 @@ public class TrialNormalizationService {
 
     private final StagingRawTrialDbService stagingRawTrialDbService;
     private final TrialRowNormalizer rowNormalizer;
+    private final ProgressTickerProperties progressProperties;
 
     public NormalizationResult normalizePending(int maxRows) {
         List<StagingRawTrial> pending = stagingRawTrialDbService.findPending(maxRows);
@@ -37,14 +40,26 @@ public class TrialNormalizationService {
         // go stale mid-run, and nothing outside this loop can observe it.
         NormalizationCache cache = new NormalizationCache();
 
-        for (StagingRawTrial staging : pending) {
-            try {
-                rowNormalizer.normalize(staging, cache);
-                normalizedCount++;
-            } catch (Exception e) {
-                log.error("Failed to normalize staging row extid={}", staging.getExtid(), e);
-                errors.add("extid=" + staging.getExtid() + ": " + e.getMessage());
-                rowNormalizer.markFailed(staging, e.getMessage());
+        // Errors are logged at debug rather than error here: a log line fired mid-loop lands in
+        // the middle of the progress bar and shreds it. Nothing is lost - every failure still
+        // goes into the errors list returned below, is counted in the summary line, and is
+        // persisted on the staging row by markFailed().
+        try (ProgressTicker ticker = new ProgressTicker("NORMALIZING",
+                progressProperties.getLineWidth(),
+                progressProperties.getFlushInterval(),
+                progressProperties.resolveEnabled(System.console() != null),
+                pending.size())) {
+            for (StagingRawTrial staging : pending) {
+                try {
+                    rowNormalizer.normalize(staging, cache);
+                    normalizedCount++;
+                    ticker.tick();
+                } catch (Exception e) {
+                    log.debug("Failed to normalize staging row extid={}", staging.getExtid(), e);
+                    errors.add("extid=" + staging.getExtid() + ": " + e.getMessage());
+                    rowNormalizer.markFailed(staging, e.getMessage());
+                    ticker.error();
+                }
             }
         }
 

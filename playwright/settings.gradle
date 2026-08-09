@@ -1,0 +1,5 @@
+// Standalone build on purpose - NOT included in the root project's settings.gradle.
+// Keeps ~300MB of Playwright browser binaries and a main()-driven scraper out of
+// ./gradlew build and off the deployment jar, while still living in this repo where
+// the staging contract it posts to is defined.
+rootProject.name = 'mychart-scraper'

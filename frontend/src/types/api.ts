@@ -264,6 +264,115 @@ export interface PatientDiagnosis {
 // which the backend marks @NotEmpty.
 export type PatientDiagnosisRequest = Omit<PatientDiagnosis, 'extid'>;
 
+// Patient variants - molecular and germline findings, one row per patient.
+// See .claude/diagnosis/patient-variant-and-treatment-tables.md.
+//
+// NOT_TESTED is a distinct state from NOT_DETECTED and the distinction is load-bearing:
+// "tested negative for BRCA1" may rule a trial out, while "never tested" leaves it an open
+// question worth asking about. Collapsing them either hides an option or invents one.
+export const VARIANT_STATUS_VALUES = [
+    'DETECTED',
+    'NOT_DETECTED',
+    'VUS',
+    'NOT_TESTED',
+    'UNKNOWN',
+] as const;
+
+export const VARIANT_STATUS_LABELS: Record<string, string> = {
+    DETECTED: 'Detected',
+    NOT_DETECTED: 'Not detected',
+    VUS: 'Uncertain significance (VUS)',
+    NOT_TESTED: 'Not tested',
+    UNKNOWN: 'Not sure',
+};
+
+export type VariantStatus = (typeof VARIANT_STATUS_VALUES)[number];
+
+export interface PatientVariant {
+    extid: string;
+    appUserExtid?: string;
+    patientDiagnosisExtid?: string;
+    pik3caStatus?: string;
+    esr1Status?: string;
+    tp53Status?: string;
+    akt1Status?: string;
+    ptenStatus?: string;
+    /** Somatic ERBB2 mutation - a different test from HER2 receptor status. */
+    erbb2SomaticStatus?: string;
+    brca1Status?: string;
+    brca2Status?: string;
+    palb2Status?: string;
+    atmStatus?: string;
+    chek2Status?: string;
+    hrdStatus?: string;
+    pdl1Status?: string;
+    ki67Percent?: number;
+    germlineTestDone?: string;
+    somaticTestDone?: string;
+    testDate?: string;
+    testLab?: string;
+    otherVariants?: string;
+    notes?: string;
+}
+
+export type PatientVariantRequest = Omit<PatientVariant, 'extid'>;
+
+// Patient prior treatment - drug-class exposure, one row per patient.
+//
+// Five states rather than a checkbox because trials split into treatment-naive and
+// post-progression populations: "has taken a CDK4/6 inhibitor" is true of both a patient
+// currently on one and a patient who progressed off one, and they qualify for opposite
+// cohorts.
+export const TREATMENT_STATUS_VALUES = [
+    'NEVER',
+    'CURRENT',
+    'PROGRESSED',
+    'STOPPED_OTHER',
+    'UNKNOWN',
+] as const;
+
+export const TREATMENT_STATUS_LABELS: Record<string, string> = {
+    NEVER: 'Never taken',
+    CURRENT: 'Taking now',
+    PROGRESSED: 'Stopped - it stopped working',
+    STOPPED_OTHER: 'Stopped - other reason',
+    UNKNOWN: 'Not sure',
+};
+
+export type TreatmentStatus = (typeof TREATMENT_STATUS_VALUES)[number];
+
+export interface PatientPriorTreatment {
+    extid: string;
+    appUserExtid?: string;
+    patientDiagnosisExtid?: string;
+    cdk46Status?: string;
+    endocrineStatus?: string;
+    serdStatus?: string;
+    chemoStatus?: string;
+    her2TherapyStatus?: string;
+    her2AdcStatus?: string;
+    trop2AdcStatus?: string;
+    parpStatus?: string;
+    pi3kAktMtorStatus?: string;
+    immunotherapyStatus?: string;
+    taxaneStatus?: string;
+    anthracyclineStatus?: string;
+    platinumStatus?: string;
+    currentDrugNames?: string;
+    priorDrugNames?: string;
+    linesOfTherapyMetastatic?: number;
+    hadNeoadjuvant?: boolean;
+    hadAdjuvant?: boolean;
+    hadRadiation?: boolean;
+    hadSurgery?: boolean;
+    lastTreatmentEndDate?: string;
+    currentlyOnTreatment?: boolean;
+    otherTreatments?: string;
+    notes?: string;
+}
+
+export type PatientPriorTreatmentRequest = Omit<PatientPriorTreatment, 'extid'>;
+
 // Pagination
 export interface PageResponse<T> {
     content: T[];

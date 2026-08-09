@@ -14,11 +14,15 @@ import com.seibel.cancer.common.domain.Medication;
 import com.seibel.cancer.common.domain.Outcome;
 import com.seibel.cancer.common.domain.PatientDiagnosis;
 import com.seibel.cancer.common.domain.PatientMedication;
+import com.seibel.cancer.common.domain.PatientPriorTreatment;
+import com.seibel.cancer.common.domain.PatientVariant;
 import com.seibel.cancer.common.domain.OverallOfficial;
 import com.seibel.cancer.common.domain.Purchase;
 import com.seibel.cancer.common.domain.Sponsor;
 import com.seibel.cancer.common.domain.StagingRawTrial;
 import com.seibel.cancer.common.domain.Trial;
+import com.seibel.cancer.common.domain.SavedTrialMatch;
+import com.seibel.cancer.common.domain.SavedTrialMatchCriterion;
 import com.seibel.cancer.common.domain.TrialSource;
 import com.seibel.cancer.common.domain.TrialStatus;
 import com.seibel.cancer.common.domain.User;
@@ -27,6 +31,8 @@ import com.seibel.cancer.database.db.entity.ArmGroupDb;
 import com.seibel.cancer.database.db.entity.MedicalConditionDb;
 import com.seibel.cancer.database.db.entity.PatientDiagnosisDb;
 import com.seibel.cancer.database.db.entity.PatientMedicationDb;
+import com.seibel.cancer.database.db.entity.PatientPriorTreatmentDb;
+import com.seibel.cancer.database.db.entity.PatientVariantDb;
 import com.seibel.cancer.database.db.entity.CustomerDb;
 import com.seibel.cancer.database.db.entity.EligibilityRuleDb;
 import com.seibel.cancer.database.db.entity.InterventionDb;
@@ -41,6 +47,8 @@ import com.seibel.cancer.database.db.entity.PurchaseDb;
 import com.seibel.cancer.database.db.entity.SponsorDb;
 import com.seibel.cancer.database.db.entity.StagingRawTrialDb;
 import com.seibel.cancer.database.db.entity.TrialDb;
+import com.seibel.cancer.database.db.entity.SavedTrialMatchCriterionDb;
+import com.seibel.cancer.database.db.entity.SavedTrialMatchDb;
 import com.seibel.cancer.database.db.entity.TrialSourceDb;
 import com.seibel.cancer.database.db.entity.TrialStatusDb;
 import com.seibel.cancer.database.db.entity.UserDb;
@@ -63,6 +71,8 @@ import com.seibel.cancer.database.db.mapper.PurchaseMapper;
 import com.seibel.cancer.database.db.mapper.SponsorMapper;
 import com.seibel.cancer.database.db.mapper.StagingRawTrialMapper;
 import com.seibel.cancer.database.db.mapper.TrialMapper;
+import com.seibel.cancer.database.db.mapper.SavedTrialMatchCriterionMapper;
+import com.seibel.cancer.database.db.mapper.SavedTrialMatchMapper;
 import com.seibel.cancer.database.db.mapper.TrialSourceMapper;
 import com.seibel.cancer.database.db.mapper.TrialStatusMapper;
 import com.seibel.cancer.database.db.mapper.UserMapper;
@@ -805,6 +815,264 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
         item.setSex(getVersionRandom("Sex_"));
         item.setDiagnosisDate(getDateRandom());
         item.setNotes(getDescriptionRandom("Notes_"));
+        setBaseSyncFields(item);
+        return item;
+    }
+
+    // ///////////////////////////////////////////////////////////////////
+    // SavedTrialMatch
+    // ///////////////////////////////////////////////////////////////////
+
+    public static SavedTrialMatch getSavedTrialMatch() {
+        SavedTrialMatchDb item = getSavedTrialMatchDb();
+        return new SavedTrialMatchMapper().toModel(item);
+    }
+
+    public static SavedTrialMatch getSavedTrialMatch(SavedTrialMatchDb item) {
+        return new SavedTrialMatchMapper().toModel(item);
+    }
+
+    public static SavedTrialMatchDb getSavedTrialMatchDb() {
+        return getSavedTrialMatchDb(null, null, null);
+    }
+
+    public static SavedTrialMatchDb getSavedTrialMatchDb(Long trialId, String searchRunId) {
+        return getSavedTrialMatchDb(trialId, searchRunId, null);
+    }
+
+    public static SavedTrialMatchDb getSavedTrialMatchDb(Long trialId, String searchRunId, String extid) {
+        SavedTrialMatchDb item = new SavedTrialMatchDb();
+        item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
+        item.setTrialId(trialId != null ? trialId : ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setSearchRunId(searchRunId != null ? searchRunId : UUID.randomUUID().toString());
+        item.setAppUserId(ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setPatientDiagnosisId(ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setQueryText(getDescriptionRandom("Query_"));
+        // Bounded 0..1: top_score is decimal(6,4) and getDecimalRandom's 0..10000 range
+        // would not fit.
+        item.setTopScore(getScoreRandom());
+        item.setMatchRank(getIntegerRandom(1, 50));
+        item.setSnapshotErStatus(getVersionRandom("Er_"));
+        item.setSnapshotPrStatus(getVersionRandom("Pr_"));
+        item.setSnapshotHer2Status(getVersionRandom("Her2_"));
+        item.setSnapshotStage(getVersionRandom("Stg_"));
+        item.setSnapshotBiomarkers(getDescriptionRandom("Bio_"));
+        item.setMatchedAt(LocalDateTime.now());
+        setBaseSyncFields(item);
+        return item;
+    }
+
+    // ///////////////////////////////////////////////////////////////////
+    // SavedTrialMatchCriterion
+    // ///////////////////////////////////////////////////////////////////
+
+    public static SavedTrialMatchCriterion getSavedTrialMatchCriterion() {
+        SavedTrialMatchCriterionDb item = getSavedTrialMatchCriterionDb();
+        return new SavedTrialMatchCriterionMapper().toModel(item);
+    }
+
+    public static SavedTrialMatchCriterion getSavedTrialMatchCriterion(SavedTrialMatchCriterionDb item) {
+        return new SavedTrialMatchCriterionMapper().toModel(item);
+    }
+
+    public static SavedTrialMatchCriterionDb getSavedTrialMatchCriterionDb() {
+        return getSavedTrialMatchCriterionDb(null, null, null);
+    }
+
+    public static SavedTrialMatchCriterionDb getSavedTrialMatchCriterionDb(Long trialMatchId, String chunkText) {
+        return getSavedTrialMatchCriterionDb(trialMatchId, chunkText, null);
+    }
+
+    public static SavedTrialMatchCriterionDb getSavedTrialMatchCriterionDb(Long trialMatchId, String chunkText, String extid) {
+        SavedTrialMatchCriterionDb item = new SavedTrialMatchCriterionDb();
+        item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
+        item.setTrialMatchId(trialMatchId != null ? trialMatchId : ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setChunkText(chunkText != null ? chunkText : getDescriptionRandom("Chunk_"));
+        // Bounded 0..1: score is decimal(6,4).
+        item.setScore(getScoreRandom());
+        item.setIsExclusion(getBooleanRandom());
+        item.setSource(getCodeRandom("Src_"));
+        item.setOrdinal(getIntegerRandom(0, 100));
+        setBaseSyncFields(item);
+        return item;
+    }
+
+    // PatientVariant
+
+    /**
+     * Real vocabulary values rather than random strings: a failing assertion that prints
+     * DETECTED/NOT_TESTED is readable, one that prints Sta_x7f2 is not.
+     */
+    private static final String[] VARIANT_STATUSES =
+            {"DETECTED", "NOT_DETECTED", "VUS", "NOT_TESTED", "UNKNOWN"};
+
+    private static String getVariantStatusRandom() {
+        return VARIANT_STATUSES[ThreadLocalRandom.current().nextInt(VARIANT_STATUSES.length)];
+    }
+
+    public static PatientVariant getPatientVariant() {
+        return getPatientVariant(getPatientVariantDb());
+    }
+
+    public static PatientVariant getPatientVariant(PatientVariantDb item) {
+        return PatientVariant.builder()
+                .id(item.getId())
+                .extid(item.getExtid())
+                .appUserId(item.getAppUserId())
+                .patientDiagnosisId(item.getPatientDiagnosisId())
+                .pik3caStatus(item.getPik3caStatus())
+                .esr1Status(item.getEsr1Status())
+                .tp53Status(item.getTp53Status())
+                .akt1Status(item.getAkt1Status())
+                .ptenStatus(item.getPtenStatus())
+                .erbb2SomaticStatus(item.getErbb2SomaticStatus())
+                .brca1Status(item.getBrca1Status())
+                .brca2Status(item.getBrca2Status())
+                .palb2Status(item.getPalb2Status())
+                .atmStatus(item.getAtmStatus())
+                .chek2Status(item.getChek2Status())
+                .hrdStatus(item.getHrdStatus())
+                .pdl1Status(item.getPdl1Status())
+                .ki67Percent(item.getKi67Percent())
+                .germlineTestDone(item.getGermlineTestDone())
+                .somaticTestDone(item.getSomaticTestDone())
+                .testDate(item.getTestDate())
+                .testLab(item.getTestLab())
+                .otherVariants(item.getOtherVariants())
+                .notes(item.getNotes())
+                .createdAt(item.getCreatedAt())
+                .updatedAt(item.getUpdatedAt())
+                .deletedAt(item.getDeletedAt())
+                .active(item.getActive())
+                .build();
+    }
+
+    public static PatientVariantDb getPatientVariantDb() {
+        return getPatientVariantDb(null, null);
+    }
+
+    public static PatientVariantDb getPatientVariantDb(Long appUserId, String pik3caStatus) {
+        return getPatientVariantDb(appUserId, pik3caStatus, null);
+    }
+
+    public static PatientVariantDb getPatientVariantDb(Long appUserId, String pik3caStatus, String extid) {
+        PatientVariantDb item = new PatientVariantDb();
+        item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
+        item.setAppUserId(appUserId != null ? appUserId : ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setPatientDiagnosisId(ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setPik3caStatus(pik3caStatus != null ? pik3caStatus : getVariantStatusRandom());
+        item.setEsr1Status(getVariantStatusRandom());
+        item.setTp53Status(getVariantStatusRandom());
+        item.setAkt1Status(getVariantStatusRandom());
+        item.setPtenStatus(getVariantStatusRandom());
+        item.setErbb2SomaticStatus(getVariantStatusRandom());
+        item.setBrca1Status(getVariantStatusRandom());
+        item.setBrca2Status(getVariantStatusRandom());
+        item.setPalb2Status(getVariantStatusRandom());
+        item.setAtmStatus(getVariantStatusRandom());
+        item.setChek2Status(getVariantStatusRandom());
+        item.setHrdStatus(getVariantStatusRandom());
+        item.setPdl1Status(getVariantStatusRandom());
+        // Bounded 0..100: ki67_percent is a percentage.
+        item.setKi67Percent(getIntegerRandom(0, 101));
+        item.setGermlineTestDone(getVariantStatusRandom());
+        item.setSomaticTestDone(getVariantStatusRandom());
+        item.setTestDate(getDateRandom());
+        item.setTestLab(getNameRandom("Lab_"));
+        item.setOtherVariants(getDescriptionRandom("Var_"));
+        item.setNotes(getDescriptionRandom("Note_"));
+        setBaseSyncFields(item);
+        return item;
+    }
+
+    // PatientPriorTreatment
+
+    /** The five states that separate treatment-naive from post-progression populations. */
+    private static final String[] TREATMENT_STATUSES =
+            {"NEVER", "CURRENT", "PROGRESSED", "STOPPED_OTHER", "UNKNOWN"};
+
+    private static String getTreatmentStatusRandom() {
+        return TREATMENT_STATUSES[ThreadLocalRandom.current().nextInt(TREATMENT_STATUSES.length)];
+    }
+
+    public static PatientPriorTreatment getPatientPriorTreatment() {
+        return getPatientPriorTreatment(getPatientPriorTreatmentDb());
+    }
+
+    public static PatientPriorTreatment getPatientPriorTreatment(PatientPriorTreatmentDb item) {
+        return PatientPriorTreatment.builder()
+                .id(item.getId())
+                .extid(item.getExtid())
+                .appUserId(item.getAppUserId())
+                .patientDiagnosisId(item.getPatientDiagnosisId())
+                .cdk46Status(item.getCdk46Status())
+                .endocrineStatus(item.getEndocrineStatus())
+                .serdStatus(item.getSerdStatus())
+                .chemoStatus(item.getChemoStatus())
+                .her2TherapyStatus(item.getHer2TherapyStatus())
+                .her2AdcStatus(item.getHer2AdcStatus())
+                .trop2AdcStatus(item.getTrop2AdcStatus())
+                .parpStatus(item.getParpStatus())
+                .pi3kAktMtorStatus(item.getPi3kAktMtorStatus())
+                .immunotherapyStatus(item.getImmunotherapyStatus())
+                .taxaneStatus(item.getTaxaneStatus())
+                .anthracyclineStatus(item.getAnthracyclineStatus())
+                .platinumStatus(item.getPlatinumStatus())
+                .currentDrugNames(item.getCurrentDrugNames())
+                .priorDrugNames(item.getPriorDrugNames())
+                .linesOfTherapyMetastatic(item.getLinesOfTherapyMetastatic())
+                .hadNeoadjuvant(item.getHadNeoadjuvant())
+                .hadAdjuvant(item.getHadAdjuvant())
+                .hadRadiation(item.getHadRadiation())
+                .hadSurgery(item.getHadSurgery())
+                .lastTreatmentEndDate(item.getLastTreatmentEndDate())
+                .currentlyOnTreatment(item.getCurrentlyOnTreatment())
+                .otherTreatments(item.getOtherTreatments())
+                .notes(item.getNotes())
+                .createdAt(item.getCreatedAt())
+                .updatedAt(item.getUpdatedAt())
+                .deletedAt(item.getDeletedAt())
+                .active(item.getActive())
+                .build();
+    }
+
+    public static PatientPriorTreatmentDb getPatientPriorTreatmentDb() {
+        return getPatientPriorTreatmentDb(null, null);
+    }
+
+    public static PatientPriorTreatmentDb getPatientPriorTreatmentDb(Long appUserId, String cdk46Status) {
+        return getPatientPriorTreatmentDb(appUserId, cdk46Status, null);
+    }
+
+    public static PatientPriorTreatmentDb getPatientPriorTreatmentDb(Long appUserId, String cdk46Status, String extid) {
+        PatientPriorTreatmentDb item = new PatientPriorTreatmentDb();
+        item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
+        item.setAppUserId(appUserId != null ? appUserId : ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setPatientDiagnosisId(ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setCdk46Status(cdk46Status != null ? cdk46Status : getTreatmentStatusRandom());
+        item.setEndocrineStatus(getTreatmentStatusRandom());
+        item.setSerdStatus(getTreatmentStatusRandom());
+        item.setChemoStatus(getTreatmentStatusRandom());
+        item.setHer2TherapyStatus(getTreatmentStatusRandom());
+        item.setHer2AdcStatus(getTreatmentStatusRandom());
+        item.setTrop2AdcStatus(getTreatmentStatusRandom());
+        item.setParpStatus(getTreatmentStatusRandom());
+        item.setPi3kAktMtorStatus(getTreatmentStatusRandom());
+        item.setImmunotherapyStatus(getTreatmentStatusRandom());
+        item.setTaxaneStatus(getTreatmentStatusRandom());
+        item.setAnthracyclineStatus(getTreatmentStatusRandom());
+        item.setPlatinumStatus(getTreatmentStatusRandom());
+        item.setCurrentDrugNames(getDescriptionRandom("Cur_"));
+        item.setPriorDrugNames(getDescriptionRandom("Pri_"));
+        item.setLinesOfTherapyMetastatic(getIntegerRandom(0, 6));
+        item.setHadNeoadjuvant(getBooleanRandom());
+        item.setHadAdjuvant(getBooleanRandom());
+        item.setHadRadiation(getBooleanRandom());
+        item.setHadSurgery(getBooleanRandom());
+        item.setLastTreatmentEndDate(getDateRandom());
+        item.setCurrentlyOnTreatment(getBooleanRandom());
+        item.setOtherTreatments(getDescriptionRandom("Oth_"));
+        item.setNotes(getDescriptionRandom("Note_"));
         setBaseSyncFields(item);
         return item;
     }

@@ -1,0 +1,50 @@
+# MyChart scraper configuration.
+#
+# Selectors live here rather than in code because My Health Connection is a vendor-hosted
+# Epic portal that gets reskinned without notice - a reskin should be a config edit, not a
+# recompile.
+#
+# NEVER put credentials in this file. It is committed. Username and password come from
+# .env (gitignored) via Dotenv: MYCHART_USERNAME / MYCHART_PASSWORD.
+#
+# The selectors below are Epic MyChart's long-standing defaults. Epic customizes per
+# deployment, so verify them against the real UCHealth login page before the first run -
+# `npx playwright codegen https://mychart.uchealth.org/` (or the Java codegen equivalent)
+# is the fastest way to confirm or correct them.
+
+app:
+  # UCHealth Colorado's My Health Connection. NOT uchealth.com, which is UC Health
+  # Cincinnati - a completely separate system.
+  url: "https://mychart.uchealth.org/mychart/Authentication/Login"
+
+  # Epic MyChart's standard login field ids.
+  usernameSelector: "#Login"
+  passwordSelector: "#Password"
+  buttonSelector: "#submit"
+
+  # Post-login marker. Must be something that appears ONLY when authenticated -
+  # this doubles as the session-still-valid check on later runs.
+  #
+  # NOT "text=Log Out": confirmed against the real portal that logout lives inside the
+  # account avatar dropdown (top right), so it is not present in the DOM on load. The
+  # feature tiles on the logged-in home page are always visible and unambiguous.
+  successSelector: "text=Test results"
+
+  # Milliseconds to wait for a form field to become visible.
+  formTimeout: 15000
+
+  # Extra time after submit for a hand-entered MFA code. 10 minutes, because the code
+  # arrives on the patient's phone, not the operator's - 2 minutes was not enough in
+  # practice. Set to 0 once it is known that this account does not prompt, which turns
+  # the run fully unattended.
+  mfaWaitMs: 600000
+
+  # Live authenticated session to a real medical record - gitignored, treat as a credential.
+  storageStatePath: ".auth/mychart-session.json"
+
+  # Headed on purpose: MFA needs a visible window, and selector work against a portal
+  # that changes is far easier to debug when you can watch it.
+  headless: false
+
+  # Captured payloads and screenshots. Gitignored - real patient data.
+  outputDir: "output"

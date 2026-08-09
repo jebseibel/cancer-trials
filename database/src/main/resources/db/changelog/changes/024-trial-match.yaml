@@ -1,0 +1,52 @@
+databaseChangeLog:
+  - changeSet:
+      id: create_trial_match_table
+      author: jeb
+      labels: diagnosis-matching
+      changes:
+
+        # TrialMatch Table - one row per trial surfaced by one diagnosis-driven search run.
+        # Accumulates: every run writes a new set of rows, nothing is overwritten or merged.
+        # The snapshot_* columns deliberately duplicate diagnosis values as of match time,
+        # because patient_diagnosis is a single row updated in place with no version history.
+        - createTable:
+            tableName: trial_match
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: trial_id, type: bigint, constraints: { nullable: false } }
+              - column: { name: app_user_id, type: bigint, constraints: { nullable: false } }
+              - column: { name: patient_diagnosis_id, type: bigint }
+              - column: { name: search_run_id, type: varchar(36), constraints: { nullable: false } }
+              - column: { name: query_text, type: text, constraints: { nullable: false } }
+              - column: { name: top_score, type: "decimal(6,4)", constraints: { nullable: false } }
+              - column: { name: match_rank, type: int }
+              - column: { name: snapshot_er_status, type: varchar(16) }
+              - column: { name: snapshot_pr_status, type: varchar(16) }
+              - column: { name: snapshot_her2_status, type: varchar(16) }
+              - column: { name: snapshot_stage, type: varchar(16) }
+              - column: { name: snapshot_biomarkers, type: varchar(1000) }
+              - column: { name: matched_at, type: datetime, constraints: { nullable: false } }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }
+
+        # Fetching one run is the primary read - a run is the unit a user looks at.
+        - createIndex:
+            tableName: trial_match
+            indexName: idx_trial_match_search_run_id
+            columns:
+              - column: { name: search_run_id }
+
+        - createIndex:
+            tableName: trial_match
+            indexName: idx_trial_match_app_user_id
+            columns:
+              - column: { name: app_user_id }
+
+        - createIndex:
+            tableName: trial_match
+            indexName: idx_trial_match_trial_id
+            columns:
+              - column: { name: trial_id }

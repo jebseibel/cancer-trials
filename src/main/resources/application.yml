@@ -79,6 +79,50 @@ cancer:
       # normalize limit to one run's fetch size silently leaves earlier rows pending.
       max-normalize-rows: ${INGEST_MAX_NORMALIZE_ROWS:5000}
 
+    progress:
+      # Character-per-record progress bar on the ingestion console: * inserted, . skipped,
+      # ! error, with the line's first record number in a left gutter. It exists because
+      # normalization is ~349ms per trial (99.3% of a run), so a full pull is minutes of
+      # silence otherwise - and a clump of ! at record 148 says something the final summary
+      # line never will.
+      #
+      #      1 | ****.**!***.*********!**********.*******
+      #    101 | ************************!!!!!!!!!*******
+      #
+      # true (default), auto, or false.
+      #
+      # Defaults to true because ingestion is triggered from the frontend against an
+      # already-running backend, and that request thread has no console attached - so auto
+      # would resolve to false and the bar would never draw, which is exactly what happened
+      # the first time this ran. auto keeps the console check for a launch that has one;
+      # false turns the bar off entirely. The counters stay accurate either way.
+      enabled: ${INGEST_PROGRESS_ENABLED:true}
+      # Records per line before wrapping. Match it to your terminal width.
+      line-width: ${INGEST_PROGRESS_LINE_WIDTH:100}
+      # System.out is line-buffered, so without a periodic flush a whole line of glyphs
+      # appears at once when it wraps, which defeats the point of a live bar. Flushing every
+      # record is a real syscall cost on a large import; 10 is the compromise. Lower for a
+      # smoother bar, raise for less overhead. Values below 1 are clamped to 1.
+      flush-interval: ${INGEST_PROGRESS_FLUSH_INTERVAL:10}
+
+  seed:
+    patient:
+      # AppUser, PatientDiagnosis, PatientVariant and PatientPriorTreatment are the only rows
+      # in this schema created through the API rather than by Liquibase, so a database rebuild
+      # silently deletes them - which has now cost a manual re-entry of a real medical record
+      # twice. This loader recreates them on startup from gitignored CSVs.
+      #
+      # They are NOT committed as Liquibase seed data on purpose: the diagnosis is real patient
+      # data and changesets go to git.
+      #
+      # Seed-if-absent, never sync. An existing row is left alone, so edits made through the UI
+      # survive a restart. A missing file or directory is not an error.
+      enabled: ${PATIENT_SEED_ENABLED:true}
+      directory: ${PATIENT_SEED_DIR:.claude/patient-data}
+      diagnosis-file: ${PATIENT_SEED_DIAGNOSIS_FILE:patient-diagnosis.csv}
+      variant-file: ${PATIENT_SEED_VARIANT_FILE:patient-variant.csv}
+      prior-treatment-file: ${PATIENT_SEED_TREATMENT_FILE:patient-prior-treatment.csv}
+
   rag:
     # Empirically-chosen tuning values, surfaced here so they can be changed without a rebuild.
     # All were set by inspecting real chunk output and real query results; the evaluation set
