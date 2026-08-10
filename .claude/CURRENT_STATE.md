@@ -5,7 +5,8 @@ Where the project stands, what is deliberately unfinished, and what that blocks.
 (schema design). This is the "where are we right now" view — update it as things change rather
 than keeping it as history.
 
-**Last verified against the code: 2026-08-10.**
+**Last verified against the code: 2026-08-10** (afternoon session — corpus pull, backfill
+fixes, two chunker bugs, first two security items).
 
 ---
 
@@ -15,43 +16,103 @@ Verified 2026-08-10, end of session:
 
 | | |
 | --- | --- |
-| Trials in MySQL | **small test pulls only — the full corpus has NOT been pulled** |
-| Qdrant | collection recreated and healthy: 384 dims, Cosine, **0 points** |
-| AppUser / PatientDiagnosis / PatientVariant / PatientPriorTreatment | 1 row each — **auto-seeded**, survived the rebuild |
+| Trials in MySQL | **4,634** — 2,108 mention breast in title/summary (45.5%) |
+| Qdrant | **136,345 chunks**, 133,140 HNSW-indexed, 384 dims, Cosine. 60/60 sampled trials covered |
+| AppUser / PatientDiagnosis / PatientVariant / PatientPriorTreatment | 1 row each — **auto-seeded** |
 | SavedTrialMatch | 0 |
-| Tests | `:database` **820**, `:datafetcher` 55, root 3 — passing. `:rag` **1 failing**, see below |
-| Branch | `qdrant-fixes`, clean, pushed. `main` is 1 behind it. |
+| Tests | `:database` 820, `:datafetcher` 55, root 3, `:rag` 35 — passing. `RetrievalEvaluation` needs a running backend, see below |
+| Branch | `qdrant-fixes`, committed, **not pushed**. `main` is 6 behind. |
+
+**The demo happened and went well, and the corpus is complete and searchable.** Both blockers
+from the last session are gone.
 
 ### Do this first when you return
 
-**Everything is built and committed. What is missing is data.** Start the backend, then:
+**Pick up Tier 2 matching.** The corpus and retrieval questions are both settled (below), so
+the thing that actually improves the tool is unblocked. Its one blocking decision is
+backend-vs-frontend; see "Candidate next steps".
 
-1. **Pull Trials** — condition `breast cancer`, status RECRUITING, max 2500. A few minutes;
-   the progress ticker shows both loops live. **This is enough to demo** — Trial Search and
-   Trial Detail read straight from MySQL.
-2. **Prepare for Search** — the slow one, ~64,000 local embedding inferences. Only semantic
-   search needs it.
-3. Log in as `jeb`. The patient data is already there — see below.
+### The retrieval question is answered: it was the corpus, not the model
 
-**Use the two buttons separately, not the combined one**, for a pull this size: the combined
-button holds a single HTTP request open across both phases, and splitting them lets you demo
-as soon as step 1 finishes.
+Measured 2026-08-10 against the full 4,634-trial corpus, by querying `/api/rag/search`
+directly. **`RetrievalEvaluation` itself could not be run to completion** — see the warning
+below.
 
-⚠️ **`:rag`'s `RetrievalEvaluation` currently fails**, and it is expected to: it asserts
-retrieval quality against an index the last rebuild emptied, so every query scores 0.000.
-Confirmed failing identically on clean `main`, so it is not a regression. **It should pass
-once steps 1 and 2 are done** — which makes it a decent end-to-end check that the whole chain
-works. If it still fails after a successful backfill, that is a real signal.
+| Query | Old (249 trials) | Now (4,634) |
+| --- | --- | --- |
+| "trials studying a BRCA mutation" | 0.388 | **0.930** |
+| "recruiting trials I could join now" | 0.526 | 0.600 |
 
-### Where the session stopped
+**BRCA now matches a chunk whose literal text is "BRCA mutation".** The old corpus simply did
+not contain BRCA criteria to find. **A bigger embedding model is not needed** — that was the
+expensive path this measurement existed to rule out. Seven of the eight asserted cases score
+≥0.969, most at 1.000.
 
-The demo had not happened yet. Everything on the app side is ready for it; only the corpus
-pull is outstanding.
+**The colloquial query barely moved** (0.526 → 0.600), and that one does look like a real model
+weakness with conversational phrasing rather than a corpus gap. Relevant if patients ever type
+queries directly.
 
-Not started, and deliberately so — `ingestion/DEPLOYMENT_SEEDING.md` analyses how a deployed
-instance should arrive with a corpus already in it (dump-and-restore vs. post-deploy script
-vs. async startup job). **Nothing there is built**: there is no dump script and no restore
-script, so there is nothing to test yet. The recommended sequence is in that document.
+⚠️ **One asserted case now fails, and the test is probably the thing that is wrong.**
+`"no prior chemotherapy"` returns `INCLUSION_CRITERION` at 1.000 where the case expects
+`EXCLUSION_CRITERION`. The expectation was written when prior-chemo limits were only seen
+phrased as exclusions; the larger corpus contains treatment-naive first-line trials that state
+it as an inclusion. **That is the better answer, and it is the clinically relevant half of the
+corpus for this patient** — she has had no cytotoxic chemotherapy ever. Decide whether the case
+should accept either source before changing a threshold.
+
+⚠️ **Caveat on all of the above.** The corpus is 45.5% breast, not pure breast, because a
+mistaken first pull loaded 2,500 general-cancer trials and the decision was to leave them and
+pull breast on top. A pure breast corpus would be denser still.
+
+### The corpus pull — what went wrong and what fixed it
+
+Worth reading before the next pull, because two of these will recur.
+
+**The first pull loaded the wrong corpus.** The Process Trials condition box started empty,
+and an empty box falls back to `cancer.ingestion.clinicaltrials.condition`, which defaults to
+`cancer`. So it pulled 2,500 arbitrary trials off the top of an 18,773-trial result set —
+11.6% breast. **Fixed**: the box now pre-fills with `breast cancer`, and the confirmation
+dialog says "all cancer types" instead of "default" if you clear it. `maxStudies` still
+defaults to 1,000 in the form and must be raised by hand.
+
+**The backfill hit three separate failures, none of them the code being wrong:**
+
+- **Qdrant crash-looped on `Too many open files`.** The container had Docker's default
+  `nofile` of 1,024 while the host allows 1,048,576; Qdrant memory-maps every segment, and at
+  ~40,000 points across 32 segments it panicked in an actix worker and aborted. `restart:
+  unless-stopped` turned that into a loop — recover the collection, exhaust descriptors,
+  abort. **Fixed**: `ulimits: nofile: 65536` in `docker-compose.yml`. Held through 78,000+
+  points with 0 restarts. Whether 65536 is enough at full corpus size is still unproven.
+- **The backend process died mid-run**, taking the job with it, at ~58%. Cause unknown — the
+  console output would have said. If it recurs, suspect JVM heap: embedding runs at ~240% CPU
+  and the machine has 58 GB, so system-wide pressure is unlikely but a heap ceiling is not.
+- **A long-held HTTP request is fragile.** Both the frontend button and a plain `curl` hold
+  one request open for the whole run. An early failure reported as `HTTP 000` after 420s was
+  read as a client timeout; it was actually the Qdrant crash. An async job endpoint is the
+  real fix and does not exist.
+
+**None of these lost work**, because of the skip check below.
+
+### ⚠️ Do not run Gradle while the backend is running
+
+**This cost more time than any actual bug today.** The app runs with `spring-boot-devtools`,
+which watches build output and hot-restarts on change. Any `./gradlew` invocation — even
+`:rag:test` — rewrites those outputs, so devtools restarts against a half-written classpath and
+the app dies. It surfaced twice with different messages, both of which look like real
+configuration faults and are not:
+
+- `Not a managed type: class ...UserDb`
+- `ClassNotFoundException: ...PatientSeedProperties`
+
+Both arrive on a `restartedMain` thread, which is the tell. The fix is a full restart, and
+`./gradlew clean build -x test` if the outputs are genuinely inconsistent.
+
+**This also made `RetrievalEvaluation` look broken.** Every attempt to run it via Gradle killed
+the backend the test then failed to reach, producing `ConnectException` from the forked test
+JVM while `curl` from a shell succeeded seconds earlier. Two wrong diagnoses came out of that —
+test-JVM network isolation, and a too-short `connectTimeout`. The real cause was the test run
+itself. **Either stop the backend before running Gradle, or measure retrieval over the REST API
+instead**, which is how the numbers above were obtained.
 
 ### The patient rows now seed themselves
 
@@ -125,11 +186,6 @@ What the record established, beyond what was already recorded:
   chose 45%; both values are in the notes. Worth asking the oncology team.
 - **A drug start date** appears as two different dates in the same record.
 
-### Where the session stopped
-
-Everything above is in the database and committed. The next step is re-ingesting the corpus
-(step 1 under "To resume") — it was dropped by the rebuild that proved the seed loader works.
-
 **The tool was used for a real person for the first time (2026-08-08).** See
 "First real search" below — it worked, and it surfaced a concrete design gap that reorders
 the candidate list.
@@ -175,12 +231,10 @@ get there.** The blocker was tooling, not design.
 
 What was in flight when the session ended:
 
-1. **Pull the full recruiting breast-cancer corpus** — ~2,456 trials. Still not done; the
-   database has only small test pulls. Use the **Pull Trials** button with condition
-   `breast cancer`, status RECRUITING, max 2500. **This does not need Prepare for Search** —
-   the deterministic filter reads `eligibility_criteria` straight from MySQL. Re-running is
-   now cheap for unchanged trials (see "Payload hashing" above).
-2. **Re-run the match with two fixes the user approved:**
+1. ✅ **Pull the corpus** — done 2026-08-10. 4,634 trials in MySQL, 2,108 of them breast.
+   Backfill was still running at session end; see "Do this first" above.
+2. **Re-run the match with two fixes the user approved** — still outstanding, and now
+   unblocked:
    - **Strict receptor polarity.** The current filter accepts any trial whose criteria
      mention "HER2-negative" anywhere, so NCT07371585 — a HER2-**positive** first-line
      trial — scored 0.8333 against a HER2-negative patient. Reject trials *requiring*
@@ -207,6 +261,81 @@ now that the database holds a real medical record rather than sample data.
 ---
 
 ## What's built
+
+### Backfill skips what is already indexed — new 2026-08-10
+
+**Backfill re-embedded the entire corpus on every run.** The pull side had skipped unchanged
+trials by `payload_hash` since earlier the same day; the far more expensive side had no
+equivalent. Every run cost ~130,000 local ONNX inferences whether or not anything had changed.
+
+`TrialIndexService.isIndexed(trialExtid)` now probes the store per trial and the backfill skips
+on a hit. Measured: re-running 50 indexed trials went from **14.9s to 0.4s**.
+
+**The probe asks Qdrant, not MySQL.** An `indexed_at` column would be cheaper — one indexed
+read instead of a network round-trip — but it can lie. A cleared collection or a DB rebuild
+leaves MySQL claiming "indexed" against an empty store, and clearing the collection is routine
+here because a rebuild invalidates every chunk's trial extid. The cached-state version fails
+exactly when it matters.
+
+**A failed probe returns false**, so an unreachable store re-indexes rather than skipping. The
+opposite default would silently skip the whole corpus and report success.
+
+**`?force=true` bypasses the skip**, and it is not optional. After a chunking change or an
+embedding-model swap every stored vector is stale despite the trial being unchanged, and
+skipping on presence would leave the corpus silently mixed — vectors from two models are not
+comparable. That is jobs 3 and 4 in `TrialBackfillService`'s own contract.
+
+**`trialsAlreadyIndexed` is reported separately from `trialsSkipped`** — nothing-to-do versus
+nothing-to-index. The same split the pull side made between "unchanged" and "already waiting".
+Surfaced in the result modal as "Already searchable".
+
+⚠️ **Re-indexing with changed chunking leaves orphans.** `reindexTrial` writes the new chunks
+but never deletes points whose ids no longer exist, and `deleteChunksFor()` exists but nothing
+calls it. Caught when a re-index left 1,475 points against 1,450 written. Handled that time by
+recreating the collection; unfixed in code.
+
+### Two chunker bugs — new 2026-08-10
+
+Both were silently degrading the index before this session, and both were found by chasing a
+single error in a 50-trial test run rather than by review.
+
+**Colliding chunk ids lost whole trials.** A chunk id hashes `trialExtid:source:ordinal`, and
+the eligibility chunker restarts its ordinal at 0 for each criteria section. A trial with two
+populations — `NCT07393529` has separate Patients and Social Network Members blocks, each with
+its own Inclusion/Exclusion lists — produced two `INCLUSION_CRITERION` chunks at ordinal 0.
+The store deduplicates by id before embedding, so 15 documents returned 10 embeddings and the
+`add()` call rejected **the entire trial**, not just the duplicates. `NCT07219277` failed
+identically in the 250-trial pull on 2026-08-08 and was recorded there under a different
+guess. Fixed by renumbering per source across the whole trial.
+
+**Unicode bullets merged criteria together.** The `BULLET` pattern matched `*`, `1.` and `a)`
+but not `•`. An unmatched bullet line falls through to the continuation branch and is appended
+to the criterion above it, so two unrelated criteria became one chunk and the glyph itself was
+embedded. A survey of all 4,634 trials found `•` on 205 lines across 107 trials, plus a tail of
+`▪ ● · ○`; 10 of those lines have no space after the bullet. **115 trials (2.5%) chunk
+differently now, recovering 217 criterion lines.**
+
+**Hyphens are still deliberately not matched** — 100 lines against 55,042 asterisk-led, and
+hyphens appear mid-sentence constantly ("HER2-positive", "day 1-21"). Comparison symbols
+(`≥ ≤ < °`) lead lines as content, not markers, and must not match either; there is a test.
+
+### Progress ticker on the backfill — new 2026-08-10
+
+The ~25-minute backfill produced **no output at all** until a single summary line at the end,
+which is indistinguishable from a hang. The ticker was wired to the two ingestion loops only.
+
+Now wired via `cancer.rag.progress.*` (a nested `Progress` class on `RagProperties` — `:rag`
+cannot use the datafetcher's `ProgressTickerProperties`, different module and prefix).
+`flush-interval` is 5 rather than ingestion's 10, since a trial takes ~350ms.
+
+**Already-indexed trials render as `.`, not `*`** — a resumed run is mostly these, and counting
+them as successes would make a 30-second resume look like a full re-embed. In-loop error
+logging is demoted to `debug` per the skill; failures still reach the caller in `errors`.
+
+⚠️ **The ETA is a flat average, and this loop has two phases with a ~100× cost difference.**
+While skipping indexed trials at ~250/s the ETA reads optimistically low, then climbs as real
+embedding drags the average down. It gets worse before it gets accurate. A windowed rate would
+fix it, at the cost of changing shared `:common` behaviour for every call site.
 
 ### Frontend rework for a non-developer user — new 2026-08-10
 
@@ -423,15 +552,31 @@ trigger something upward, use a Spring event with the type declared in `:databas
 
 ### Security — must be resolved before any deployment
 
-- **All endpoint security is disabled.** `SecurityConfig` line 55 is
+**Two of the four were fixed 2026-08-10** (uncommitted), chosen because they change nothing
+about how the app behaves locally. The two that remain both need testing immediately after the
+change, which is why they were left.
+
+✅ **The JWT signing secret is now an env var.** `JwtUtil`'s inline literal is gone from source
+entirely; `application.yml` has a `jwt:` block reading `${JWT_SECRET}`, and a fresh 512-bit
+value lives in `.env`. **Neither the property nor the `@Value` carries a default, deliberately**
+— a default would quietly re-enable the old literal whenever the env var is unset, so a
+misconfigured deployment would sign tokens with a value that is public in the repo history.
+Unset now fails startup, which is the failure you want. Consequence: **the backend will not
+boot without `JWT_SECRET`**, and existing tokens are invalid, so log in again.
+
+✅ **Qdrant is bound to `127.0.0.1`.** It was publishing 6333/6334 on all interfaces, and Qdrant
+ships with no authentication of any kind. Override with `QDRANT_BIND` if a remote container
+ever needs it, and put real auth in front first.
+
+- ⬜ **All endpoint security is still disabled.** `SecurityConfig` line 55 is
   `.anyRequest().permitAll()`. The original JWT rule set is preserved commented-out directly
   below it. On restore, `/api/uchealth/callback` must stay `permitAll` — Epic's OAuth redirect
-  cannot carry a JWT.
-- **The JWT signing secret is a hardcoded literal in the repo.** There is no `jwt:` block in
-  `application.yml`, so `JwtUtil`'s inline default is live. Anyone with repo access can forge a
-  token. Move it to `JWT_SECRET` in `.env`.
-- **`UcHealthOAuthTokenController` exposes full CRUD over the token table**, including reading
-  refresh tokens back over HTTP.
+  cannot carry a JWT. **Left deliberately**: restoring it means every API call needs a valid
+  JWT, and the frontend login flow has not been verified end-to-end. Do this when you can test
+  the login immediately after. Note `RetrievalEvaluation` hits the REST API unauthenticated and
+  will start failing for a new reason.
+- ⬜ **`UcHealthOAuthTokenController` exposes full CRUD over the token table**, including reading
+  refresh tokens back over HTTP. Needs a decision on remove-versus-protect, not a quick edit.
 
 Full checklist in `_archive/hosting/qa-setup.md`.
 
@@ -509,12 +654,20 @@ Rebuild also invalidates Qdrant: chunks reference trial extids that no longer ex
 collection must be deleted and re-created, not reused. The recreate command and its required
 dimensions are in `ingestion/QDRANT_SETUP.md`.
 
+**Recreating the collection is safe; recreating the container is also safe.** `docker compose
+up -d` destroys and recreates the container, but the vectors live in the named volume
+`cancer_qdrant_storage` and are re-mounted. Only `docker compose down -v` deletes them. This
+was verified 2026-08-10 when the container had to be recreated mid-corpus to apply the
+`ulimits` fix — 46,247 points survived intact. And even a total loss is now recoverable
+without a full re-embed, since backfill skips what is already indexed.
+
 ### Other
 
-- **Two single-item failures from the 2026-08-08 250-trial pull**, neither blocking:
-  `NCT06685796` failed to normalize (`Create operation failed for TrialDb`, generic message —
-  needs the staging row inspected), and `NCT07219277` failed to index (`Embeddings must have
-  the same number as that of the documents`). 249 of 250 normalized, 248 of 249 indexed.
+- **One single-item failure from the 2026-08-08 250-trial pull remains**: `NCT06685796` failed
+  to normalize (`Create operation failed for TrialDb`, generic message — needs the staging row
+  inspected). **The second one is solved**: `NCT07219277`'s "Embeddings must have the same
+  number as that of the documents" was the colliding-chunk-id bug, fixed 2026-08-10 — see "Two
+  chunker bugs" above. It was never a one-off; any multi-population trial hit it.
 - **`findByAppUserId` returned soft-deleted rows — fixed 2026-08-08.**
   `PatientDiagnosisRepository.findByAppUserId` had no `active` filter while the Diagnosis
   page takes `rows[0]`, so after replacing a diagnosis the page displayed and edited the
@@ -535,15 +688,33 @@ dimensions are in `ingestion/QDRANT_SETUP.md`.
   `types/api.ts`; adding a backend enum value will not surface in the UI on its own.
 - **`BasicApplicationTests.contextLoads()`** — status unconfirmed. It previously failed on a
   Liquibase parse error (unquoted `decimal(x,y)`) that has since been fixed; re-check.
-- **Retrieval is weak on conceptual queries.** Measured: clinical terminology scores 0.66–0.99,
-  but "BRCA mutation" scores 0.388 and colloquial phrasing 0.526. Partly a corpus gap rather
-  than a model limit — try a larger recruiting-only corpus before considering a model upgrade.
+- **Retrieval is weak on conceptual queries** — measured on the old 249-trial corpus: clinical
+  terminology 0.66–0.99, but "BRCA mutation" 0.388 and colloquial phrasing 0.526. **The larger
+  corpus now exists, so this is answerable rather than hypothetical** — the two TRACKED queries
+  in `RetrievalEvaluation` report exactly these. Read them before considering a model upgrade,
+  with the 45.5%-breast dilution caveat in mind.
 - **Six of eight files in `.claude/agents/` lack YAML frontmatter** and therefore cannot be
   invoked as subagents. They work only as prompts referenced by path.
 
 ---
 
 ## Deploying to QA (Hostinger KVM) — analysed 2026-08-08, not started
+
+**The user raised deploying on 2026-08-10** and chose to clear the security blockers first.
+Two of four are now done (see Security above). The framing that came out of that conversation
+is worth keeping: **deploying the app is largely solved — `buildDeployment` works, config is
+env-var driven — but a fresh deploy arrives with an empty MySQL and an empty Qdrant.**
+Reproducing the current corpus on the target means a ~14-minute pull plus a ~25-minute backfill,
+assuming the box has the CPU for ~130,000 local ONNX inferences.
+
+**Seeding Qdrant is the harder half and is unanalysed.** `ingestion/DEPLOYMENT_SEEDING.md`
+covers only MySQL. The binding constraint: chunk payloads key on `trialExtid`, and extids
+regenerate on every rebuild, so a Qdrant snapshot is only valid against the exact MySQL rows it
+was built from. Three options — native Qdrant snapshots paired with a MySQL dump; ship MySQL
+and re-embed on deploy; or **key chunks on `nctId` instead of `trialExtid`**, which is globally
+stable so a snapshot survives a rebuild independently. The third is the structural fix and the
+one with a deadline: it is a chunking change, so adopting it later costs a full `force=true`
+re-index.
 
 QA on your own KVM is a reasonable next step and a **different risk profile from
 production**: your host, your data, and no real patient record required while the seeded
@@ -593,10 +764,10 @@ matching logic lives in the backend or stays in the frontend, where Tier 1 curre
 (`frontend/src/lib/tier1Matching.ts`). Recommend backend: the frontend cannot be tested
 against the corpus in bulk, cannot inform ranking, and cannot be reused by Tier 3.
 
-1. **Re-run the evaluation against a recruiting-only corpus.** Ingestion now defaults to
-   RECRUITING, but that has not been exercised end-to-end followed by a backfill and eval run.
-   That tells you whether the weak queries were a corpus problem — do this before considering a
-   bigger embedding model.
+1. ✅ **Re-run the evaluation against a real corpus** — the corpus exists as of 2026-08-10 and
+   `RetrievalEvaluation` passed mid-backfill. **What remains is reading the two TRACKED numbers**
+   and deciding whether the weak queries were a corpus gap or a model limit. Do that before
+   considering a bigger embedding model.
 2. **Tier 2 matching** — use diagnosis fields to build retrieval queries against indexed
    criteria, reusing the existing `isExclusion` chunk metadata so a high-scoring exclusion match
    is shown as a concern rather than a fit. `DIAGNOSIS_MATCHING_DESIGN.md` §4.
@@ -615,12 +786,16 @@ against the corpus in bulk, cannot inform ranking, and cannot be reused by Tier 
 
 ## Git state
 
-**Merged to `main` on 2026-08-10** — 16 commits, a clean fast-forward, so `main` now carries
+**All 2026-08-10 afternoon work is committed** on `qdrant-fixes`: six commits covering the two
+chunker bug fixes, the backfill skip check plus progress ticker, the first two security items,
+the evaluation harness fix, and this document. Not yet pushed, not yet merged to `main`.
+
+**Merged to `main` on 2026-08-10** — 16 commits, a clean fast-forward, so `main` carries
 everything through the payload-hash work. `uchealth-fhir-ingestion` and `payload-hash` are
 fully contained in `main` and can be deleted whenever convenient.
 
-**Current branch is `qdrant-fixes`**, one commit ahead of `main`, committed and pushed but
-**not yet merged**. Merging it is a clean fast-forward whenever you want it.
+**Current branch is `qdrant-fixes`**, one commit ahead of `main` and pushed, plus the
+uncommitted work above.
 
 | Commit | Branch | What |
 | --- | --- | --- |
