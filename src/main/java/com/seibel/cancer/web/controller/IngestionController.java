@@ -110,6 +110,7 @@ public class IngestionController {
                 .studiesFetched(ingestResult.studiesFetched())
                 .stagingRowsWritten(ingestResult.stagingRowsWritten())
                 .stagingRowsSkipped(ingestResult.stagingRowsSkipped())
+                .stagingRowsUnchanged(ingestResult.stagingRowsUnchanged())
                 .pendingRowsProcessed(normalizationResult.pendingRows())
                 .trialsNormalized(normalizationResult.normalizedCount())
                 .ingestErrors(ingestResult.errors())

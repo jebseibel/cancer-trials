@@ -34,8 +34,10 @@ export default function Ingestion() {
                 lines: [
                     { label: 'Downloaded from ClinicalTrials.gov', value: '' },
                     { label: '  Trials found', value: data.studiesFetched },
-                    { label: '  New trials', value: data.stagingRowsWritten },
-                    { label: '  Already had (skipped)', value: data.stagingRowsSkipped },
+                    { label: '  New or updated', value: data.stagingRowsWritten },
+                    { label: '  Unchanged since last time', value: data.stagingRowsUnchanged },
+                    { label: '  Already waiting to be saved', value:
+                        data.stagingRowsSkipped - data.stagingRowsUnchanged },
                     { label: '', value: '' },
                     { label: 'Saved to the database', value: '' },
                     { label: '  Trials processed', value: data.pendingRowsProcessed },
@@ -90,9 +92,11 @@ export default function Ingestion() {
                 title: 'All Steps Complete',
                 lines: [
                     { label: 'Downloaded from ClinicalTrials.gov', value: '' },
-                    { label: '  Studies fetched', value: ingest.studiesFetched },
-                    { label: '  New trials staged', value: ingest.stagingRowsWritten },
-                    { label: '  Already had (skipped)', value: ingest.stagingRowsSkipped },
+                    { label: '  Trials found', value: ingest.studiesFetched },
+                    { label: '  New or updated', value: ingest.stagingRowsWritten },
+                    { label: '  Unchanged since last time', value: ingest.stagingRowsUnchanged },
+                    { label: '  Already waiting to be saved', value:
+                        ingest.stagingRowsSkipped - ingest.stagingRowsUnchanged },
                     { label: '', value: '' },
                     { label: 'Saved to the database', value: '' },
                     { label: '  Trials saved', value: ingest.trialsNormalized },

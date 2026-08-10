@@ -11,6 +11,8 @@ public class ResponseIngestionResult {
     private int studiesFetched;
     private int stagingRowsWritten;
     private int stagingRowsSkipped;
+    /** Subset of stagingRowsSkipped: unchanged since last run, so normalization was skipped. */
+    private int stagingRowsUnchanged;
     private int pendingRowsProcessed;
     private int trialsNormalized;
     private List<String> ingestErrors;

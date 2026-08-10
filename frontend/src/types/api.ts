@@ -211,6 +211,7 @@ export interface IngestionResult {
     studiesFetched: number;
     stagingRowsWritten: number;
     stagingRowsSkipped: number;
+    stagingRowsUnchanged: number;
     pendingRowsProcessed: number;
     trialsNormalized: number;
     ingestErrors: string[];

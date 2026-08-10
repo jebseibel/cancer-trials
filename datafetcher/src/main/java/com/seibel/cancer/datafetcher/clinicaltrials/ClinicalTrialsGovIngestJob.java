@@ -120,7 +120,7 @@ public class ClinicalTrialsGovIngestJob {
 
         log.info("run(): fetched={}, staged={}, skipped={} (unchanged={}), errors={}",
                 studies.size(), stagedCount, skippedCount, unchangedCount, errors.size());
-        return new IngestResult(studies.size(), stagedCount, skippedCount, errors);
+        return new IngestResult(studies.size(), stagedCount, skippedCount, unchangedCount, errors);
     }
 
     /**
@@ -147,6 +147,12 @@ public class ClinicalTrialsGovIngestJob {
         }
     }
 
-    public record IngestResult(int studiesFetched, int stagingRowsWritten, int stagingRowsSkipped, List<String> errors) {
+    /**
+     * @param stagingRowsUnchanged subset of stagingRowsSkipped: already normalized and the
+     *                             payload hashed identically, so normalization was skipped
+     *                             entirely. This is the saving a re-pull produces.
+     */
+    public record IngestResult(int studiesFetched, int stagingRowsWritten, int stagingRowsSkipped,
+                               int stagingRowsUnchanged, List<String> errors) {
     }
 }
