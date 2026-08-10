@@ -120,6 +120,32 @@ public class TrialIndexService {
                 .build();
     }
 
+    /**
+     * True when the store already holds at least one chunk for this trial.
+     *
+     * <p>{@code topK(1)} rather than reusing {@link #countChunksFor}: the question is existence,
+     * and this runs once per trial across the whole corpus, so fetching up to 1,000 chunks to
+     * discover a non-zero count would be the expensive way to ask.
+     *
+     * <p>A failed probe returns false, so an unreachable store re-indexes rather than skipping.
+     * The alternative - treating an error as "indexed" - would silently skip the entire corpus
+     * and report success against an empty store.
+     */
+    public boolean isIndexed(String trialExtid) {
+        try {
+            return !vectorStore.similaritySearch(SearchRequest.builder()
+                            .query("*")
+                            .topK(1)
+                            .filterExpression("trialExtid == '" + trialExtid + "'")
+                            .build())
+                    .isEmpty();
+        } catch (Exception e) {
+            log.debug("isIndexed({}) probe failed, treating as not indexed: {}",
+                    trialExtid, e.getMessage());
+            return false;
+        }
+    }
+
     /** Chunk count currently in the store, for verification. */
     public int countChunksFor(String trialExtid) {
         return vectorStore.similaritySearch(SearchRequest.builder()

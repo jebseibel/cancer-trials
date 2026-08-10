@@ -8,7 +8,10 @@ import type { JobResultContent } from '../components/JobResultModal';
 
 export default function Ingestion() {
     const queryClient = useQueryClient();
-    const [condition, setCondition] = useState('');
+    // Breast cancer, not the backend's broader 'cancer' default: an empty box falls back to
+    // that default and silently pulls the whole 18,773-trial cancer corpus, truncated at
+    // maxStudies. Pre-filling makes the intended scope visible and editable rather than implied.
+    const [condition, setCondition] = useState('breast cancer');
     const [term, setTerm] = useState('');
     const [location, setLocation] = useState('');
     // Defaults mirror the backend's cancer.ingestion.clinicaltrials.* values.
@@ -62,6 +65,7 @@ export default function Ingestion() {
                 lines: [
                     { label: 'Trials made searchable', value: data.trialsIndexed },
                     { label: 'Sections of text prepared', value: data.chunksWritten },
+                    { label: 'Already searchable', value: data.trialsAlreadyIndexed },
                     { label: 'Trials skipped (nothing to read)', value: data.trialsSkipped },
                 ],
                 errors: data.errors,
@@ -104,6 +108,7 @@ export default function Ingestion() {
                     { label: 'Made searchable', value: '' },
                     { label: '  Trials made searchable', value: backfill.trialsIndexed },
                     { label: '  Sections of text prepared', value: backfill.chunksWritten },
+                    { label: '  Already searchable', value: backfill.trialsAlreadyIndexed },
                 ],
                 errors: [
                     ...ingest.ingestErrors,
@@ -306,7 +311,7 @@ export default function Ingestion() {
                             <div className="flex justify-between py-0.5">
                                 <span className="text-gray-500">Condition</span>
                                 <span className="font-medium text-gray-900">
-                                    {condition.trim() || 'default'}
+                                    {condition.trim() || 'all cancer types'}
                                 </span>
                             </div>
                             <div className="flex justify-between py-0.5">

@@ -19,6 +19,9 @@ public class ResponseBackfillResult {
     /** Trials that produced no chunks - e.g. no eligibility text or child records. */
     private int trialsSkipped;
 
+    /** Trials left alone because the vector store already held chunks for them. */
+    private int trialsAlreadyIndexed;
+
     /** Per-trial failures. The run continues past each one rather than abandoning the corpus. */
     private List<String> errors;
 }

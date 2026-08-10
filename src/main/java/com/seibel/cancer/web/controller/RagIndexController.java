@@ -40,16 +40,21 @@ public class RagIndexController {
     public ResponseBackfillResult backfill(
             // Omit pageSize to use cancer.rag.backfill.page-size.
             @RequestParam(required = false) Integer pageSize,
-            @RequestParam(defaultValue = "2147483647") int maxTrials) {
+            @RequestParam(defaultValue = "2147483647") int maxTrials,
+            // Re-embeds trials that are already indexed. Required after a chunking or
+            // embedding-model change, when stored vectors are stale despite the trial being
+            // unchanged - see TrialBackfillService.
+            @RequestParam(defaultValue = "false") boolean force) {
 
         var result = pageSize == null
-                ? backfillService.backfillAll(maxTrials)
-                : backfillService.backfillAll(pageSize, maxTrials);
+                ? backfillService.backfillAll(maxTrials, force)
+                : backfillService.backfillAll(pageSize, maxTrials, force);
 
         return ResponseBackfillResult.builder()
                 .trialsIndexed(result.trialsIndexed())
                 .chunksWritten(result.chunksWritten())
                 .trialsSkipped(result.trialsSkipped())
+                .trialsAlreadyIndexed(result.trialsAlreadyIndexed())
                 .errors(result.errors())
                 .build();
     }

@@ -203,6 +203,8 @@ export interface BackfillResult {
     chunksWritten: number;
     /** Trials that produced no chunks - e.g. no eligibility text. */
     trialsSkipped: number;
+    /** Trials left alone because the vector store already held chunks for them. */
+    trialsAlreadyIndexed: number;
     /** Per-trial failures. The run continues past each one. */
     errors: string[];
 }
