@@ -11,35 +11,47 @@ than keeping it as history.
 
 ## Picking the project back up
 
-Verified 2026-08-10, after a database rebuild to apply the `payload_hash` column:
+Verified 2026-08-10, end of session:
 
 | | |
 | --- | --- |
-| Trials in MySQL | small test pulls only — a full corpus pull has not been run |
-| Qdrant | **the `clinical_trial_chunks` collection does not exist** — see below |
+| Trials in MySQL | **small test pulls only — the full corpus has NOT been pulled** |
+| Qdrant | collection recreated and healthy: 384 dims, Cosine, **0 points** |
 | AppUser / PatientDiagnosis / PatientVariant / PatientPriorTreatment | 1 row each — **auto-seeded**, survived the rebuild |
 | SavedTrialMatch | 0 |
-| Tests | `:database` **820**, `:datafetcher` 55, root 3 — all passing |
-| Working tree | clean; branch `payload-hash` merged to `main` |
+| Tests | `:database` **820**, `:datafetcher` 55, root 3 — passing. `:rag` **1 failing**, see below |
+| Branch | `qdrant-fixes`, clean, pushed. `main` is 1 behind it. |
 
-⚠️ **The Qdrant collection is missing, so Prepare for Search and the combined button both
-fail with a 500.** Backfill deletes a trial's old chunks before indexing, and that delete
-errors with `NOT_FOUND: Collection 'clinical_trial_chunks' doesn't exist`. The frontend's
-error banner says "check that the server is running", which is wrong and unhelpful here.
+### Do this first when you return
 
-Auto-creation is **deliberately off** (`initialize-schema: false`) — letting Spring AI create
-the collection would infer vector dimensions at first write, so a model/collection mismatch
-would surface as bad search results rather than a loud error. Recreate it explicitly with
-**384 dimensions, Cosine distance**, over Qdrant's REST port 6333 (note 6334 is gRPC, which
-is what the app speaks).
+**Everything is built and committed. What is missing is data.** Start the backend, then:
 
-**To resume, in order:**
+1. **Pull Trials** — condition `breast cancer`, status RECRUITING, max 2500. A few minutes;
+   the progress ticker shows both loops live. **This is enough to demo** — Trial Search and
+   Trial Detail read straight from MySQL.
+2. **Prepare for Search** — the slow one, ~64,000 local embedding inferences. Only semantic
+   search needs it.
+3. Log in as `jeb`. The patient data is already there — see below.
 
-1. Recreate the Qdrant collection (above) — otherwise two of the three buttons error.
-2. **Pull Trials** with condition `breast cancer`, status RECRUITING, max 2500 — a few
-   minutes, and the progress ticker shows both loops live.
-3. **Prepare for Search**. This is the slow one, ~64,000 local embedding inferences.
-4. Log in as `jeb`. The patient data is already there — see below.
+**Use the two buttons separately, not the combined one**, for a pull this size: the combined
+button holds a single HTTP request open across both phases, and splitting them lets you demo
+as soon as step 1 finishes.
+
+⚠️ **`:rag`'s `RetrievalEvaluation` currently fails**, and it is expected to: it asserts
+retrieval quality against an index the last rebuild emptied, so every query scores 0.000.
+Confirmed failing identically on clean `main`, so it is not a regression. **It should pass
+once steps 1 and 2 are done** — which makes it a decent end-to-end check that the whole chain
+works. If it still fails after a successful backfill, that is a real signal.
+
+### Where the session stopped
+
+The demo had not happened yet. Everything on the app side is ready for it; only the corpus
+pull is outstanding.
+
+Not started, and deliberately so — `ingestion/DEPLOYMENT_SEEDING.md` analyses how a deployed
+instance should arrive with a corpus already in it (dump-and-restore vs. post-deploy script
+vs. async startup job). **Nothing there is built**: there is no dump script and no restore
+script, so there is nothing to test yet. The recommended sequence is in that document.
 
 ### The patient rows now seed themselves
 
@@ -218,6 +230,21 @@ button labels, result modals, error banners, and the Dashboard. Internal names a
 **The Dashboard's "Pull Latest Trials" button became a link.** It ran a multi-minute job from a
 card whose neighbours all navigate, and it pulled *without* preparing for search — so trials
 loaded that way silently never appeared in search results. That path no longer exists.
+
+### Vector-store setup is now self-reporting — new 2026-08-10
+
+The `clinical_trial_chunks` collection went missing (a rebuild, or a manual clear) and the
+failure was badly reported. **Backfill caught the failure per trial and returned
+*successfully* with zero indexed and one identical error per trial**, which reads as a data
+problem rather than a setup step nobody ran.
+
+Now the store is probed once before a backfill starts, and the run aborts with a single
+message naming the real cause. A startup check logs `SEARCH UNAVAILABLE` at boot so the
+condition is known before anyone presses a button — a warning, not a boot failure, since
+ingestion, the patient record and Tier 1 matching all work fine without search.
+
+Recreating the collection is a manual REST call by design; `ingestion/QDRANT_SETUP.md` has the
+exact command, the 384-dimension/Cosine requirement, and the REST-6333-vs-gRPC-6334 trap.
 
 ### Payload hashing — new 2026-08-10
 
@@ -479,8 +506,8 @@ patient rows now seed themselves" above. Verified through two real rebuilds (202
 2026-08-10).
 
 Rebuild also invalidates Qdrant: chunks reference trial extids that no longer exist, so the
-collection must be deleted and re-created, not reused. **Note the collection is currently
-missing entirely** — see the warning at the top of this document.
+collection must be deleted and re-created, not reused. The recreate command and its required
+dimensions are in `ingestion/QDRANT_SETUP.md`.
 
 ### Other
 
@@ -588,20 +615,24 @@ against the corpus in bulk, cannot inform ranking, and cannot be reused by Tier 
 
 ## Git state
 
-**Merged to `main` on 2026-08-10** — 16 commits, a clean fast-forward. `main`,
-`uchealth-fhir-ingestion` and `payload-hash` all point at the same commit; the two branches
-are now redundant and can be deleted whenever convenient.
+**Merged to `main` on 2026-08-10** — 16 commits, a clean fast-forward, so `main` now carries
+everything through the payload-hash work. `uchealth-fhir-ingestion` and `payload-hash` are
+fully contained in `main` and can be deleted whenever convenient.
 
-The last three commits, on top of the 2026-08-09 work:
+**Current branch is `qdrant-fixes`**, one commit ahead of `main`, committed and pushed but
+**not yet merged**. Merging it is a clean fast-forward whenever you want it.
 
-| Commit | What |
-| --- | --- |
-| `59393d6` | Patient record tabs; Process Trials combined button; user-facing renames; ingestion request logging; the two `ingestion/` design docs |
-| `6043833` | `payload_hash` column and the skip-unchanged branch |
-| `13b4bd9` | Unchanged-count reporting through to the result modal |
+| Commit | Branch | What |
+| --- | --- | --- |
+| `59393d6` | merged | Patient record tabs; Process Trials combined button; user-facing renames; ingestion request logging; the two `ingestion/` design docs |
+| `6043833` | merged | `payload_hash` column and the skip-unchanged branch |
+| `13b4bd9` | merged | Unchanged-count reporting through to the result modal |
+| `739937b` | merged | This document, updated for the session |
+| `77c0db0` | `qdrant-fixes` | Vector-store readiness check, startup warning, `QDRANT_SETUP.md` |
 
-Test counts: `:database` **820**, `:datafetcher` 55, root 3. All passing. Frontend typecheck
-and build clean; one pre-existing lint error in `Login.tsx`.
+Test counts: `:database` **820**, `:datafetcher` 55, root 3 — passing. `:rag` has one
+expected failure (see "Do this first" above). Frontend typecheck and build clean; one
+pre-existing lint error in `Login.tsx`.
 
 ### Files that must never be committed
 
