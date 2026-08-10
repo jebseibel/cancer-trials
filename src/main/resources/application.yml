@@ -154,6 +154,26 @@ cancer:
     backfill:
       # Trials per page. Bounds memory and the embedding batch size.
       page-size: 25
+    progress:
+      # Character-per-trial progress bar on the backfill console: * embedded, . already
+      # searchable or nothing to read, ! error, with the line's first trial number in a left
+      # gutter.
+      #
+      #      1 | ....................*****!**********************  12s 4.1/s ETA 18m
+      #
+      # Backfill is where a bar matters most: a full run is ~25 minutes of embedding whose only
+      # log output is a single summary line at the very end, so it is otherwise indistinguishable
+      # from a hang. Separate from cancer.ingestion.progress because :rag and :datafetcher are
+      # independent modules with differently-shaped runs.
+      #
+      # true (default) / auto / false. Defaults to true because backfill is triggered from the
+      # frontend on an HTTP request thread, which has no attached console - auto resolves to
+      # false there and nothing draws.
+      enabled: ${RAG_PROGRESS_ENABLED:true}
+      line-width: ${RAG_PROGRESS_LINE_WIDTH:100}
+      # Lower than ingestion's 10: a trial takes ~350ms to embed, so flushing every 5 keeps the
+      # bar moving visibly without meaningful syscall cost.
+      flush-interval: ${RAG_PROGRESS_FLUSH_INTERVAL:5}
 
 uchealth:
   # Epic / SMART on FHIR settings. Point at Epic's sandbox first; switch to UCHealth
@@ -165,6 +185,14 @@ uchealth:
   redirect-uri: ${UCHEALTH_REDIRECT_URI:http://localhost:8080/api/uchealth/callback}
   # MedicationStatement is deliberately absent - Epic exposes it only in DSTU2/STU3, not R4.
   scope: ${UCHEALTH_SCOPE:launch/patient openid fhirUser offline_access patient/Patient.read patient/Observation.read patient/DiagnosticReport.read patient/MedicationRequest.read}
+
+# Deliberately no default. JwtUtil carries an inline fallback literal, and a default here would
+# quietly re-enable it whenever JWT_SECRET is unset - so a misconfigured deployment would sign
+# tokens with a value that is public in the repo history. Unset now fails startup instead, which
+# is the failure you want. Set JWT_SECRET in .env (local) or the server environment (deployed);
+# HS256 needs at least 256 bits, and the generated value is 512.
+jwt:
+  secret: ${JWT_SECRET}
 
 logging:
   level:

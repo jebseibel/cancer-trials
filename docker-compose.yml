@@ -17,11 +17,28 @@ services:
     container_name: cancer-qdrant
     restart: unless-stopped
     ports:
+      # Bound to loopback, not 0.0.0.0. Qdrant ships with no authentication of any kind, so a
+      # published port is an open door to the whole corpus - and on a public host, to anything
+      # else the collection ever holds. Only the app and local tooling need to reach it.
+      # Override QDRANT_BIND to 0.0.0.0 if a container on another host ever needs access, and
+      # put real auth in front of it first.
+      #
       # 6333 = HTTP/REST: dashboard, curl health checks, collection admin.
-      - "6333:6333"
+      - "${QDRANT_BIND:-127.0.0.1}:6333:6333"
       # 6334 = gRPC: what Spring AI's QdrantVectorStore actually connects on
       # (spring.ai.vectorstore.qdrant.port defaults to 6334).
-      - "6334:6334"
+      - "${QDRANT_BIND:-127.0.0.1}:6334:6334"
+    # Qdrant memory-maps every segment file, so its descriptor use grows with the corpus.
+    # Docker's default nofile is 1024 regardless of the host's limit, and at ~40,000 points
+    # across 32 segments that ceiling was hit mid-backfill: an actix worker panicked with
+    # Os { code: 24, "Too many open files" }, the process aborted, and `restart: unless-stopped`
+    # turned it into a crash loop - recover the collection, exhaust descriptors, abort, repeat.
+    # Stored data was never at risk (recovery logged 32/32 segments each cycle), but the
+    # backfill feeding it died.
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     volumes:
       # Named volume so embeddings survive a restart. Without this every `down` would
       # silently discard the corpus and force re-embedding at real API cost.

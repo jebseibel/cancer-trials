@@ -15,7 +15,13 @@ import java.util.Date;
 @Slf4j
 public class JwtUtil {
 
-    @Value("${jwt.secret:mySecretKeyForJWTGenerationThatIsLongEnoughFor256BitHS256Algorithm}")
+    /**
+     * No default, deliberately. This previously carried an inline literal, which meant a
+     * deployment that forgot to set the secret still signed tokens - with a value committed to
+     * the repo, so anyone with read access could forge one. Startup now fails instead.
+     * Supplied via JWT_SECRET; see the jwt block in application.yml.
+     */
+    @Value("${jwt.secret}")
     private String jwtSecret;
 
     @Value("${jwt.expiration:86400000}") // 24 hours in milliseconds
