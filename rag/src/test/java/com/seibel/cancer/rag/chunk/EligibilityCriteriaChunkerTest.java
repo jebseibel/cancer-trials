@@ -232,4 +232,60 @@ class EligibilityCriteriaChunkerTest {
         assertThat(chunker.chunk("")).isEmpty();
         assertThat(chunker.chunk("   \n  \n ")).isEmpty();
     }
+
+    @Test
+    @DisplayName("unicode bullets split criteria instead of merging into the previous one")
+    void unicodeBulletsAreSplit() {
+        // 205 lines across 107 trials use • rather than *. Unmatched, each one merges into the
+        // criterion above it and carries the glyph into the embedded text.
+        List<EligibilityChunk> chunks = chunker.chunk("""
+                Inclusion criteria:
+
+                • Age 18 years or older
+                ▪ Measurable disease per RECIST 1.1
+                ● Adequate organ function
+                ○ Life expectancy over 12 weeks
+                · ECOG performance status 0 or 1
+                """);
+
+        assertThat(chunks).hasSize(5);
+        assertThat(chunks).allSatisfy(c -> assertThat(c.text())
+                .as("the bullet glyph must not survive into the chunk text")
+                .doesNotContain("•", "▪", "●", "○", "·"));
+        assertThat(chunks.get(0).text()).isEqualTo("Age 18 years or older");
+        assertThat(chunks.get(4).text()).isEqualTo("ECOG performance status 0 or 1");
+    }
+
+    @Test
+    @DisplayName("a unicode bullet with no following space is still a bullet")
+    void unicodeBulletWithoutSpace() {
+        // 10 of 217 surveyed lines are written •Patients with no gap.
+        List<EligibilityChunk> chunks = chunker.chunk("""
+                Inclusion criteria:
+
+                •Able to provide informed consent
+                •Able to speak English
+                """);
+
+        assertThat(chunks).hasSize(2);
+        assertThat(chunks.get(0).text()).isEqualTo("Able to provide informed consent");
+    }
+
+    @Test
+    @DisplayName("comparison symbols leading a line are content, not bullet markers")
+    void comparisonSymbolsAreNotBullets() {
+        // ≥ ≤ < ° lead lines as criterion content. Treating them as markers would strip the
+        // symbol and invert the meaning of the criterion.
+        List<EligibilityChunk> chunks = chunker.chunk("""
+                Inclusion criteria:
+
+                * Absolute neutrophil count
+                ≥ 1500 per microliter
+                """);
+
+        assertThat(chunks).hasSize(1);
+        assertThat(chunks.get(0).text())
+                .as("the continuation keeps its comparison symbol")
+                .contains("≥ 1500");
+    }
 }

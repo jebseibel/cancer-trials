@@ -43,10 +43,28 @@ public class EligibilityCriteriaChunker {
      * <p>Deliberately does NOT match {@code - } hyphens: across the 50-trial sample there
      * were 632 asterisk-bullet lines and 163 numbered, and <em>zero</em> hyphen bullets.
      * Hyphens do appear mid-sentence in clinical text ("HER2-positive", "day 1-21"), so
-     * matching them would split criteria at the wrong places.
+     * matching them would split criteria at the wrong places. A survey of all 4,634 ingested
+     * trials later found 100 hyphen-led lines against 55,042 asterisk-led - still not worth
+     * the mis-splits.
+     *
+     * <p>Unicode bullets ARE matched. That same survey found {@code •} on 205 lines across 107
+     * trials, plus a long tail of {@code ▪ ● · ○}. Unmatched, a bullet line falls through to
+     * the continuation branch and is appended to the previous criterion - so two unrelated
+     * criteria merge into one chunk, and the glyph itself survives into the embedded text.
+     * NCT07393529 showed both: its last criterion kept the bullet, and a section header was
+     * swallowed into the criterion above it.
+     *
+     * <p>Currency and comparison symbols are excluded on purpose: {@code ≥}, {@code ≤},
+     * {@code <} and {@code °} lead lines too, but as criterion content ("≥18 years"), not as
+     * markers.
+     *
+     * <p>The space after a unicode bullet is optional - 10 of 217 such lines in the survey are
+     * written {@code •Patients} with no gap. It stays mandatory after {@code *}, where
+     * {@code *text*} is markdown emphasis rather than a bullet, and after {@code 1.}, where
+     * "1.5 mg" would otherwise parse as a list marker.
      */
     private static final Pattern BULLET =
-            Pattern.compile("^(\\s*)(?:\\*|\\d+\\.|[a-z]\\))\\s+(.*)$");
+            Pattern.compile("^(\\s*)(?:[\\u2022\\u25AA\\u25CF\\u25CB\\u00B7]\\s*|(?:\\*|\\d+\\.|[a-z]\\))\\s+)(.*)$");
 
     /** Defaults, used by the no-arg constructor. Overridden from {@code cancer.rag.chunking.*}. */
     private static final int DEFAULT_MAX_PARENT_PREFIX_LENGTH = 160;
