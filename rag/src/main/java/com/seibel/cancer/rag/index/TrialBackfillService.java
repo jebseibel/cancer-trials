@@ -60,6 +60,16 @@ public class TrialBackfillService {
         int trialsSkipped = 0;
         List<String> errors = new ArrayList<>();
 
+        // Checked once up front rather than discovered per trial. Without this a missing
+        // collection produces one identical error per trial and still returns "success" with
+        // zero indexed, which reads as a data problem instead of a setup problem.
+        String setupProblem = indexService.checkVectorStoreReady();
+        if (setupProblem != null) {
+            log.error("backfill aborted: {}", setupProblem);
+            errors.add(setupProblem);
+            return new BackfillResult(0, 0, 0, errors);
+        }
+
         int pageNumber = 0;
         Page<Trial> page;
         do {

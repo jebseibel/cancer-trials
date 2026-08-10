@@ -75,6 +75,32 @@ public class TrialIndexService {
         return chunks.size();
     }
 
+    /**
+     * Confirms the vector store can be queried before a long job starts.
+     *
+     * <p>The collection is not auto-created ({@code initialize-schema: false}), deliberately -
+     * letting Spring AI create it would infer vector dimensions at first write, so a
+     * model/collection mismatch would surface as bad search results instead of a clear error.
+     * The cost of that choice is that a missing collection has to be reported well, which is
+     * what this is for.
+     *
+     * @return null when the store is usable, otherwise a message naming the actual problem
+     */
+    public String checkVectorStoreReady() {
+        try {
+            vectorStore.similaritySearch(SearchRequest.builder().query("readiness check").topK(1).build());
+            return null;
+        } catch (Exception e) {
+            String detail = e.getMessage() == null ? e.toString() : e.getMessage();
+            if (detail.contains("doesn't exist") || detail.contains("NOT_FOUND")) {
+                return "The search index has not been set up: the vector store collection is "
+                        + "missing. It must be created with 384 dimensions and Cosine distance "
+                        + "before trials can be prepared for search.";
+            }
+            return "The vector store is not reachable: " + detail;
+        }
+    }
+
     /** Removes a trial's chunks from the vector store, by trialExtid metadata. */
     public void deleteChunksFor(String trialExtid) {
         try {
