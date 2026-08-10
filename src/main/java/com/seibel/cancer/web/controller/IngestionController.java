@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/ingestion")
 @Validated
@@ -71,6 +73,12 @@ public class IngestionController {
     @PostMapping("/clinicaltrials")
     @Operation(summary = "Fetch trials from ClinicalTrials.gov, stage them, and normalize into the core schema")
     public ResponseIngestionResult ingestClinicalTrials(@Valid @RequestBody RequestClinicalTrialsIngest request) {
+        // Logged as received, before defaults are applied - what the caller actually sent is what
+        // you need when a pull returns something unexpected.
+        log.info("Ingestion request received: condition={}, term={}, location={}, overallStatus={}, maxStudies={}",
+                request.getCondition(), request.getTerm(), request.getLocation(),
+                request.getOverallStatus(), request.getMaxStudies());
+
         // Any omitted field falls back to cancer.ingestion.clinicaltrials.* - the frontend sends
         // explicit values for a targeted pull, and defaults cover the routine case.
         String condition = StringUtils.hasText(request.getCondition())
@@ -83,6 +91,12 @@ public class IngestionController {
         String overallStatus = StringUtils.hasText(requestedStatus)
                 ? ("ALL".equalsIgnoreCase(requestedStatus.trim()) ? null : requestedStatus.trim())
                 : ingestProperties.getOverallStatus();
+
+        // The resolved values are what the fetch actually uses. Logging both makes a
+        // default silently filling in for an omitted field visible rather than invisible.
+        log.info("Ingestion resolved: condition={}, term={}, location={}, overallStatus={}, maxStudies={}",
+                condition, request.getTerm(), request.getLocation(),
+                overallStatus == null ? "ALL" : overallStatus, maxStudies);
 
         var ingestResult = ingestJob.run(
                 condition, request.getTerm(), request.getLocation(), overallStatus, maxStudies);

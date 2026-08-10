@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pill, Save, Loader2 } from 'lucide-react';
+import { Save, Loader2 } from 'lucide-react';
 import { patientPriorTreatmentApi } from '../services/api';
 import { BooleanSelect, Field, Section, Select, inputClass } from '../components/FormControls';
 import { useCurrentAppUser } from '../lib/useCurrentAppUser';
@@ -179,11 +179,7 @@ export default function PriorTreatment() {
     );
 
     return (
-        <div className="px-4 py-6 sm:px-0">
-            <div className="flex items-center gap-2 mb-1">
-                <Pill className="h-6 w-6 text-green-600" />
-                <h1 className="text-2xl font-bold text-gray-900">Prior & Current Treatment</h1>
-            </div>
+        <div>
             <p className="text-sm text-gray-500 mb-4">
                 Used to match against trial eligibility criteria. Everything here is optional —
                 record what you know, leave the rest blank.

@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -8,9 +8,7 @@ import TrialSearch from './pages/TrialSearch';
 import TrialDetail from './pages/TrialDetail';
 import SavedTrials from './pages/SavedTrials';
 import Ingestion from './pages/Ingestion';
-import Diagnosis from './pages/Diagnosis';
-import Variants from './pages/Variants';
-import PriorTreatment from './pages/PriorTreatment';
+import PatientRecord from './pages/PatientRecord';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -40,9 +38,13 @@ function App() {
                         <Route path="trials" element={<TrialSearch />} />
                         <Route path="trials/:extid" element={<TrialDetail />} />
                         <Route path="saved-trials" element={<SavedTrials />} />
-                        <Route path="diagnosis" element={<Diagnosis />} />
-                        <Route path="variants" element={<Variants />} />
-                        <Route path="prior-treatment" element={<PriorTreatment />} />
+                        <Route path="diagnosis" element={<PatientRecord />} />
+                        {/* Folded into the Diagnosis page as tabs; kept so old links still land. */}
+                        <Route path="variants" element={<Navigate to="/diagnosis" replace />} />
+                        <Route
+                            path="prior-treatment"
+                            element={<Navigate to="/diagnosis" replace />}
+                        />
                         <Route path="ingestion" element={<Ingestion />} />
                     </Route>
                 </Routes>

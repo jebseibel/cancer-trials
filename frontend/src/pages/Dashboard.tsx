@@ -1,12 +1,11 @@
-import { FlaskConical, Bookmark, Heart, Download, Loader2 } from 'lucide-react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { FlaskConical, Bookmark, Heart, Download } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { trialApi, trialStatusApi, ingestionApi } from '../services/api';
+import { trialApi, trialStatusApi } from '../services/api';
 import { useCurrentAppUser } from '../lib/useCurrentAppUser';
 
 export default function Dashboard() {
     const { data: appUser } = useCurrentAppUser();
-    const queryClient = useQueryClient();
 
     const { data: trialsPage } = useQuery({
         queryKey: ['trials'],
@@ -18,23 +17,6 @@ export default function Dashboard() {
         queryFn: async () => (await trialStatusApi.getByAppUserExtid(appUser!.extid)).data,
         enabled: !!appUser?.extid,
     });
-
-    const pullTrialsMutation = useMutation({
-        mutationFn: async () => (await ingestionApi.runClinicalTrials({})).data,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['trials'] });
-        },
-    });
-
-    const handlePullLatestTrials = () => {
-        if (
-            window.confirm(
-                'Pull the latest trials from ClinicalTrials.gov? This fetches new/updated trials and normalizes them into the database.'
-            )
-        ) {
-            pullTrialsMutation.mutate();
-        }
-    };
 
     const totalTrials = trialsPage?.totalElements ?? 0;
     const savedCount = myStatuses?.length ?? 0;
@@ -126,50 +108,25 @@ export default function Dashboard() {
                             <p className="text-sm text-gray-500 truncate">See trials you're tracking</p>
                         </div>
                     </Link>
-                    <button
-                        type="button"
-                        onClick={handlePullLatestTrials}
-                        disabled={pullTrialsMutation.isPending}
-                        className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-left"
+                    {/* A link, not a run-it-here button: every other card on this page navigates,
+                        and pulling without preparing for search leaves trials that silently do
+                        not turn up in results. The Process Trials page does the whole job. */}
+                    <Link
+                        to="/ingestion"
+                        className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-green-500"
                     >
                         <div className="flex-shrink-0">
-                            {pullTrialsMutation.isPending ? (
-                                <Loader2 className="h-10 w-10 text-green-600 animate-spin" />
-                            ) : (
-                                <Download className="h-10 w-10 text-green-600" />
-                            )}
+                            <Download className="h-10 w-10 text-green-600" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900">
-                                {pullTrialsMutation.isPending ? 'Pulling...' : 'Pull Latest Trials'}
-                            </p>
+                            <span className="absolute inset-0" aria-hidden="true" />
+                            <p className="text-sm font-medium text-gray-900">Process Trials</p>
                             <p className="text-sm text-gray-500 truncate">
-                                Fetch and normalize new trials from ClinicalTrials.gov
+                                Pull new trials and prepare them for search
                             </p>
                         </div>
-                    </button>
+                    </Link>
                 </div>
-
-                {pullTrialsMutation.isSuccess && (
-                    <div className="mt-4 rounded-md bg-green-50 border border-green-200 p-4 text-sm text-green-800">
-                        Pulled {pullTrialsMutation.data.studiesFetched} studies,{' '}
-                        {pullTrialsMutation.data.trialsNormalized} trials normalized.
-                        {(pullTrialsMutation.data.ingestErrors.length > 0 ||
-                            pullTrialsMutation.data.normalizationErrors.length > 0) && (
-                            <span className="text-red-700">
-                                {' '}
-                                ({pullTrialsMutation.data.ingestErrors.length +
-                                    pullTrialsMutation.data.normalizationErrors.length}{' '}
-                                error(s) — see Ingest page for details.)
-                            </span>
-                        )}
-                    </div>
-                )}
-                {pullTrialsMutation.isError && (
-                    <div className="mt-4 rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-700">
-                        Failed to pull trials. Check that the backend is running and try again.
-                    </div>
-                )}
             </div>
         </div>
     );
