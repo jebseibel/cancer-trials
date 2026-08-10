@@ -6,7 +6,9 @@ import com.seibel.cancer.common.domain.Trial;
 import com.seibel.cancer.rag.chunk.EligibilityChunk.ChunkType;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Turns a Trial plus its child records into the full set of embeddable chunks, with the
@@ -53,8 +55,20 @@ public class TrialChunker {
         List<TrialChunk> chunks = new ArrayList<>();
 
         // --- Eligibility criteria: one chunk per criterion ---
+        //
+        // Renumbered per source across the whole trial rather than reusing the eligibility
+        // chunker's ordinal, which restarts at 0 for each criteria section. A trial with two
+        // sections - e.g. NCT07393529, which has separate Patients and Social Network Members
+        // blocks, each with its own Inclusion/Exclusion lists - then produces two
+        // INCLUSION_CRITERION chunks at ordinal 0. Since a chunk id hashes
+        // trialExtid:source:ordinal, those collide, and the store deduplicates by id before
+        // embedding: 15 documents in, 10 embeddings back, and the add() call fails the whole
+        // trial with "Embeddings must have the same number as that of the documents".
+        Map<TrialChunk.Source, Integer> nextOrdinal = new EnumMap<>(TrialChunk.Source.class);
         for (EligibilityChunk ec : eligibilityChunker.chunk(trial.getEligibilityCriteria())) {
-            chunks.add(TrialChunk.of(trial, sourceFor(ec.type()), ec.text(), ec.ordinal(), ec.type()));
+            TrialChunk.Source source = sourceFor(ec.type());
+            int ordinal = nextOrdinal.merge(source, 1, Integer::sum) - 1;
+            chunks.add(TrialChunk.of(trial, source, ec.text(), ordinal, ec.type()));
         }
 
         // --- Whole-trial prose ---

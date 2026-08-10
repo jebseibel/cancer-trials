@@ -168,4 +168,74 @@ class TrialChunkerTest {
         assertThat(chunker.chunk(t, List.of(), List.of())).isEmpty();
         assertThat(chunker.chunk(null, List.of(), List.of())).isEmpty();
     }
+
+    @Test
+    @DisplayName("multiple criteria sections do not produce colliding chunk ids")
+    void repeatedSectionsGetDistinctIds() {
+        // Two populations, each with its own Inclusion/Exclusion lists - the shape of
+        // NCT07393529, which failed to index entirely. The eligibility chunker restarts its
+        // ordinal per section, so without renumbering the first criterion of each section
+        // hashes to the same id. The store deduplicates by id before embedding, returns fewer
+        // embeddings than documents, and rejects the whole trial.
+        Trial t = trial();
+        t.setEligibilityCriteria("""
+                Patients
+
+                Inclusion criteria:
+
+                * Age >=65 years
+                * Able to speak English
+
+                Exclusion criteria:
+
+                * Unwilling to complete study procedures
+
+                Social Network Members
+
+                Inclusion criteria:
+
+                * Age >=18 years
+                * Able to speak English
+
+                Exclusion criteria:
+
+                * Unwilling to complete study procedures
+                """);
+
+        List<TrialChunk> chunks = chunker.chunk(t, List.of(), List.of());
+
+        assertThat(chunks.stream().map(TrialChunk::id).distinct())
+                .as("every chunk id must be unique within a trial")
+                .hasSameSizeAs(chunks);
+    }
+
+    @Test
+    @DisplayName("identical criterion text in two sections still gets distinct ids")
+    void identicalTextInTwoSectionsGetsDistinctIds() {
+        // The nastiest case: the same sentence appears in both sections, so the chunks differ
+        // only by ordinal. If ids were content-addressed on text alone these would collide by
+        // design rather than by accident.
+        Trial t = trial();
+        t.setEligibilityCriteria("""
+                Group A
+
+                Inclusion criteria:
+
+                * Able to provide informed consent
+
+                Group B
+
+                Inclusion criteria:
+
+                * Able to provide informed consent
+                """);
+
+        List<TrialChunk> chunks = chunker.chunk(t, List.of(), List.of());
+        List<TrialChunk> inclusion = chunks.stream()
+                .filter(c -> c.source() == TrialChunk.Source.INCLUSION_CRITERION)
+                .toList();
+
+        assertThat(inclusion).hasSize(2);
+        assertThat(inclusion.get(0).id()).isNotEqualTo(inclusion.get(1).id());
+    }
 }
