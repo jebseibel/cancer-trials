@@ -70,7 +70,7 @@ class RetrievalEvaluation {
     @Test
     @DisplayName("retrieval evaluation set: every asserted query meets its score and source bar")
     void evaluationSetPasses() {
-        assumeBackendRunning();
+        requireBackendRunning();
 
         List<String> failures = new ArrayList<>();
         System.out.println("\n=== ASSERTED ===");
@@ -104,21 +104,43 @@ class RetrievalEvaluation {
         assertThat(failures).as("evaluation set failures").isEmpty();
     }
 
-    private void assumeBackendRunning() {
+    /**
+     * Confirms the backend is up, failing rather than skipping when it is not.
+     *
+     * <p><b>This deliberately does not use {@code Assumptions.abort}.</b> It did, and the skip
+     * rendered as {@code BUILD SUCCESSFUL} — so on 2026-08-10 a down backend was read as this
+     * evaluation passing, twice, and a corpus was reported as validated when nothing had run.
+     * A test whose failure mode is indistinguishable from success is worse than no test.
+     *
+     * <p>The cost of failing instead is that {@code ./gradlew build} needs a running backend.
+     * That is the right trade for an evaluation whose entire purpose is measuring the live
+     * system: there is no useful "skipped" outcome here, only "measured" or "did not measure".
+     * Set {@code -Deval.skipWithoutBackend=true} to restore the old behaviour for a CI run that
+     * genuinely has no backend.
+     */
+    private void requireBackendRunning() {
+        String failure;
         try {
             HttpResponse<String> r = HTTP.send(
                     HttpRequest.newBuilder(URI.create(BASE + "?query=ping&maxTrials=1"))
                             .timeout(Duration.ofSeconds(30)).GET().build(),
                     HttpResponse.BodyHandlers.ofString());
-            if (r.statusCode() != 200) {
-                Assumptions.abort("backend returned HTTP " + r.statusCode() + " - skipping");
+            if (r.statusCode() == 200) {
+                return;
             }
+            failure = "backend returned HTTP " + r.statusCode();
         } catch (Exception e) {
-            // Report WHY it skipped. A bare "not running" message hid a real bug here once:
-            // the guard caught an unrelated exception and the skip looked like a correct signal.
-            Assumptions.abort("backend unreachable on :8080 (" + e.getClass().getSimpleName()
-                    + ": " + e.getMessage() + ") - skipping retrieval evaluation");
+            failure = "backend unreachable on :8080 (" + e.getClass().getSimpleName()
+                    + ": " + e.getMessage() + ")";
         }
+
+        if (Boolean.getBoolean("eval.skipWithoutBackend")) {
+            Assumptions.abort(failure + " - skipping (eval.skipWithoutBackend=true)");
+        }
+        throw new AssertionError(failure
+                + ". The retrieval evaluation measures the live system, so it cannot run without"
+                + " one - start the backend and re-run. Pass -Deval.skipWithoutBackend=true to"
+                + " skip instead.");
     }
 
     private String search(String query) {

@@ -75,4 +75,11 @@ tasks.named('test') {
     // Note this is NOT covered by org.gradle.jvmargs in gradle.properties - that sizes the
     // Gradle daemon, not the forked test JVM.
     maxHeapSize = '4g'
+
+    // Forward the evaluation's escape hatch to the forked JVM. A bare -D on the Gradle command
+    // line sets the property on the daemon, not on the JVM the test actually runs in, so
+    // RetrievalEvaluation would never see it.
+    if (System.getProperty('eval.skipWithoutBackend') != null) {
+        systemProperty 'eval.skipWithoutBackend', System.getProperty('eval.skipWithoutBackend')
+    }
 }
