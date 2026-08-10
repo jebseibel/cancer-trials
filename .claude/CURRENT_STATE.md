@@ -5,34 +5,41 @@ Where the project stands, what is deliberately unfinished, and what that blocks.
 (schema design). This is the "where are we right now" view — update it as things change rather
 than keeping it as history.
 
-**Last verified against the code: 2026-08-09.**
+**Last verified against the code: 2026-08-10.**
 
 ---
 
 ## Picking the project back up
 
-Verified 2026-08-09 at end of session, immediately after a database rebuild:
+Verified 2026-08-10, after a database rebuild to apply the `payload_hash` column:
 
 | | |
 | --- | --- |
-| Trials in MySQL | **0** — the rebuild dropped 2,676. Re-ingest before anything works. |
-| Qdrant | **stale/empty** — must be cleared and re-backfilled, chunks reference dead extids |
-| AppUser | 1 row, `jeb`, extid `03c6958f-6a1f-46bf-96a7-330cf1bbe9ca` — **auto-seeded** |
-| PatientDiagnosis | 1 row, real data, extid `441591db-fddf-423a-8d74-845d1f2e89e4` — **auto-seeded** |
-| PatientVariant | 1 row, extid `a588da6c-2dd1-479c-a140-a1c279a02cdc` — **auto-seeded** |
-| PatientPriorTreatment | 1 row, extid `86f4de7d-f5e3-4864-8e6d-53e878d98129` — **auto-seeded** |
-| SavedTrialMatch | 0 — the 15 rows from 2026-08-08 were lost in the rebuild |
-| Tests | `:database` **818**, root 3 — all passing |
-| Working tree | large; being committed at end of this session |
+| Trials in MySQL | small test pulls only — a full corpus pull has not been run |
+| Qdrant | **the `clinical_trial_chunks` collection does not exist** — see below |
+| AppUser / PatientDiagnosis / PatientVariant / PatientPriorTreatment | 1 row each — **auto-seeded**, survived the rebuild |
+| SavedTrialMatch | 0 |
+| Tests | `:database` **820**, `:datafetcher` 55, root 3 — all passing |
+| Working tree | clean; branch `payload-hash` merged to `main` |
+
+⚠️ **The Qdrant collection is missing, so Prepare for Search and the combined button both
+fail with a 500.** Backfill deletes a trial's old chunks before indexing, and that delete
+errors with `NOT_FOUND: Collection 'clinical_trial_chunks' doesn't exist`. The frontend's
+error banner says "check that the server is running", which is wrong and unhelpful here.
+
+Auto-creation is **deliberately off** (`initialize-schema: false`) — letting Spring AI create
+the collection would infer vector dimensions at first write, so a model/collection mismatch
+would surface as bad search results rather than a loud error. Recreate it explicitly with
+**384 dimensions, Cosine distance**, over Qdrant's REST port 6333 (note 6334 is gRPC, which
+is what the app speaks).
 
 **To resume, in order:**
 
-1. `POST /api/ingestion/clinicaltrials` with
-   `{"condition":"breast cancer","overallStatus":"RECRUITING","maxStudies":2500}` — a few
-   minutes, and the new progress ticker shows both loops live.
-2. Clear the Qdrant collection, then `POST /api/rag/backfill`. The collection must be
-   **deleted**, not reused: its chunks reference trial extids that no longer exist.
-3. Log in as `jeb`. The patient data is already there — see below.
+1. Recreate the Qdrant collection (above) — otherwise two of the three buttons error.
+2. **Pull Trials** with condition `breast cancer`, status RECRUITING, max 2500 — a few
+   minutes, and the progress ticker shows both loops live.
+3. **Prepare for Search**. This is the slow one, ~64,000 local embedding inferences.
+4. Log in as `jeb`. The patient data is already there — see below.
 
 ### The patient rows now seed themselves
 
@@ -156,12 +163,11 @@ get there.** The blocker was tooling, not design.
 
 What was in flight when the session ended:
 
-1. **Ingest the full recruiting breast-cancer corpus.** Only 249 of **2,456** are in MySQL
-   (~10%). The API call is
-   `POST /api/ingestion/clinicaltrials {"condition":"breast cancer","overallStatus":"RECRUITING","maxStudies":2500}`.
-   Measured rate: 250 trials in 9.5s, so the full pull should take ~2-4 minutes and fit in
-   one request. Re-runs dedup by `nctId`. **This does not need a RAG backfill** — the
-   deterministic filter reads `eligibility_criteria` straight from MySQL.
+1. **Pull the full recruiting breast-cancer corpus** — ~2,456 trials. Still not done; the
+   database has only small test pulls. Use the **Pull Trials** button with condition
+   `breast cancer`, status RECRUITING, max 2500. **This does not need Prepare for Search** —
+   the deterministic filter reads `eligibility_criteria` straight from MySQL. Re-running is
+   now cheap for unchanged trials (see "Payload hashing" above).
 2. **Re-run the match with two fixes the user approved:**
    - **Strict receptor polarity.** The current filter accepts any trial whose criteria
      mention "HER2-negative" anywhere, so NCT07371585 — a HER2-**positive** first-line
@@ -190,6 +196,56 @@ now that the database holds a real medical record rather than sample data.
 
 ## What's built
 
+### Frontend rework for a non-developer user — new 2026-08-10
+
+The app was shown to the patient herself, so developer vocabulary and developer-shaped
+workflows had to go.
+
+**Diagnosis, Variants and Prior Treatment are now three tabs on one page** (`PatientRecord`),
+not three menu items. Each tab keeps its own Save button and its own endpoint, so the reason
+they were separate pages — three tables, three writes, no partial-write problem — still holds.
+Tabs mount only while selected, so switching away and back refetches rather than holding stale
+form state behind a hidden tab. The old `/variants` and `/prior-treatment` routes redirect.
+
+**"Ingest" is now "Process Trials"**, with three buttons: **Pull Trials and Prepare for
+Search** (both steps, behind a confirmation dialog stating what it does and that it takes
+minutes), **Pull Trials**, and **Prepare for Search**. A failed pull stops the combined run
+rather than backfilling a half-loaded corpus.
+
+**Backfill / Ingest / staging / normalize / chunks are gone from every user-visible string** —
+button labels, result modals, error banners, and the Dashboard. Internal names are unchanged.
+
+**The Dashboard's "Pull Latest Trials" button became a link.** It ran a multi-minute job from a
+card whose neighbours all navigate, and it pulled *without* preparing for search — so trials
+loaded that way silently never appeared in search results. That path no longer exists.
+
+### Payload hashing — new 2026-08-10
+
+`staging_raw_trial.payload_hash` (SHA-256 hex, `varchar(64)`, nullable). A re-pull now skips
+trials whose payload is byte-identical instead of re-normalizing them.
+
+**This fixed a real cost.** Every already-normalized trial previously took the refresh branch
+unconditionally, so a second full pull re-normalized the entire corpus and cost the same as the
+first — ~15 minutes for 2,500 trials, since normalization is ~349ms/trial and 99.3% of a run's
+wall-clock.
+
+**The approach was verified against the live API before being built**: two fetches of the same
+study, and of the search endpoint the ingest job actually uses, returned byte-identical
+payloads. No per-request timestamps or unstable key ordering. Re-check if CT.gov ever versions
+their API.
+
+**A byte-length check was considered and rejected** — `RECRUITING` → `SUSPENDED` is the same
+character count, as is a date change, so it would report "unchanged" for precisely the changes
+worth catching.
+
+**Null hash means refresh, never skip**, enforced in three places: the column is nullable so
+pre-existing rows still refresh, the branch requires a non-null match, and the digest helper
+returns null on failure so an unavailable algorithm degrades to the old behavior.
+
+The pull result now separates **"Unchanged since last time"** from **"Already waiting to be
+saved"** — two different skip reasons that previously collapsed into one number. Design and
+open questions in `ingestion/PAYLOAD_HASH_PLAN.md`.
+
 ### Backend
 
 Full layered scaffold (domain → entity → repository → db service → service → controller) for
@@ -204,16 +260,17 @@ Every entity referencing a Trial also exposes `GET /api/{entity}/by-trial/{trial
 
 ### Frontend
 
-Nine pages: Login, Dashboard, Trial Search, Trial Detail, Saved Trials, **Diagnosis**,
-**Variants**, **Prior Treatment**, Ingestion. Structure and gotchas in
-`_archive/frontend/frontend-module.md`.
+Seven routes: Login, Dashboard, Trial Search, Trial Detail, Saved Trials, **Diagnosis** (the
+`PatientRecord` shell, with Diagnosis / Variants / Prior Treatment as tabs), and Process
+Trials. Structure and gotchas in `_archive/frontend/frontend-module.md`.
 
-**Variants and Prior Treatment are new (2026-08-09)** and deliberately separate pages rather
-than sections of Diagnosis: three tables means three endpoints, so one Save button per page
-avoids inventing a partial-write problem. They also draw on different source documents — a
-pathology report, a genomic report, and a medication list — plausibly filled in on different
-days. Shared `Section`/`Field`/`Select`/`BooleanSelect` live in `components/FormControls.tsx`,
-extracted from `Diagnosis.tsx` so the three pages cannot drift apart.
+**Variants and Prior Treatment became tabs on 2026-08-10**, having been separate pages when
+added on 2026-08-09. The reason they were separate still governs the tab design: three tables
+means three endpoints, so each keeps its own Save button and there is no partial-write problem
+to solve. They also draw on different source documents — a pathology report, a genomic report,
+and a medication list — plausibly filled in on different days. Shared
+`Section`/`Field`/`Select`/`BooleanSelect` live in `components/FormControls.tsx`, extracted
+from `Diagnosis.tsx` so the three cannot drift apart.
 
 Each carries an amber callout explaining the one thing a person filling it in is most likely
 to get wrong: on Variants, that "not tested" is not "not detected"; on Prior Treatment, that
@@ -416,16 +473,14 @@ rebuild worked correctly** — but if a rebuild ever produces "Table 'cancer.X' 
 on some endpoints and not others, this is the cause. The fallback is to flip `drop-first`
 to `true`, restart, and flip it back.
 
-**A rebuild destroys the AppUser and the real PatientDiagnosis.** Both had to be recreated by
-hand this session. Her diagnosis is now saved at
-`.claude/patient-data/patient-diagnosis.csv` (gitignored, `600`, keyed on username `jeb`
-rather than extid since extids regenerate). **The startup loader that would read it does not
-exist yet** — the user asked for it, chose the gitignored-CSV approach over a committed
-Liquibase seed, and it was not built before the session ended. That is a small, self-contained
-task and it removes the worst repeat-pain of a rebuild.
+**A rebuild used to destroy the AppUser and the real patient rows.** `PatientSeedLoader` now
+recreates all four from gitignored CSVs in `.claude/patient-data/` on startup — see "The
+patient rows now seed themselves" above. Verified through two real rebuilds (2026-08-09 and
+2026-08-10).
 
 Rebuild also invalidates Qdrant: chunks reference trial extids that no longer exist, so the
-collection must be deleted and re-backfilled, not reused.
+collection must be deleted and re-created, not reused. **Note the collection is currently
+missing entirely** — see the warning at the top of this document.
 
 ### Other
 
@@ -533,29 +588,20 @@ against the corpus in bulk, cannot inform ranking, and cannot be reused by Tier 
 
 ## Git state
 
-Branch `uchealth-fhir-ingestion`, working tree clean. Seven commits on top of the FHIR
-baseline (`4de3ef1`):
+**Merged to `main` on 2026-08-10** — 16 commits, a clean fast-forward. `main`,
+`uchealth-fhir-ingestion` and `payload-hash` all point at the same commit; the two branches
+are now redundant and can be deleted whenever convenient.
+
+The last three commits, on top of the 2026-08-09 work:
 
 | Commit | What |
 | --- | --- |
-| `a95729b` | `.claude` docs cleanup — removed inherited ViroTrade/jobhunting content, corrected the rest |
-| `41355a5` | `:rag` module — chunking, embedding, Qdrant indexing, retrieval |
-| `0b1a94e` | CT.gov ingestion made configurable; `filter.overallStatus`; normalize-limit bug fixed |
-| `43b72ff` | `LocationRepositoryTest` latitude truncation fix |
-| `db7347c` | `PatientDiagnosis` entity, full stack, 34 tests |
-| `c621dce` | Backfill button + `JobResultModal` on the Ingest page |
-| `0f55855` | Diagnosis page + Tier 1 eligibility matching |
+| `59393d6` | Patient record tabs; Process Trials combined button; user-facing renames; ingestion request logging; the two `ingestion/` design docs |
+| `6043833` | `payload_hash` column and the skip-unchanged branch |
+| `13b4bd9` | Unchanged-count reporting through to the result modal |
 
-Test counts: `:database` **818** (was 756; +62 for `PatientVariant` and
-`PatientPriorTreatment`), root 3. All passing. Frontend typecheck and build clean; one
-pre-existing lint error in `Login.tsx`.
-
-Not merged to `main`; this work is still on the branch.
-
-The 2026-08-08 and 2026-08-09 work was committed together at the end of the 2026-08-09
-session — `SavedTrialMatch`/`SavedTrialMatchCriterion`, `PatientVariant`/
-`PatientPriorTreatment`, the progress ticker, the seed loader, the two new frontend pages,
-and the docs.
+Test counts: `:database` **820**, `:datafetcher` 55, root 3. All passing. Frontend typecheck
+and build clean; one pre-existing lint error in `Login.tsx`.
 
 ### Files that must never be committed
 
