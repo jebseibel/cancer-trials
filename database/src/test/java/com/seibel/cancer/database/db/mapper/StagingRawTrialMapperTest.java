@@ -35,6 +35,7 @@ class StagingRawTrialMapperTest {
         assertEquals(db.getTrialSourceId(), domain.getTrialSourceId());
         assertEquals(db.getSourceTrialId(), domain.getSourceTrialId());
         assertEquals(db.getRawPayload(), domain.getRawPayload());
+        assertEquals(db.getPayloadHash(), domain.getPayloadHash());
         assertEquals(db.getFetchedAt(), domain.getFetchedAt());
         assertEquals(db.getNormalizedAt(), domain.getNormalizedAt());
         assertEquals(db.getNormalizationError(), domain.getNormalizationError());
@@ -58,6 +59,7 @@ class StagingRawTrialMapperTest {
         assertEquals(domain.getTrialSourceId(), db.getTrialSourceId());
         assertEquals(domain.getSourceTrialId(), db.getSourceTrialId());
         assertEquals(domain.getRawPayload(), db.getRawPayload());
+        assertEquals(domain.getPayloadHash(), db.getPayloadHash());
         assertEquals(domain.getFetchedAt(), db.getFetchedAt());
         assertEquals(domain.getNormalizedAt(), db.getNormalizedAt());
         assertEquals(domain.getNormalizationError(), db.getNormalizationError());

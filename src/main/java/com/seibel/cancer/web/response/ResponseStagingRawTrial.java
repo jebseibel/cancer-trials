@@ -12,6 +12,7 @@ public class ResponseStagingRawTrial {
     private Long trialSourceId;
     private String sourceTrialId;
     private String rawPayload;
+    private String payloadHash;
     private LocalDateTime fetchedAt;
     private LocalDateTime normalizedAt;
     private String normalizationError;

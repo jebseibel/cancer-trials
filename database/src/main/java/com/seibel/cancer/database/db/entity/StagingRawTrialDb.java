@@ -25,6 +25,10 @@ public class StagingRawTrialDb extends BaseDb {
     @Column(name = "raw_payload", columnDefinition = "longtext")
     private String rawPayload;
 
+    /** SHA-256 hex of {@link #rawPayload}. Null means unknown, which forces a refresh. */
+    @Column(name = "payload_hash", length = 64)
+    private String payloadHash;
+
     @Column(name = "fetched_at", nullable = false)
     private LocalDateTime fetchedAt;
 

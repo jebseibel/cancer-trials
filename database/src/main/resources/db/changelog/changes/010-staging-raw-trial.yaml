@@ -14,6 +14,10 @@ databaseChangeLog:
               - column: { name: trial_source_id, type: bigint, constraints: { nullable: false } }
               - column: { name: source_trial_id, type: varchar(255), constraints: { nullable: false } }
               - column: { name: raw_payload, type: longtext }
+              # SHA-256 hex of raw_payload. Lets a re-pull skip a trial whose payload is
+              # byte-identical instead of re-normalizing it. Nullable: rows staged before this
+              # column existed have no hash, and null must mean "unknown, so refresh".
+              - column: { name: payload_hash, type: varchar(64) }
               - column: { name: fetched_at, type: datetime, constraints: { nullable: false } }
               - column: { name: normalized_at, type: datetime }
               - column: { name: normalization_error, type: text }

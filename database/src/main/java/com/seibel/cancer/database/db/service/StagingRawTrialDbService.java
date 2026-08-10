@@ -54,6 +54,17 @@ public class StagingRawTrialDbService extends BaseDbService {
 
     public StagingRawTrial create(@NonNull Long trialSourceId, @NonNull String sourceTrialId, String rawPayload,
                                    @NonNull LocalDateTime fetchedAt, LocalDateTime normalizedAt, String normalizationError) {
+        return create(trialSourceId, sourceTrialId, rawPayload, null, fetchedAt, normalizedAt, normalizationError);
+    }
+
+    /**
+     * @param payloadHash SHA-256 hex of rawPayload, or null when unknown. Always written
+     *                    together with the payload so the two can never describe different
+     *                    content.
+     */
+    public StagingRawTrial create(@NonNull Long trialSourceId, @NonNull String sourceTrialId, String rawPayload,
+                                   String payloadHash, @NonNull LocalDateTime fetchedAt,
+                                   LocalDateTime normalizedAt, String normalizationError) {
 
         String extid = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();
@@ -64,6 +75,7 @@ public class StagingRawTrialDbService extends BaseDbService {
             record.setTrialSourceId(trialSourceId);
             record.setSourceTrialId(sourceTrialId);
             record.setRawPayload(rawPayload);
+            record.setPayloadHash(payloadHash);
             record.setFetchedAt(fetchedAt);
             record.setNormalizedAt(normalizedAt);
             record.setNormalizationError(normalizationError);
@@ -134,11 +146,25 @@ public class StagingRawTrialDbService extends BaseDbService {
 
     public StagingRawTrial refreshForRenormalization(@NonNull String extid, @NonNull String rawPayload,
                                                       @NonNull LocalDateTime fetchedAt) {
+        return refreshForRenormalization(extid, rawPayload, null, fetchedAt);
+    }
+
+    /**
+     * Replaces the stored payload and re-queues the row for normalization.
+     *
+     * @param payloadHash SHA-256 hex of the new rawPayload. Set here rather than left alone on
+     *                    purpose: a row carrying a hash of its *previous* payload would cause
+     *                    the next pull to compare against a stale value and skip a trial that
+     *                    had in fact changed.
+     */
+    public StagingRawTrial refreshForRenormalization(@NonNull String extid, @NonNull String rawPayload,
+                                                      String payloadHash, @NonNull LocalDateTime fetchedAt) {
         StagingRawTrialDb record = repository.findByExtid(extid)
                 .orElseThrow(() -> new ServiceException(getFoundFailureMessage(extid)));
 
         try {
             record.setRawPayload(rawPayload);
+            record.setPayloadHash(payloadHash);
             record.setFetchedAt(fetchedAt);
             record.setNormalizedAt(null);
             record.setNormalizationError(null);

@@ -53,7 +53,7 @@ do so silently. **A false unchanged is the worst failure mode available here** �
 goes stale and nothing surfaces it. SHA-256 costs the same order of magnitude to compute and
 has no practical collision risk.
 
-## The thing to verify first — this decides whether the plan works at all
+## The thing to verify first — checked 2026-08-10, **passes**
 
 **Does the CT.gov payload contain any field that varies between fetches when nothing
 meaningful has changed?**
@@ -62,10 +62,16 @@ A per-request timestamp, a response-scoped id, or a field ordering that is not s
 make every hash differ on every pull. The change would then be an expensive no-op: full
 normalization cost, plus a hash computation, plus a schema migration, for zero saving.
 
-Verify by fetching the same `nctId` twice and diffing the two payloads, **before** writing any
-code. If unstable fields exist, the options are to hash a normalized projection of the payload
-(strip the offending fields first) or to abandon the approach — but do not discover this after
-the migration.
+**Verified against the live API and the answer is no.** Two fetches of
+`/studies/NCT05753657`, seconds apart, returned byte-identical responses. Two fetches of the
+search endpoint the ingest job actually uses (`/studies?query.cond=breast+cancer&
+filter.overallStatus=RECRUITING`) were also byte-identical, and each of the five individual
+study objects — which is the unit the job hashes — compared equal under key-sorted
+serialization. No per-request timestamps, no response-scoped ids, no unstable key ordering.
+
+Worth re-checking if CT.gov ever changes their API version. If unstable fields do appear
+later, the fallback is to hash a normalized projection of the payload with the offending
+fields stripped, rather than abandoning the approach.
 
 ## Scope
 

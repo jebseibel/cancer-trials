@@ -63,6 +63,55 @@ class StagingRawTrialDbServiceTest {
     }
 
     @Test
+    void create_shouldPersistPayloadHash() {
+        // Arrange
+        StagingRawTrialDb savedDb = DomainBuilderDatabase.getStagingRawTrialDb();
+        when(repository.save(any(StagingRawTrialDb.class))).thenReturn(savedDb);
+        when(mapper.toModel(savedDb)).thenReturn(DomainBuilderDatabase.getStagingRawTrial(savedDb));
+
+        // Act
+        service.create(1L, "NCT00000001", "{\"a\":1}", "abc123", LocalDateTime.now(), null, null);
+
+        // Assert
+        ArgumentCaptor<StagingRawTrialDb> captor = ArgumentCaptor.forClass(StagingRawTrialDb.class);
+        verify(repository).save(captor.capture());
+        assertEquals("abc123", captor.getValue().getPayloadHash());
+        assertEquals("{\"a\":1}", captor.getValue().getRawPayload());
+    }
+
+    /**
+     * The characteristic bug this guards: a refresh that replaces the payload but leaves the
+     * old hash would make the next pull compare against a stale value and skip a trial that
+     * had in fact changed. Payload and hash must always be written together.
+     */
+    @Test
+    void refreshForRenormalization_shouldUpdateHashAlongsidePayload() {
+        // Arrange
+        StagingRawTrialDb existing = DomainBuilderDatabase.getStagingRawTrialDb();
+        existing.setPayloadHash("oldhash");
+        existing.setRawPayload("{\"old\":true}");
+        existing.setNormalizedAt(LocalDateTime.now());
+
+        when(repository.findByExtid(existing.getExtid())).thenReturn(Optional.of(existing));
+        when(repository.save(any(StagingRawTrialDb.class))).thenReturn(existing);
+        when(mapper.toModel(existing)).thenReturn(DomainBuilderDatabase.getStagingRawTrial(existing));
+
+        // Act
+        service.refreshForRenormalization(existing.getExtid(), "{\"new\":true}", "newhash",
+                LocalDateTime.now());
+
+        // Assert
+        ArgumentCaptor<StagingRawTrialDb> captor = ArgumentCaptor.forClass(StagingRawTrialDb.class);
+        verify(repository).save(captor.capture());
+
+        StagingRawTrialDb captured = captor.getValue();
+        assertEquals("newhash", captured.getPayloadHash());
+        assertEquals("{\"new\":true}", captured.getRawPayload());
+        // Cleared so the row re-enters the pending queue.
+        assertNull(captured.getNormalizedAt());
+    }
+
+    @Test
     void create_shouldThrowException_whenRepositoryFails() {
         // Arrange
         StagingRawTrial input = DomainBuilderDatabase.getStagingRawTrial();

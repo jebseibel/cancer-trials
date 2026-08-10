@@ -111,6 +111,7 @@ class StagingRawTrialConverter {
                 .trialSourceId(item.getTrialSourceId())
                 .sourceTrialId(item.getSourceTrialId())
                 .rawPayload(item.getRawPayload())
+                .payloadHash(item.getPayloadHash())
                 .fetchedAt(item.getFetchedAt())
                 .normalizedAt(item.getNormalizedAt())
                 .normalizationError(item.getNormalizationError())

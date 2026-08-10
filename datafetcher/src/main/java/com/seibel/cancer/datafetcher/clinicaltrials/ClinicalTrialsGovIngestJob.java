@@ -11,6 +11,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,6 +55,9 @@ public class ClinicalTrialsGovIngestJob {
 
         int stagedCount = 0;
         int skippedCount = 0;
+        // Subset of skippedCount: skipped because the payload was byte-identical to what is
+        // already normalized. Logged separately so a re-pull's saving is visible.
+        int unchangedCount = 0;
         List<String> errors = new ArrayList<>();
 
         // Errors are logged at debug rather than error here: a log line fired mid-loop lands in
@@ -71,21 +77,36 @@ public class ClinicalTrialsGovIngestJob {
                         continue;
                     }
                     String rawJson = client.toRawJson(study);
+                    // Hashed from the exact string that gets stored, not from a second
+                    // serialization of the node - two serializations can differ in whitespace or
+                    // key order and would produce a hash that does not describe its own payload.
+                    String payloadHash = sha256Hex(rawJson);
 
                     StagingRawTrial existing = stagingRawTrialDbService
                             .findByTrialSourceIdAndSourceTrialId(trialSource.getId(), nctId);
 
                     if (existing == null) {
-                        stagingRawTrialDbService.create(trialSource.getId(), nctId, rawJson, fetchedAt, null, null);
+                        stagingRawTrialDbService.create(trialSource.getId(), nctId, rawJson, payloadHash,
+                                fetchedAt, null, null);
                         stagedCount++;
                         ticker.tick();
                     } else if (existing.getNormalizedAt() == null) {
                         // Already staged and still pending normalization - avoid a duplicate row.
                         skippedCount++;
                         ticker.skip();
+                    } else if (payloadHash != null && payloadHash.equals(existing.getPayloadHash())) {
+                        // Normalized already and the payload has not changed since. Leave
+                        // normalizedAt alone so the row stays out of the pending queue -
+                        // re-normalizing is ~349ms and 99% of a run's cost, for no new data.
+                        // A null stored hash falls through to the refresh below on purpose:
+                        // unknown must mean refresh, never skip.
+                        unchangedCount++;
+                        skippedCount++;
+                        ticker.skip();
                     } else {
                         // Already normalized before - refresh with the latest payload and re-queue it.
-                        stagingRawTrialDbService.refreshForRenormalization(existing.getExtid(), rawJson, fetchedAt);
+                        stagingRawTrialDbService.refreshForRenormalization(existing.getExtid(), rawJson,
+                                payloadHash, fetchedAt);
                         stagedCount++;
                         ticker.tick();
                     }
@@ -97,9 +118,33 @@ public class ClinicalTrialsGovIngestJob {
             }
         }
 
-        log.info("run(): fetched={}, staged={}, skipped={}, errors={}",
-                studies.size(), stagedCount, skippedCount, errors.size());
+        log.info("run(): fetched={}, staged={}, skipped={} (unchanged={}), errors={}",
+                studies.size(), stagedCount, skippedCount, unchangedCount, errors.size());
         return new IngestResult(studies.size(), stagedCount, skippedCount, errors);
+    }
+
+    /**
+     * SHA-256 of the payload as lowercase hex. Returns null if the digest is unavailable, which
+     * makes the caller fall back to refreshing - the safe direction, since an unknown hash must
+     * never be read as "unchanged".
+     */
+    private String sha256Hex(String payload) {
+        if (payload == null) {
+            return null;
+        }
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(payload.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                hex.append(Character.forDigit((b >> 4) & 0xF, 16));
+                hex.append(Character.forDigit(b & 0xF, 16));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            log.debug("SHA-256 unavailable, falling back to unconditional refresh", e);
+            return null;
+        }
     }
 
     public record IngestResult(int studiesFetched, int stagingRowsWritten, int stagingRowsSkipped, List<String> errors) {

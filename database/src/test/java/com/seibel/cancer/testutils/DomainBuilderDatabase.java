@@ -427,6 +427,12 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
         item.setTrialSourceId(trialSourceId != null ? trialSourceId : ThreadLocalRandom.current().nextLong(1, 100000));
         item.setSourceTrialId(sourceTrialId != null ? sourceTrialId : getCodeRandom("SRC_"));
         item.setRawPayload(getDescriptionRandom("Payload "));
+        // 64 hex chars, matching a real SHA-256 so the column's width is actually exercised.
+        StringBuilder hash = new StringBuilder(64);
+        for (int i = 0; i < 64; i++) {
+            hash.append(Character.forDigit(ThreadLocalRandom.current().nextInt(16), 16));
+        }
+        item.setPayloadHash(hash.toString());
         item.setFetchedAt(getDateTimeRandom());
         item.setNormalizedAt(getDateTimeRandom());
         item.setNormalizationError(normalizationError != null ? normalizationError : getDescriptionRandom("Error "));
