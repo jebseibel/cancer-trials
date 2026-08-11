@@ -20,6 +20,11 @@ bin/
 
 # Ignore ENV
 .env
+# Production env template. Gets real secrets pasted into it before scp, so it must never
+# be committed even though the version in the repo has only placeholders.
+deployed.env
+*.env
+!.env.example
 
 ### IntelliJ IDEA ###
 .idea
