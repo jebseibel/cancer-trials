@@ -19,6 +19,19 @@ public interface LocationRepository extends JpaRepository<LocationDb, Long> {
     List<LocationDb> findByTrialId(Long trialId);
     List<LocationDb> findByTrialIdAndActive(Long trialId, ActiveEnum active);
 
+    /**
+     * Locations for many trials in one query.
+     *
+     * <p>Exists for trial matching, which assesses thousands of trials per request and needs a
+     * location signal on each. Fetching them one trial at a time cost ~2,000 round trips and 43
+     * seconds; this is the same shape as the per-record queries that make normalization 99.3%
+     * of an ingestion run.
+     *
+     * <p>Callers must chunk large id lists — MySQL's placeholder limit makes an unbounded
+     * {@code IN} clause fail on a full-corpus call.
+     */
+    List<LocationDb> findByTrialIdInAndActive(List<Long> trialIds, ActiveEnum active);
+
     default List<LocationDb> findAllActive() {
         return findByActive(ActiveEnum.ACTIVE);
     }

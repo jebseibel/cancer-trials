@@ -13,7 +13,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -110,6 +113,37 @@ public class LocationDbService extends BaseDbService {
 
     public List<Location> findByTrialId(@NonNull Long trialId) {
         return findAndLog(repository.findByTrialIdAndActive(trialId, ActiveEnum.ACTIVE), String.format("trialId (%d)", trialId));
+    }
+
+    /**
+     * Locations for many trials at once, grouped by trial id.
+     *
+     * <p>For callers assessing a whole corpus. One query per trial cost 43 seconds over ~2,000
+     * trials; this replaces that with a handful of batched queries.
+     *
+     * <p>Ids are chunked because MySQL's placeholder limit makes a single unbounded {@code IN}
+     * clause fail at corpus scale — the batch size is well under it and the query planner is
+     * happy either way.
+     *
+     * <p>A trial with no locations is absent from the map rather than mapping to an empty list,
+     * so callers should use {@code getOrDefault}. That keeps "no locations recorded" a distinct
+     * answer from "not asked about", which is what the location signal reports as UNKNOWN.
+     */
+    public Map<Long, List<Location>> findByTrialIds(@NonNull List<Long> trialIds) {
+        if (trialIds.isEmpty()) {
+            return Map.of();
+        }
+        final int batchSize = 500;
+        Map<Long, List<Location>> byTrial = new HashMap<>();
+        for (int start = 0; start < trialIds.size(); start += batchSize) {
+            List<Long> batch = trialIds.subList(start, Math.min(start + batchSize, trialIds.size()));
+            repository.findByTrialIdInAndActive(batch, ActiveEnum.ACTIVE).stream()
+                    .map(mapper::toModel)
+                    .forEach(l -> byTrial.computeIfAbsent(l.getTrialId(), k -> new ArrayList<>()).add(l));
+        }
+        log.info(getFoundMessageByType(String.format("findByTrialIds (%d trials)", trialIds.size()),
+                byTrial.values().stream().mapToInt(List::size).sum()));
+        return byTrial;
     }
 
     public Page<Location> findAll(Pageable pageable) {
