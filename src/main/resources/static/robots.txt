@@ -1,0 +1,11 @@
+# This is a private tool built for one patient and her family, not a public service.
+#
+# Nothing here should be indexed: the login page carries a personal email address, and a
+# memorable domain about breast cancer trials will otherwise attract search traffic from
+# patients looking for a service this is not. Someone arriving from a search result would
+# find a sign-in wall and no way in.
+#
+# This is a request, not access control. Well-behaved crawlers honour it; nothing else does.
+# What actually protects the data is authentication on every /api/** endpoint.
+User-agent: *
+Disallow: /

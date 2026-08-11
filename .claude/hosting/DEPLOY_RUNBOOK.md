@@ -36,12 +36,37 @@ Read this before following any step from `_archive/hosting/qa-setup.md`.
 
 | Prerequisite | Why |
 | --- | --- |
-| A domain name pointing at the server | Let's Encrypt will not issue for a bare IP |
+| `breastcancertrialfinder.com` A record -> the server IP, propagated | Let's Encrypt will not issue for a bare IP, and certbot fails if DNS has not resolved yet |
 | A **new** strong password for `jeb` | `password123` is local-only and must not reach prod |
 | A fresh 512-bit `JWT_SECRET` | Never reuse the local value |
 | A MySQL password | Not the local one |
 
 **Time budget: 3-4 hours**, nearly all of it the corpus rebuild (see Phase 4).
+
+### Phase 0 — DNS, first, because it has to propagate
+
+Do this before anything else; certbot in Phase 6 fails outright if the name does not yet resolve
+to the server, and propagation can take minutes to hours.
+
+At the registrar, two A records pointing at the server's IPv4:
+
+| Type | Host | Value |
+| --- | --- | --- |
+| A | `@` | the server IP |
+| A | `www` | the server IP |
+
+Check from somewhere that is not your own machine's cache:
+
+```bash
+dig +short breastcancertrialfinder.com @8.8.8.8
+dig +short www.breastcancertrialfinder.com @8.8.8.8
+```
+
+Both must print the server IP before you run certbot.
+
+⚠️ **If the registrar offers "domain privacy" or WHOIS redaction, turn it on.** This domain is
+about to be publicly associated with a tool built for one named person's medical care; the
+registration record should not carry your home address.
 
 ---
 
@@ -118,7 +143,7 @@ RDS_USERNAME=cancer_user
 RDS_PASSWORD=...                  # the real one
 JWT_SECRET=...                    # fresh 512-bit; the app will NOT boot without it
 QDRANT_BIND=127.0.0.1
-CORS_ALLOWED_ORIGINS=https://yourdomain.com
+CORS_ALLOWED_ORIGINS=https://breastcancertrialfinder.com,https://www.breastcancertrialfinder.com
 SERVER_PORT=8080
 ```
 
@@ -230,7 +255,7 @@ Nginx proxies **everything** to :8080 and serves no files. The SPA lives in the 
 ```nginx
 server {
     listen 80;
-    server_name yourdomain.com;
+    server_name breastcancertrialfinder.com www.breastcancertrialfinder.com;
 
     location / {
         proxy_pass http://localhost:8080;
@@ -261,7 +286,7 @@ Then TLS:
 
 ```bash
 apt install -y certbot python3-certbot-nginx
-certbot --nginx -d yourdomain.com
+certbot --nginx -d breastcancertrialfinder.com -d www.breastcancertrialfinder.com
 certbot renew --dry-run
 ```
 
@@ -274,7 +299,7 @@ work mean anything.
 ## Phase 7 — Verify before telling her it is ready
 
 ```bash
-D=https://yourdomain.com
+D=https://breastcancertrialfinder.com
 
 # Unauthenticated: her record must be closed
 for p in /api/patientdiagnosis /api/patientvariant /api/trial /api/uchealthoauthtoken /v3/api-docs; do
