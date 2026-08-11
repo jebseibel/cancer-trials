@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import TrialSearch from './pages/TrialSearch';
+import RankedTrials from './pages/RankedTrials';
 import TrialDetail from './pages/TrialDetail';
 import SavedTrials from './pages/SavedTrials';
 import Ingestion from './pages/Ingestion';
@@ -36,6 +37,7 @@ function App() {
                     >
                         <Route index element={<Dashboard />} />
                         <Route path="trials" element={<TrialSearch />} />
+                        <Route path="ranked-trials" element={<RankedTrials />} />
                         <Route path="trials/:extid" element={<TrialDetail />} />
                         <Route path="saved-trials" element={<SavedTrials />} />
                         <Route path="diagnosis" element={<PatientRecord />} />

@@ -1,5 +1,5 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom';
-import { Home, Search, Bookmark, LogOut, FlaskConical, Download, Stethoscope } from 'lucide-react';
+import { Home, Search, Bookmark, LogOut, FlaskConical, Download, Stethoscope, ListChecks } from 'lucide-react';
 import { authHelpers } from '../services/api';
 
 export default function Layout() {
@@ -20,7 +20,7 @@ export default function Layout() {
                         <div className="flex">
                             <Link to="/" className="flex items-center px-2 text-gray-900">
                                 <FlaskConical className="h-8 w-8 text-green-600" />
-                                <span className="ml-2 text-xl font-bold">Tina Cancer Project</span>
+                                <span className="ml-2 text-xl font-bold">Breast Cancer Trial Finder</span>
                             </Link>
                             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
                                 <Link
@@ -29,6 +29,13 @@ export default function Layout() {
                                 >
                                     <Home className="h-4 w-4 mr-2" />
                                     Dashboard
+                                </Link>
+                                <Link
+                                    to="/ranked-trials"
+                                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 border-b-2 border-transparent hover:border-gray-300"
+                                >
+                                    <ListChecks className="h-4 w-4 mr-2" />
+                                    Trials for You
                                 </Link>
                                 <Link
                                     to="/trials"

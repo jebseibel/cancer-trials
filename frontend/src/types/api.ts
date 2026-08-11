@@ -395,3 +395,37 @@ export interface PageResponse<T> {
     first: boolean;
     empty: boolean;
 }
+
+// ---- Trial matching (Rank Trials) ----
+
+export const SIGNAL_OUTCOME_VALUES = ['PASS', 'CONCERN', 'UNKNOWN', 'NOT_APPLICABLE'] as const;
+export type SignalOutcome = (typeof SIGNAL_OUTCOME_VALUES)[number];
+
+// `evidence` is the quoted criteria text that produced the signal. It is what lets a reader
+// judge the reasoning instead of trusting it - a flag without it is an unexplained verdict.
+export interface EligibilitySignal {
+    name: string;
+    outcome: SignalOutcome;
+    detail: string;
+    evidence?: string | null;
+}
+
+// Deliberately no fit score or percentage. The counts are what the backend can state
+// honestly; a number that looks like a probability invites reliance this tool must not earn.
+export interface TrialAssessment {
+    trialExtid: string;
+    nctId: string;
+    briefTitle?: string | null;
+    overallStatus?: string | null;
+    signals: EligibilitySignal[];
+    concernCount: number;
+    unknownCount: number;
+    passCount: number;
+    applicableCount: number;
+    breastCancer: boolean;
+    // Where the trial runs. Travel decides whether a trial is reachable at all, so these are
+    // first-class fields rather than something to parse out of the location signal's sentence.
+    siteCities: string[];
+    siteCount: number;
+    hasUnitedStatesSite: boolean;
+}

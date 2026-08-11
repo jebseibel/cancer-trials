@@ -26,6 +26,7 @@ import type {
     PatientVariantRequest,
     PatientPriorTreatment,
     PatientPriorTreatmentRequest,
+    TrialAssessment,
 } from '../types/api';
 
 // API Configuration
@@ -84,6 +85,15 @@ export const trialApi = {
     create: (trial: TrialRequest) => apiClient.post<Trial>('/trial', trial),
     update: (extid: string, trial: Partial<TrialRequest>) => apiClient.put<Trial>(`/trial/${extid}`, trial),
     delete: (extid: string) => apiClient.delete(`/trial/${extid}`),
+};
+
+// Ranks the whole corpus against the patient record already on file, so nobody has to know
+// what to type into a search box. Slow by nature - it assesses thousands of trials per call.
+export const matchingApi = {
+    rank: (appUserExtid: string, params?: { breastOnly?: boolean; limit?: number }) =>
+        apiClient.get<TrialAssessment[]>(`/matching/rank/${appUserExtid}`, { params }),
+    assessTrial: (trialExtid: string, appUserExtid: string) =>
+        apiClient.get<TrialAssessment>(`/matching/trial/${trialExtid}/for/${appUserExtid}`),
 };
 
 export const trialSourceApi = {
