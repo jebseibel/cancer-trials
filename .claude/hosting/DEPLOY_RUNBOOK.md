@@ -43,6 +43,22 @@ Read this before following any step from `_archive/hosting/qa-setup.md`.
 
 **Time budget: 3-4 hours**, nearly all of it the corpus rebuild (see Phase 4).
 
+⚠️ **This box is not empty, and that changed three decisions.** It runs `/opt/cpss/cpss.jar`
+**on port 8080** (a separate long-running app - do not stop it), MySQL, and two Ghost containers
+on 2369/2371. Nginx is already installed and fronting them.
+
+- **The app runs on 8081**, set as `PORT=8081` in `.env`. Deploying to 8080 fails with
+  "port already in use", and `Restart=on-failure` turns that into a crash loop that looks like
+  an application fault.
+- **Heap is `-Xmx640m`**, not 1536m. With 1 vCPU and ~3.9GB shared across MySQL (626MB), cpss
+  (449MB) and two Ghost containers, a large heap starves the off-heap ONNX model.
+- **Nginx is an ADD-A-SERVER-BLOCK job, not an install.** Read the existing config first; it
+  serves live sites.
+
+**The server is reachable as `ssh cancer`** (an SSH config alias on the dev machine); every
+`scp` below uses it. Its hostname is `cpss`, a leftover from the project this repo was copied
+from — cosmetic, not a sign you are on the wrong box.
+
 ### Phase 0 — DNS, first, because it has to propagate
 
 Do this before anything else; certbot in Phase 6 fails outright if the name does not yet resolve
@@ -130,7 +146,7 @@ On the dev machine:
 Trials for You page and no trial locations. A plain `build` ships that.
 
 ```bash
-scp build/libs/cancer-0.0.2-SNAPSHOT.jar root@HOST:/opt/cancer/cancer.jar
+scp build/libs/cancer-0.0.2-SNAPSHOT.jar cancer:/opt/cancer/cancer.jar
 ```
 
 `/opt/cancer/.env` on the server, `chmod 600`:
@@ -144,7 +160,7 @@ RDS_PASSWORD=...                  # the real one
 JWT_SECRET=...                    # fresh 512-bit; the app will NOT boot without it
 QDRANT_BIND=127.0.0.1
 CORS_ALLOWED_ORIGINS=https://breastcancertrialfinder.com,https://www.breastcancertrialfinder.com
-SERVER_PORT=8080
+PORT=8081
 ```
 
 ⚠️ **`JWT_SECRET` has no default, deliberately.** A default would silently re-enable the literal
@@ -169,7 +185,7 @@ Then `systemctl daemon-reload && systemctl enable --now cancer`.
 **Health check** (there is no actuator):
 
 ```bash
-curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8080/api/auth/login \
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8081/api/auth/login \
   -H 'Content-Type: application/json' -d '{}'
 # 400 = up and validating. 000 = not up.
 ```
@@ -187,13 +203,13 @@ survive it. A long-held request already failed at 58% once locally.
 ```bash
 tmux new -s corpus
 # 1. Pull  (~14 min here)
-curl -X POST 'http://localhost:8080/api/ingestion/clinicaltrials' \
+curl -X POST 'http://localhost:8081/api/ingestion/clinicaltrials' \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"condition":"breast cancer","maxStudies":5000}'
 
 # 2. Backfill  (~25 min HERE; expect 2-3 HOURS on a small VPS)
-curl -X POST 'http://localhost:8080/api/rag/backfill' -H "Authorization: Bearer $TOKEN"
+curl -X POST 'http://localhost:8081/api/rag/backfill' -H "Authorization: Bearer $TOKEN"
 ```
 
 Get `$TOKEN` from `/api/auth/login` — **every endpoint now requires a JWT.**
@@ -223,7 +239,7 @@ change, so it costs a full re-index whenever it is adopted; cheaper now than lat
 scp .claude/patient-data/patient-diagnosis.csv \
     .claude/patient-data/patient-variant.csv \
     .claude/patient-data/patient-prior-treatment.csv \
-    root@HOST:/opt/cancer/.claude/patient-data/
+    cancer:/opt/cancer/.claude/patient-data/
 ```
 
 On the server: `chmod 700` the directory, `chmod 600` the files.
@@ -236,7 +252,7 @@ sit there for no functional reason.
 Restart; `PatientSeedLoader` creates `AppUser` + the three patient rows. Then:
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" 'http://localhost:8080/api/appuser?page=0&size=5'
+curl -s -H "Authorization: Bearer $TOKEN" 'http://localhost:8081/api/appuser?page=0&size=5'
 ```
 
 ⚠️ **Extids regenerate.** The prod AppUser extid differs from local — every Rank Trials call is
@@ -258,7 +274,7 @@ server {
     server_name breastcancertrialfinder.com www.breastcancertrialfinder.com;
 
     location / {
-        proxy_pass http://localhost:8080;
+        proxy_pass http://localhost:8081;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
         # LoginRateLimitFilter reads this. Nginx OVERWRITES rather than appends, so a client
@@ -270,7 +286,7 @@ server {
     # Ingestion and backfill run for minutes to hours. Nginx's 60s default kills them.
     # Raised only on these paths, so a genuinely hung request elsewhere still fails fast.
     location ~ ^/api/(ingestion|rag/backfill) {
-        proxy_pass http://localhost:8080;
+        proxy_pass http://localhost:8081;
         proxy_set_header Host $host;
         proxy_read_timeout 4h;
         proxy_send_timeout 4h;
