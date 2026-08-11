@@ -35,8 +35,61 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RetrievalEvaluation {
 
     private static final String BASE = "http://localhost:8080/api/rag/search";
+    private static final String LOGIN = "http://localhost:8080/api/auth/login";
     private static final HttpClient HTTP = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(3)).build();
+
+    /**
+     * Credentials for the authenticated API. Endpoint security is on, so this measurement has
+     * to log in like the frontend does — an unauthenticated call now returns 401, which would
+     * read as "retrieval is broken" rather than "the harness never logged in".
+     *
+     * <p>Override with {@code -Deval.username=} / {@code -Deval.password=}. No password is
+     * committed: unset means the login is skipped and the run reports why.
+     */
+    private static final String USERNAME = System.getProperty("eval.username", "jeb");
+    private static final String PASSWORD = System.getProperty("eval.password", "");
+
+    /** Cached bearer token, fetched once per run. */
+    private static String token;
+
+    /**
+     * Logs in and caches the JWT.
+     *
+     * @return the token, or null when no password was supplied
+     */
+    private static String token() {
+        if (token != null) {
+            return token;
+        }
+        if (PASSWORD.isBlank()) {
+            return null;
+        }
+        try {
+            String body = "{\"username\":\"" + USERNAME + "\",\"password\":\"" + PASSWORD + "\"}";
+            HttpResponse<String> r = HTTP.send(
+                    HttpRequest.newBuilder(URI.create(LOGIN))
+                            .header("Content-Type", "application/json")
+                            .timeout(Duration.ofSeconds(30))
+                            .POST(HttpRequest.BodyPublishers.ofString(body)).build(),
+                    HttpResponse.BodyHandlers.ofString());
+            if (r.statusCode() != 200) {
+                return null;
+            }
+            Matcher m = Pattern.compile("\"token\"\\s*:\\s*\"([^\"]+)\"").matcher(r.body());
+            token = m.find() ? m.group(1) : null;
+            return token;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** A GET carrying the bearer token when one is available. */
+    private static HttpRequest.Builder authorized(String url) {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url));
+        String t = token();
+        return t == null ? b : b.header("Authorization", "Bearer " + t);
+    }
 
     /**
      * @param query        the search text
@@ -122,13 +175,19 @@ class RetrievalEvaluation {
         String failure;
         try {
             HttpResponse<String> r = HTTP.send(
-                    HttpRequest.newBuilder(URI.create(BASE + "?query=ping&maxTrials=1"))
+                    authorized(BASE + "?query=ping&maxTrials=1")
                             .timeout(Duration.ofSeconds(30)).GET().build(),
                     HttpResponse.BodyHandlers.ofString());
             if (r.statusCode() == 200) {
                 return;
             }
-            failure = "backend returned HTTP " + r.statusCode();
+            // 401 means the harness is unauthenticated, not that retrieval is broken. Say so,
+            // because the two failures look identical from a red test.
+            failure = r.statusCode() == 401 || r.statusCode() == 403
+                    ? "backend returned HTTP " + r.statusCode()
+                            + " - endpoint security is on and this run has no token. Pass"
+                            + " -Deval.password=... (and -Deval.username= if not 'jeb')"
+                    : "backend returned HTTP " + r.statusCode();
         } catch (Exception e) {
             failure = "backend unreachable on :8080 (" + e.getClass().getSimpleName()
                     + ": " + e.getMessage() + ")";
@@ -148,7 +207,7 @@ class RetrievalEvaluation {
             String url = BASE + "?maxTrials=1&query="
                     + URLEncoder.encode(query, StandardCharsets.UTF_8);
             HttpResponse<String> r = HTTP.send(
-                    HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(60)).GET().build(),
+                    authorized(url).timeout(Duration.ofSeconds(60)).GET().build(),
                     HttpResponse.BodyHandlers.ofString());
             return r.body();
         } catch (Exception e) {

@@ -20,7 +20,7 @@ Verified 2026-08-10, end of session:
 | Qdrant | **136,345 chunks**, 133,140 HNSW-indexed, 384 dims, Cosine. 60/60 sampled trials covered |
 | AppUser / PatientDiagnosis / PatientVariant / PatientPriorTreatment | 1 row each — **auto-seeded** |
 | SavedTrialMatch | 0 |
-| Tests | `:database` 820, `:datafetcher` 55, root 3, `:rag` 35 — passing. `RetrievalEvaluation` needs a running backend, see below |
+| Tests | `:database` 820, `:datafetcher` 55, root **71**, `:common` 12, `:rag` 35 — all passing, 0 skipped (2026-08-11). `RetrievalEvaluation` needs a running backend, see below |
 | Branch | `qdrant-fixes`, committed, **not pushed**. `main` is 6 behind. |
 
 **The demo happened and went well, and the corpus is complete and searchable.** Both blockers
@@ -28,9 +28,14 @@ from the last session are gone.
 
 ### Do this first when you return
 
-**Pick up Tier 2 matching.** The corpus and retrieval questions are both settled (below), so
-the thing that actually improves the tool is unblocked. Its one blocking decision is
-backend-vs-frontend; see "Candidate next steps".
+**Wire up the Rank Trials page.** The matching service is built, measured against the full
+corpus, and its two worst bugs are fixed; the disease-type gate landed 2026-08-11 and took
+receptor silence from 77% down to 55%. What stands between here and a usable page is the REST
+boundary — a controller, a converter, and a response DTO, none of which exist. The
+backend-vs-frontend decision is settled: it is in the backend, in code.
+
+⚠️ **Run `CorpusSweep` after any pattern change.** The 41 unit tests passed while the treatment
+signal was producing 550 false concerns; only the corpus caught it.
 
 ### The retrieval question is answered: it was the corpus, not the model
 
@@ -261,6 +266,332 @@ now that the database holds a real medical record rather than sample data.
 ---
 
 ## What's built
+
+### Tier 2 matching is half-built and uncommitted — 2026-08-11
+
+The service layer exists on disk and **nothing calls it**. No controller, no converter, no
+response DTO, no frontend. It compiles and the new `:common` test suite passes.
+
+Two decisions the previous session left open are settled in code. **Matching lives in the
+backend**, not the frontend where Tier 1 sits — it has to be testable against the whole corpus
+in bulk, inform ranking, and be reusable by Tier 3, none of which the browser can do. And
+**there is no fit score**: `TrialAssessment` exposes concern/unknown/pass/applicable counts
+instead of the old `signals_matched / 6`, which was unreachable by construction and counted
+keyword co-occurrence rather than whether the patient qualifies.
+
+Four signals: receptor polarity, treatment line against CDK4/6 history, PI3K pathway, and US
+location. Each returns the criteria phrase that produced it, so a flag is never an unexplained
+verdict.
+
+✅ **The exclusion-context check now exists — 2026-08-11.** It was described in the class's own
+javadoc and had never been written; criteria were read as one flat string, so a phrase meant
+the same thing whether the trial required it or ruled it out.
+
+**It reuses `EligibilityCriteriaChunker` from `:rag` rather than re-parsing.** Root already
+depends on `:rag`, so no new module edge was needed. That parser is the one producing the
+`isExclusion` metadata retrieval filters on, tuned against 50 real trials and surveyed across
+all 4,634 — so there is one parser to keep correct, and a block this evaluator cannot attribute
+to a section is the same block retrieval cannot attribute either.
+
+What changed in behaviour:
+
+- **A trial that excludes triple-negative disease is now a PASS**, not a concern. It was the
+  worst case: TNBC is tested first and returns immediately, so ruling it out demoted a trial
+  this hormone-positive patient actually fits.
+- **Excluding HER2-positive disease reads as a HER2-negative requirement**, which is how many
+  trials state it. The old `!her2NegAlsoMentioned` guard suppressed that false concern only
+  when the trial happened to also write "HER2-negative" somewhere — **coincidence, not
+  design**. An exclusion with no such phrase slipped straight through.
+- **Prior CDK4/6 under Exclusion is a bar, not a requirement.** Previously read as a
+  post-CDK4/6 trial.
+- **UNPARSED blocks are read as inclusion**, unchanged from before. Legacy
+  "DISEASE CHARACTERISTICS:" records never stated a division and inventing one would invert
+  text that never said so.
+
+⚠️ **`POST_CDK46` misses the most common phrasings, found while testing this.** It requires
+"prior" adjacent to "CDK", so *"prior treatment with a CDK4/6 inhibitor"*, *"received a CDK4/6
+inhibitor"* and *"any prior therapy with a CDK4/6 inhibitor"* all miss — only the terse *"prior
+CDK4/6"* hits. Inside an exclusion section this no longer matters, since naming the class is
+itself the bar and a separate `CDK46_MENTIONED` pattern handles it. **On the inclusion side the
+gap is still open**, so a post-progression trial using the common wording reports NOT_APPLICABLE
+instead of comparing against her CDK4/6 history.
+
+**52 tests cover the evaluator**, including the six inversion cases, the phrasings above, and
+six real trials the corpus sweep flagged wrongly.
+
+### Treatment-line signal bound to the drug class — 2026-08-11
+
+Found by the corpus sweep below, not by review. `TREATMENT_NAIVE` matches "first-line" and
+"untreated", and it was read against a whole concatenated section — so **any** trial in **any**
+disease saying "previously untreated" was compared against her CDK4/6 history. Result:
+**550 concerns and zero passes** across 4,634 trials, with sampled flags reading *"no prior
+treatment for their DLBCL"*, *"Relapsed AML"*, and *"untreated with anti-tumor therapy for
+rectal cancer"*.
+
+Two changes fixed it. **Patterns now co-occur within a single criterion**, not a section —
+`sectionsOf` returns the individual criteria and `firstCriterionMatching` requires both patterns
+in one of them. A section is every criterion concatenated, so co-occurrence there implies
+nothing. And a new `RELEVANT_THERAPY_CLASS` pattern requires CDK4/6, one of its three drugs, or
+endocrine therapy to be named in that same criterion — endocrine belongs there because she is on
+abemaciclib **plus** letrozole, so an endocrine-naive requirement bears on her directly.
+
+**Measured after: 550 → 160 concerns.** 390 false flags removed, and the remaining sample is
+entirely CDK4/6 or endocrine.
+
+A third adjacency bug surfaced in testing: `TREATMENT_NAIVE` required "prior" adjacent to
+"therapy", so *"no prior endocrine therapy"* missed. Same trap as `POST_CDK46`, now fixed with a
+bounded gap.
+
+⚠️ **`Treatment history` still reports zero passes, and that is correct rather than broken.**
+A pass requires `isNaive()` and she is not. The signal can only ever demote her — worth knowing
+before it feeds a ranking.
+
+### Known limitation: carve-outs inside exclusion criteria
+
+**Deliberately not fixed — decision 2026-08-11.** An exclusion criterion naming CDK4/6 is read
+as a bar, but ~15% of them contain a permission instead.
+
+Measured across the corpus: **39 trials name CDK4/6 in an exclusion criterion.**
+
+| Shape | Count | Flag correct? |
+| --- | --- | --- |
+| Hard lifetime bar | **29 (74%)** | Yes |
+| Washout / recency window | 4 (10%) | Partly — a timing question, not disqualification |
+| Explicit carve-out | 6 (15%) | **No — the criterion admits her** |
+
+The carve-outs have no common keyword: *"may participate as long as..."* (NCT07060807),
+*"except hormonal therapy in combination with a CDK 4/6 inhibitor"* (NCT07137871), a bare
+parenthetical (NCT05362760). **NCT04523857 is the trap** — it carves out *"prior CDK4/6 therapy
+with an agent other than abemaciclib"*, which still excludes her, so a naive carve-out rule
+would turn a correct flag into a miss.
+
+A keyword list for this would re-create the brittleness that produced the 550 false concerns,
+on exactly the criteria where nuance decides eligibility. The considered alternative was
+downgrading carve-out wording to UNKNOWN rather than CONCERN — honest under the no-verdicts
+rule, since these are genuinely questions. **Deferred; the tool over-flags ~10 trials in 4,634
+and that was judged acceptable against the risk of a wrong fix.**
+
+⚠️ One diagnostic wrong turn worth not repeating: NCT07044310 was briefly recorded as a chunker
+boundary bug. It is not — the chunker filed the line correctly, and the trial genuinely excludes
+her (*"Receiving or will receive CDK 4/6 inhibitor"*, and it is a stage 0-III trial while she is
+stage IV). The error came from locating lines with a substring search rather than by line index.
+
+### Receptor patterns widened — 2026-08-11
+
+`HORMONE_POSITIVE_REQUIRED` matched `HR`, `ER` and `hormone receptor` but not the spelled-out
+`estrogen receptor positive` or `progesterone receptor positive`, so trials writing it longhand
+scored NOT_APPLICABLE. **A missed PASS on this patient's most important axis** — she is ER
+positive. Now matches the full words, the `(ER)`/`(PR)` parenthetical abbreviation form,
+and `PgR`, which is the pathology-report spelling of progesterone receptor.
+
+**`HER2[\s-]?(negative|-\b)`'s `-\b` branch never fired.** A hyphen followed by a space is not
+a word boundary, so `HER2- metastatic` missed while `HER2-negative` hit via the other branch —
+the alternative contributed nothing but looked like it handled the shorthand. The positive side
+*did* handle `ER+`/`HR+`, so the asymmetry was invisible in review. Fixed with an explicit
+lookahead.
+
+Verified not to regress: `HER2 non-amplified` and `HER2 not amplified` still correctly miss the
+HER2-positive pattern, so this patient's low-positive IHC record does not false-positive.
+
+### The Rank Trials endpoint — 2026-08-11
+
+`GET /api/matching/rank/{appUserExtid}?breastOnly=&limit=` ranks the corpus against the record
+already on file, best first. `GET /api/matching/trial/{trialExtid}/for/{appUserExtid}` assesses
+one trial, for Trial Detail. Both extid-only; controller plus package-private converter in one
+file, per the existing convention.
+
+**Verified live against the real record.** The top hits are genuinely the patient's profile — PI3K-pathway
+HR+/HER2− breast trials with US sites — and every signal carries its quoted criteria text
+through to the response.
+
+**Ranking is lexicographic over honest counts**, since there is deliberately no score to sort
+on: breast trials first, then fewest concerns, then most passes, then most applicable signals.
+That last tier matters — a trial the tool could say something about outranks one it was silent
+on, because silence is not a pass.
+
+**`breastOnly` defaults to false and filters *before* assessment.** It is the one parameter that
+hides trials, so per the no-verdicts rule it is an explicit caller choice rather than a default
+the patient never sees. Filtering first also skips the expensive per-trial work on the ~54% of
+the corpus that is other diseases; the pre-filter calls `diseaseTypeSignal` rather than
+re-implementing it, so it cannot drift from the reported signal.
+
+⚠️ **`SecurityConfig` is still `.anyRequest().permitAll()`.** This endpoint returns a patient's
+assessment keyed on a guessable path — one more reason that item matters before anything leaves
+localhost.
+
+### "Trials for You" — the page she actually uses — 2026-08-11
+
+`frontend/src/pages/RankedTrials.tsx`, route `/ranked-trials`, **first in the nav, ahead of
+Trial Search** — it is the one page that asks nothing of the reader. Trial Search requires
+knowing what to type; this uses the Patient Record already on file.
+
+**Runs on a button press, never on page load.** Ranking assesses thousands of trials in one
+request and takes tens of seconds, so an unbidden spinner would read as a hang. The pending
+state says "This can take up to a minute" for the same reason — for someone waiting, saying so
+is the difference between "working" and "broken".
+
+**Locations are on the card, directly under the trial title.** Requested by the user
+2026-08-11: *"they need to travel to those cities"*. Travel is often what decides whether a
+trial is possible at all — a perfect biological match three states away may be out of reach and
+a mediocre one nearby may not be — so the cities belong beside the trial name, not inside a
+signal a reader has to expand.
+
+They were technically present before and effectively invisible: the location signal is a PASS,
+and the page collapses passes behind "What matched", so she would never have seen them. Two
+changes fixed that.
+
+- `TrialAssessment` now carries `siteCities`, `siteCount` and `hasUnitedStatesSite` as
+  structured fields, so the card renders them rather than parsing them back out of prose.
+  `CriteriaSignalEvaluator.siteLabels` is shared with the signal, so the two cannot drift.
+- The signal's own sample went from **3 cities to 8**, and the detail sentence now names them.
+  "and 9 more" hid exactly the city that might be an hour away.
+
+Non-US trials show their countries with an "Outside the United States" prefix in amber, rather
+than appearing to have no locations. A trial with none says so plainly.
+
+**Verified live 2026-08-11.** All 50 top-ranked trials return real cities — "Chicago, Illinois ·
+Boston, Massachusetts · Las Vegas, Nevada and 3 more" — with zero missing. Ranking sorts US
+trials to the top, so the non-US path had to be checked directly: **NCT05753657**, the
+single-site trial (outside the US) that ranked first in the 2026-08-08 search, now reports
+`hasUnitedStatesSite: false`, `siteCities: ["Israel"]` and a CONCERN, instead of silently
+looking local. That trial is the reason geography became a signal at all.
+
+Three decisions about what she sees, all following from the no-verdicts rule:
+
+- **Counts, never a percentage.** "2 to check · 1 to ask about · 4 matched", not a fit score.
+- **Concerns and open questions are shown; matches are collapsed behind "What matched".** A
+  green checklist reads like an eligibility verdict, and this tool does not make that call.
+- **Quoted criteria text sits behind a "why?" toggle on every flag.** A reader has to be able
+  to check the reasoning rather than trust it, but the wall of trial text should not be the
+  first thing they see.
+
+An amber callout states plainly that this is a starting point for conversations, not medical
+advice; that only her care team decides eligibility; and that **a trial is never hidden because
+of a flag**.
+
+"Only breast cancer trials" is a checkbox, on by default, mapping to `breastOnly`. It is the one
+control that hides anything, so it is visible and reversible rather than silent.
+
+Typecheck and production build clean. Lint has only the pre-existing `Login.tsx` error.
+
+**Measured 2026-08-11, after the batch-location fix:**
+
+| Call | Time |
+| --- | --- |
+| `breastOnly=true`, limit 50 (the default the page sends) | **4.3s** |
+| `breastOnly=false`, whole corpus | 8.6s |
+
+Down from 43 seconds. Repeat runs are stable at ~4.2s, so it is not warm-cache luck. The
+"up to a minute" wording in the pending state is now conservative rather than accurate — worth
+softening once it has been watched under real use.
+
+### Locations are fetched in batches — 2026-08-11
+
+The first live ranking call took **43 seconds**. `assess()` ran one location query per trial, so
+ranking ~2,000 breast trials meant ~2,000 round trips — the same N+1 shape that makes
+normalization 99.3% of an ingestion run.
+
+`LocationDbService.findByTrialIds` now fetches them grouped by trial id, chunked at 500 to stay
+under MySQL's placeholder limit, and `assessAll` passes the map down. The single-trial path is
+unchanged and still pays one query. A trial with no locations is **absent from the map rather
+than mapped to an empty list**, so "no locations recorded" stays distinct from "not asked
+about" — which is what the location signal reports as UNKNOWN.
+
+**Measured: 43s → 4.3s** for the breast corpus (~2,000 trials), 8.6s for all 4,634. Verified
+live 2026-08-11; `:database`'s 820 tests re-run in full because this touched a shared
+repository and db service.
+
+### The first live run found a bug the sweep missed — 2026-08-11
+
+**NCT05894239 requires HER2-positivity. She is HER2-negative. It scored zero concerns and ranked
+4th.**
+
+`HER2_POSITIVE_REQUIRED` matched `positive` but the trial writes **"documenting
+HER2-positivity"**, so nothing fired. Now `positiv\w*`, and the negative side is `negativ\w*`
+since `negativity` had the identical gap.
+
+The section-wide `!her2NegRequired` guard was also removed in favour of a per-criterion test
+that ignores criteria naming *both* polarities — those are stating a comparison
+("HER2-negative or HER2-positive by local testing"), not a requirement. That guard was the same
+coincidence-based logic flagged earlier, this time suppressing correct concerns.
+
+⚠️ **The corpus sweep did not catch this and could not have.** The sweep measures distributions;
+this was one trial in 4,634 and the aggregate looked healthy. Only ranking — putting the best
+trials on top and reading them — surfaced it. **Ranking is a different test from sweeping, and
+it is the one that matches how the tool is actually used.** Re-swept after the fix: 11 trials
+moved PASS → CONCERN, exactly the expected HER2-positive reclassification.
+
+### Tier 2 measured against the corpus — 2026-08-11
+
+**The unit tests said the evaluator worked; the corpus said it did not.** 41 tests passed while
+the treatment signal was producing 550 false concerns. The tests were written by whoever wrote
+the patterns, against phrasings they chose — circular in the way that matters. This measurement
+is what caught it, and it is the same measure-before-building step skipped on 2026-08-08.
+
+`CorpusSweep` (root test sources) runs the real evaluator over every trial via `/api/trial`,
+read-only. Off by default; enable with `-Dsweep.enabled=true`, size with `-Dsweep.limit=N`.
+It prints an outcome distribution plus samples with evidence text for hand-checking — **the
+distribution alone looks healthy while being wrong, so the samples are the point.**
+
+Full corpus, 4,634 trials, against the real record (ER+/PR−/HER2−, PIK3CA detected, CDK4/6
+CURRENT, PI3K NEVER):
+
+| Signal | PASS | CONCERN | UNKNOWN | N/A |
+| --- | --- | --- | --- | --- |
+| Receptor status | 513 (11.1%) | 555 (12.0%) | 0 | 3,566 (77.0%) |
+| Treatment history | 0 | **160 (3.5%)** — was 550 | 0 | 4,474 (96.5%) |
+| PI3K pathway | 60 (1.3%) | 0 | 0 | 4,574 (98.7%) |
+
+**Receptor signals hand-checked and correct.** Concerns are genuinely triple-negative or
+HER2-positive trials; passes are real, including ones only the widened regex catches.
+
+**The unparsed rate is 5.3% (244 trials)** — close to the 4% estimated from a 50-trial sample,
+so that estimate was sound.
+
+One thing the distribution exposes that is not a bug:
+
+- **PI3K raises zero concerns** because the only concern branch needs `isRuledOut()` and she is
+  `DETECTED` — unreachable for this patient. With 98.7% NOT_APPLICABLE the signal is near-silent,
+  and its `PIK3CA|PI3K|AKT1|PTEN` pattern matched a BRCA/PTEN **germline carrier** line
+  (NCT03729115) that has nothing to do with PI3K as a trial target. Narrowing it is open work.
+
+### The disease-type gate — 2026-08-11
+
+**Built in response to the sweep above**, which showed the other signals reporting 77-88%
+NOT_APPLICABLE because they were being asked about colorectal, AML and DLBCL studies.
+`diseaseTypeSignal` is now the first signal on every assessment.
+
+**It reads the title and summary, never the criteria.** Criteria text mentions breast in passing
+on pan-tumour studies — "solid tumors including breast" — so gating on it admits exactly the
+trials the gate exists to catch. Title-or-summary reproduces the corpus's known 45.5% breast
+share, which is the check that it reads the right fields.
+
+**A concern, never a removal.** A basket trial can still be open to her, and per the no-verdicts
+rule an off-topic trial demoted to the bottom of a list is recoverable where a deleted one is
+not. Basket trials — three or more other tumour types named — report UNKNOWN rather than PASS or
+CONCERN, since whether they are currently enrolling breast patients is a real question.
+
+Measured across all 4,634 trials: **2,046 PASS (44.2%), 2,521 CONCERN (54.4%), 67 UNKNOWN
+(1.4%)**. Hand-checked concerns are correct — colorectal, Barrett's oesophagus, oral lesions,
+head and neck.
+
+**What the other signals look like on the 2,046 breast trials**, which is the population a
+ranked list would actually draw from:
+
+| Signal | PASS | CONCERN | N/A |
+| --- | --- | --- | --- |
+| Receptor status | 473 (23.1%) — was 11.1% | 440 (21.5%) | 1,133 (55.4%) — was 77.0% |
+| Treatment history | 0 | 142 (6.9%) | 1,904 (93.1%) |
+| PI3K pathway | 46 (2.2%) | 0 | 2,000 (97.8%) |
+
+**Receptor coverage roughly doubles** and its silence drops from 77% to 55%. The signals were
+always working; they were being diluted by a corpus that is 54% other diseases.
+
+⚠️ **10 trials in 4,634 are breast studies that never write "breast"** — surgical-technique and
+mammography-outreach studies saying "mastectomy", "nipple-sparing", "axillary". Adding those as
+proxy terms was considered and rejected: the same sweep found one of the 10 is a **lung** cancer
+screening study, so the proxies import noise into the one signal whose job is removing it. None
+of the 10 are treatment trials.
 
 ### Backfill skips what is already indexed — new 2026-08-10
 
@@ -698,6 +1029,144 @@ without a full re-embed, since backfill skips what is already indexed.
 
 ---
 
+## Login rate limiting — 2026-08-11, verified live
+
+`LoginRateLimitFilter` throttles `/api/auth/login` and `/register`: 8 consecutive failures →
+**429 with `Retry-After`** for 15 minutes. Configurable via `LOGIN_MAX_ATTEMPTS` /
+`LOGIN_LOCKOUT_MINUTES`. Registered ahead of `UsernamePasswordAuthenticationFilter` so a
+locked-out caller is refused before any bcrypt work — otherwise the throttle still pays the cost
+of every guess.
+
+⚠️ **Keyed on IP + username. The first version was IP-only and that was a denial of service** —
+caught by the very next check after "it works". Eight probes against a *nonexistent* username
+locked the real account out of the same machine (`login jeb -> 429`). Behind Nginx or CGNAT
+everyone shares an address, so an attacker could have locked the patient out of her own tool at
+will. The IP half is kept as well: without it, one attacker locks a known username from anywhere.
+
+Reading the username means reading the request body in a filter, and a servlet input stream is
+single-pass — `CachedBodyRequest` buffers and replays it, or the controller receives an empty
+body and every login breaks. Extraction is a bounded regex, not a JSON parse: this runs
+pre-authentication on a public endpoint and must not throw on hostile input.
+
+**Verified live, all four cases:**
+
+| Check | Result |
+| --- | --- |
+| 9 failures on a junk username | `401 ×8` then **429** ✓ |
+| `jeb` from the same machine | **200** — unaffected ✓ |
+| 8 failures on `jeb`, then the *correct* password | **429** — lockout real ✓ |
+| `admin` while `jeb` is locked | **401**, not 429 — isolated ✓ |
+| Empty body | **400** validation — body still reaches the controller ✓ |
+
+**Recovery: the counter is in-memory, so a backend restart clears any lockout instantly.** Worth
+knowing before locking yourself out of prod.
+
+There is now a **`login-rate-limit` skill** in `~/.claude/skills/` carrying this implementation,
+the IP+username trap as its first design point, and the test that catches it. The user asked for
+it so the pattern reaches his other projects.
+
+## ⚠️ The authorization gap — found 2026-08-11, doors closed, gap deferred
+
+**The app authenticates but does not authorize.** The user asked the right question — *"users
+should only be able to see their stuff"* — and the answer is that they cannot today.
+
+Every patient endpoint takes its target from the URL: `/api/matching/rank/{appUserExtid}`,
+`/api/patientdiagnosis/by-appuser/{extid}`, and the same `by-appuser` shape on variants and
+prior treatment. **Nothing compares that extid to the caller.** `SecurityContextHolder` is
+written once by `JwtAuthenticationFilter` and never read again — no controller or service
+references it. Roles are granted and never checked, so `ROLE_USER`/`ROLE_ADMIN` are decorative.
+`AppUser` has no FK to the login `User`; they match on a username string.
+
+**Three doors closed the same day, each verified against the running app:**
+
+- ✅ **`/api/auth/register` was anonymous.** A stranger could POST, receive a valid JWT, and read
+  everything. **Proven: HTTP 201 with a working token.** Now ADMIN-only, via `@PreAuthorize`
+  *and* a filter-chain rule. ⚠️ `@EnableMethodSecurity` was **not** enabled — `@PreAuthorize`
+  would have been silently ignored and the endpoint would have looked protected while standing
+  open. Now enabled.
+- ✅ **Soft-deleted users could still log in.** `DELETE /api/user/{extid}` returns 204 and sets
+  INACTIVE, but `loadUserByUsername` had no active filter. **Proven: delete 204, then login
+  200.** A delete that does not revoke is worse than none — it reports success and changes
+  nothing. Now refused.
+- ✅ **A `log.warn` printed bcrypt hashes** on every registration. A password hash in a log file
+  is a credential in plaintext on disk and in any log shipper. Removed.
+
+⚠️ **Existing JWTs survive a delete.** Tokens are stateless and nothing can recall one; deleting
+an account stops new logins only. A token blacklist or short expiry is the fix if that ever
+matters.
+
+**The real fix, deferred: resolve identity from the token, not the URL.**
+`/api/matching/rank/me`, with the server reading the username from `SecurityContextHolder` and
+looking up that AppUser — so a caller has nowhere to name someone else. Same for every
+`by-appuser` endpoint, plus the frontend calls.
+
+**Acceptable for a single-patient demo with registration closed and one strong password. It
+becomes a live problem the moment a second real user exists.**
+
+## Getting her record onto prod — decided 2026-08-11, not yet done
+
+**Only three files go to the server, 4.4 KB total**: `patient-diagnosis.csv`,
+`patient-variant.csv`, `patient-prior-treatment.csv`. `scp` straight into
+`.claude/patient-data/`, `700` on the directory and `600` on the files, owned by the app user —
+never through git, never through the app.
+
+⚠️ **`my-health-summary.pdf` (21 MB) never goes to the server. Decided by the user, permanently.**
+Nor do `mri-scan.md` or `pet-scan-2026-03-16.md`. `PatientSeedLoader` does not read any of them
+— they were the source documents used to populate the CSVs. Shipping them would put the largest
+concentration of her medical data on a hosted box for no functional reason. **This is the single
+biggest risk reduction available in the whole deploy and it costs nothing.**
+
+The eventual replacement, per the user: a feature where a patient drops in their own medical
+history and AI parses it into the structured fields. That keeps the source document transient
+rather than resident.
+
+**Order on the server: corpus first, patient data last.** The trial rebuild is 2-3 hours; her
+record on a box with no trials to match against demonstrates nothing.
+
+**Vocabulary verified 2026-08-11** — all controlled values in the three CSVs match
+`frontend/src/types/api.ts` (`RECEPTOR_STATUS`, `RECEPTOR_SUBTYPE`, `VARIANT_STATUS`,
+`TREATMENT_STATUS`, `STAGE_SYSTEM`, `MENOPAUSAL_STATUS`). The 2026-08-09 drift that rendered
+dropdowns blank has not regressed. Re-run this check before any future push; the backend stores
+plain varchars and will accept a wrong value silently.
+
+⚠️ **Extids regenerate on prod.** Any URL or script keyed on a local extid will not work there —
+including the AppUser extid used in every Rank Trials call. Fetch the prod one after seeding.
+
+⚠️ **Her UI edits will silently revert.** `PatientSeedLoader` seeds-if-absent and never syncs, so
+once she edits her record through the app the CSVs are stale and the next rebuild reverts her
+changes. Acceptable for a demo; a real data-loss path if she starts using it in earnest.
+
+**Still accepted rather than solved:** prod will hold a real medical record with **no encryption
+at rest and no access log**. Auth, HTTPS and login rate limiting close the paths that matter
+most; these two remain, and the user has chosen to proceed knowingly for a single-patient tool
+on his own host.
+
+## The deploy runbook — written 2026-08-11
+
+**`hosting/DEPLOY_RUNBOOK.md` is the current deployment document.** Seven phases, ordered, with
+the verification block at the end. It supersedes `_archive/hosting/qa-setup.md` for anything
+security- or architecture-related; that guide's infrastructure steps are still good and are
+folded in by reference.
+
+**Four things the archived guide gets wrong**, each of which would break a deploy:
+
+- It serves the frontend from Nginx at `/var/www/cancer`. **Wrong architecture** —
+  `buildDeployment` bundles the SPA *inside the jar* and Spring serves it. Following the old
+  guide gives two copies of the frontend, and Nginx serves whichever was last copied by hand.
+- The jar is `cancer-0.0.2-SNAPSHOT.jar`, not `cancer-server.jar`.
+- It health-checks `/actuator/health`. **There is no actuator dependency in this project.**
+- Its security checklist describes the pre-2026-08-11 state and its step 15 is truncated
+  mid-sentence.
+
+`_archive/hosting/setup-n8n-user.md` is local-only: it recreates the MySQL user with the `'%'`
+wildcard for a Docker n8n container. **Do not apply it to prod** — keep the account scoped to
+`localhost`.
+
+**A real bug was found while writing it:** `cors.allowed.origins` existed only as a `@Value`
+default in `WebConfig` and was **not in `application.yml`**, so `CORS_ALLOWED_ORIGINS` would not
+have bound — the browser would have blocked every API call from the real domain, failing
+client-side with no server-side error. Property added.
+
 ## Deploying to QA (Hostinger KVM) — analysed 2026-08-08, not started
 
 **The user raised deploying on 2026-08-10** and chose to clear the security blockers first.
@@ -771,16 +1240,44 @@ against the corpus in bulk, cannot inform ranking, and cannot be reused by Tier 
 2. **Tier 2 matching** — use diagnosis fields to build retrieval queries against indexed
    criteria, reusing the existing `isExclusion` chunk metadata so a high-scoring exclusion match
    is shown as a concern rather than a fit. `DIAGNOSIS_MATCHING_DESIGN.md` §4.
+   **The service layer for this exists uncommitted** — see "Tier 2 matching is half-built" below.
+3. **A "Rank Trials for Me" page** — the thing the whole tool is for, and the piece that turns
+   Tier 2 from service code into an answer. One button: take the patient record already on file,
+   run it against the corpus, and come back with trials ordered best-first with the concerns and
+   open questions attached to each.
+
+   The user should not have to compose a search. Trial Search asks someone to know what to type;
+   this page asks nothing and uses the record they already filled in across the three Patient
+   Record tabs.
+
+   Two things it must not do, both settled already and both easy to lose here: **no fit
+   percentage** — order by concern count and applicable-signal count, never a number that reads
+   like a probability — and **nothing is removed**, so a receptor mismatch demotes and flags but
+   still appears, because receptor status can be re-tested and the judgement is not the tool's to
+   make.
+
+   Ordering is the open question. Retrieval score and concern count are different axes and it is
+   undecided which leads; `assessAll` deliberately preserves caller order rather than guessing.
+
+   **No longer blocked** — the exclusion-context check landed 2026-08-11, so a trial that rules
+   out triple-negative disease now reads as a fit rather than a concern. What stands between
+   here and the page is the REST boundary: a controller, a converter, and a response DTO, none
+   of which exist. The service layer is done and tested.
+
+   ✅ **The disease-type gate landed 2026-08-11**, so a ranked list no longer has to carry the
+   54% of the corpus that is other diseases. It demotes rather than filters, so the page still
+   has to decide whether to hide non-breast trials behind a toggle or just rank them last.
+4. **The after-commit event hook** so new ingestions index themselves — `datafetcher` publishes
 3. **The after-commit event hook** so new ingestions index themselves — `datafetcher` publishes
    a Spring event (type declared in `:database`), `:rag` consumes it after commit. Avoids the
    `datafetcher` → `:rag` cycle and keeps a Qdrant outage from rolling back ingested data.
    `RAG_PLAN.md` §3 and §6 settle the design.
-4. **The join tables**, extid-only from the start, then condition/sponsor/phase filters on Trial
+5. **The join tables**, extid-only from the start, then condition/sponsor/phase filters on Trial
    Search and sections on Trial Detail.
-5. **Generation** (`RAG_PLAN.md` §9) — the grounded "why might this fit" answer with citations.
+6. **Generation** (`RAG_PLAN.md` §9) — the grounded "why might this fit" answer with citations.
    Deferred until retrieval was proven; it now is. The chunk-per-criterion strategy is what
    makes line-level citation possible.
-6. **Restore endpoint security** before this goes anywhere but localhost.
+7. **Restore endpoint security** before this goes anywhere but localhost.
 
 ---
 
@@ -805,9 +1302,17 @@ uncommitted work above.
 | `739937b` | merged | This document, updated for the session |
 | `77c0db0` | `qdrant-fixes` | Vector-store readiness check, startup warning, `QDRANT_SETUP.md` |
 
-Test counts: `:database` **820**, `:datafetcher` 55, root 3 — passing. `:rag` has one
-expected failure (see "Do this first" above). Frontend typecheck and build clean; one
-pre-existing lint error in `Login.tsx`.
+Test counts, all re-run 2026-08-11 with the backend stopped and read from the test XML rather
+than the build result: `:database` **820**, `:datafetcher` 55, root **71**, `:common` 12,
+`:rag` 35 — **0 skipped, 0 failures** everywhere. `:database` was re-run in full because the
+batch-location work touched a shared repository and db service.
+
+`:rag`'s one skip is `RetrievalEvaluation`, which needs a running backend; it fails loudly
+without one by design, and was run with `-Deval.skipWithoutBackend=true`. Root's 71 includes
+`CorpusSweep`, which self-skips unless `-Dsweep.enabled=true` — so a normal build never depends
+on a live backend.
+
+Frontend typecheck and build clean; one pre-existing lint error in `Login.tsx`.
 
 ### Files that must never be committed
 
