@@ -203,6 +203,15 @@ cors:
 
 security:
   login:
+    # Usernames permitted to authenticate. Empty means no restriction.
+    #
+    # This deployment serves one household, and the schema seeds an unused `admin` account that
+    # is ADMIN - the most valuable door on the box and one nobody ever legitimately opens.
+    # Blocked accounts fail identically to accounts that do not exist, so this leaks no
+    # information about which usernames are real.
+    #
+    # Set LOGIN_ALLOWED_USERNAMES to a comma-separated list to add someone.
+    allowed-usernames: ${LOGIN_ALLOWED_USERNAMES:}
     # /api/auth/login must stay public - the browser cannot carry a token before it has one -
     # so it is the only unauthenticated door into a database holding a real medical record.
     # Unthrottled, an attacker guesses passwords as fast as the network allows.

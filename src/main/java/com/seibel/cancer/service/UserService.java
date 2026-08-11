@@ -6,6 +6,7 @@ import com.seibel.cancer.common.exceptions.ResourceNotFoundException;
 import com.seibel.cancer.common.exceptions.ServiceException;
 import com.seibel.cancer.database.db.service.UserDbService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -25,10 +26,30 @@ public class UserService extends BaseService {
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("username", "email", "role", "createdAt", "updatedAt");
 
     private final UserDbService dbService;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserDbService dbService) {
+    public UserService(UserDbService dbService, PasswordEncoder passwordEncoder) {
         super(User.class.getSimpleName());
         this.dbService = dbService;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    /**
+     * BCrypt-hashes a password before it reaches the database.
+     *
+     * <p>Only {@code AuthController.register} hashed passwords; every write through this
+     * service stored the raw string. Two consequences, and the second is worse than the first:
+     * a password changed through the API could never log in again, because authentication
+     * compares against a BCrypt hash - and the plaintext sat in the database.
+     *
+     * <p>Found on 2026-08-11 changing the production password off password123: the update
+     * returned 200 and the new password then failed with 401.
+     *
+     * <p>Null means "leave the password alone" on an update, which is how every other field in
+     * this schema's update path behaves.
+     */
+    private String encodeIfPresent(String rawPassword) {
+        return rawPassword == null || rawPassword.isBlank() ? null : passwordEncoder.encode(rawPassword);
     }
 
     @Transactional
@@ -37,7 +58,7 @@ public class UserService extends BaseService {
         log.info("create(): {}", item);
 
         try {
-            return dbService.create(item.getUsername(), item.getPassword(), item.getEmail(), item.getRole());
+            return dbService.create(item.getUsername(), encodeIfPresent(item.getPassword()), item.getEmail(), item.getRole());
         } catch (Exception e) {
             log.error("Failed to create user: {}", item.getUsername(), e);
             throw new ServiceException("Unable to create user", e);
@@ -51,7 +72,7 @@ public class UserService extends BaseService {
         log.info("update(): extid={}, {}", extid, item);
 
         try {
-            User updated = dbService.update(extid, item.getUsername(), item.getPassword(), item.getEmail(), item.getRole());
+            User updated = dbService.update(extid, item.getUsername(), encodeIfPresent(item.getPassword()), item.getEmail(), item.getRole());
             if (updated == null) {
                 throw new ResourceNotFoundException("User", extid);
             }
