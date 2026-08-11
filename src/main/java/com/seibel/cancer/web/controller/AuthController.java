@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -67,8 +68,21 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Creates a user. <b>Requires an existing ADMIN.</b>
+     *
+     * <p>This was anonymous, and that was the most serious hole in the application: a stranger
+     * could POST here, receive a valid JWT, and read everything — because no endpoint checks
+     * <em>whose</em> data it is serving (see the authorization gap in CURRENT_STATE.md).
+     * Authentication was restored on 2026-08-11 and bought nothing while anyone could mint
+     * themselves an account. Verified by creating one against the running app.
+     *
+     * <p>This is a single-patient tool. Open registration is a liability with no upside, so the
+     * endpoint is kept for creating accounts deliberately rather than deleted outright.
+     */
     @PostMapping("/register")
-    @Operation(summary = "Register a new user")
+    @Operation(summary = "Register a new user (ADMIN only)")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> register(@Valid @RequestBody RequestRegister request) {
         if (userRepository.existsByUsername(request.getUsername())) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Username already exists");
@@ -77,9 +91,10 @@ public class AuthController {
         UserDb user = new UserDb();
         user.setExtid(UUID.randomUUID().toString());
         user.setUsername(request.getUsername());
+        // The bcrypt hash was logged at WARN here to capture it for CSV seeding. A password
+        // hash in a log file is a credential sitting in plaintext on disk and in any log
+        // shipper - removed rather than downgraded to debug.
         String encodedPassword = passwordEncoder.encode(request.getPassword());
-        // TEMP DEBUG - remove after capturing hash for 02-user.csv seeding
-        log.warn("TEMP DEBUG - bcrypt hash for user '{}': {}", request.getUsername(), encodedPassword);
         user.setPassword(encodedPassword);
         user.setEmail(request.getEmail());
         user.setRole("USER");

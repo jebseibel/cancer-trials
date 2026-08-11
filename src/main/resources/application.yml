@@ -194,6 +194,24 @@ uchealth:
 jwt:
   secret: ${JWT_SECRET}
 
+cors:
+  allowed:
+    # The browser blocks every API call from an origin not listed here, and it fails client-side
+    # with no server-side error - so a wrong value looks like the app is broken rather than
+    # misconfigured. Defaults to the Vite dev server; a deployment MUST set the real origin.
+    origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
+
+security:
+  login:
+    # /api/auth/login must stay public - the browser cannot carry a token before it has one -
+    # so it is the only unauthenticated door into a database holding a real medical record.
+    # Unthrottled, an attacker guesses passwords as fast as the network allows.
+    #
+    # Counts CONSECUTIVE FAILURES per IP; a successful login clears the counter, so mistyping
+    # a password twice and then getting it right never locks anyone out.
+    max-attempts: ${LOGIN_MAX_ATTEMPTS:8}
+    lockout-minutes: ${LOGIN_LOCKOUT_MINUTES:15}
+
 logging:
   level:
     com.seibel.cancer.loader.DataLoader: INFO
