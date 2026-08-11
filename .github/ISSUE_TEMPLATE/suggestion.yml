@@ -1,0 +1,58 @@
+name: Suggestion or unclear wording
+description: Something is hard to understand, badly worded, or could work better
+title: "[Suggestion] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This tool is used by patients and their families, not developers — so
+        "this wording is confusing" is a genuinely valuable report, not a nitpick.
+
+        **Please do not paste anyone's real medical details** into this form.
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: What could be better?
+      placeholder: |
+        The page says "2 to check · 1 to ask about". I did not know whether
+        "to check" meant the trial was ruled out or just needed a question.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why does it matter?
+      description: Who would be confused or put off by it, and what might they do wrong?
+      placeholder: |
+        Someone might think a trial was ruled out and skip past it, when the tool
+        is only flagging something to ask their doctor about.
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: Drag an image in. Blur or crop any real patient information first.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: where
+    attributes:
+      label: Which page?
+      options:
+        - Trials for You (the ranked list)
+        - Trial Search
+        - A specific trial's detail page
+        - Patient Record (Diagnosis / Variants / Prior Treatment)
+        - Saved Trials
+        - Dashboard
+        - Signing in
+        - Process Trials
+        - Somewhere else / not sure
+    validations:
+      required: false

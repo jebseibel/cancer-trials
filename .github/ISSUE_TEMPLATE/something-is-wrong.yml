@@ -1,0 +1,95 @@
+name: Something is wrong
+description: A page is broken, confusing, or does not do what you expected
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this. You do not need to know anything technical —
+        just describe what happened in your own words.
+
+        **Please do not paste anyone's real medical details** (names, dates of
+        birth, diagnoses, medical record numbers) into this form. If a problem
+        involves specific patient data, say "the diagnosis page" rather than
+        quoting what it showed, and blur it out of any screenshot.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe it the way you would to a friend.
+      placeholder: I clicked "Find trials for me" and it spun for a long time, then showed nothing.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      placeholder: I expected a list of trials to appear.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: What did you click, in order?
+      description: |
+        Even a rough list helps enormously — most bugs are only findable if we can
+        reproduce the exact path you took.
+      placeholder: |
+        1. Signed in
+        2. Clicked "Trials for You" at the top
+        3. Left the "Only breast cancer trials" box ticked
+        4. Clicked "Find trials for me"
+        5. Waited about a minute
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: |
+        Drag an image straight into this box. A picture is usually worth more than
+        the description. **Blur or crop out any real patient information first.**
+      placeholder: Drag your screenshot here.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: where
+    attributes:
+      label: Which page?
+      options:
+        - Trials for You (the ranked list)
+        - Trial Search
+        - A specific trial's detail page
+        - Patient Record (Diagnosis / Variants / Prior Treatment)
+        - Saved Trials
+        - Dashboard
+        - Signing in
+        - Process Trials
+        - Somewhere else / not sure
+    validations:
+      required: false
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: How much did this get in your way?
+      options:
+        - It is confusing, but I could carry on
+        - It is annoying and slows me down
+        - I could not finish what I was trying to do
+        - Something looked wrong or misleading about the medical information
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        **If you picked the last option** — anything where the medical information
+        itself looked wrong, mismatched, or misleading — that is the most important
+        kind of report there is. Please add as much detail as you can above.

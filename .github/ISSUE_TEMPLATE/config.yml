@@ -1,0 +1,10 @@
+# Blank issues are off so the forms are the only path. Both templates carry the
+# "do not paste real medical details" warning, and a blank issue would skip it.
+blank_issues_enabled: false
+contact_links:
+  - name: Something about the actual medical information looks wrong
+    url: https://github.com/jebseibel/Cancer/issues/new?template=something-is-wrong.yml
+    about: >-
+      Use the bug form and pick the last severity option. This tool never decides
+      eligibility - it only surfaces what to ask a care team about - so anything
+      that reads like a verdict, or contradicts a real record, matters most.
