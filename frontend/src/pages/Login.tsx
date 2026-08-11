@@ -41,7 +41,7 @@ export default function Login() {
             <div className="max-w-md w-full space-y-8">
                 <div>
                     <h2 className="text-center text-3xl font-extrabold text-gray-900 mb-2">
-                        Tina Cancer Project
+                        Breast Cancer Trial Finder
                     </h2>
                     <p className="mt-2 text-center text-sm text-gray-600">
                         {isLogin ? 'Sign in to your account' : 'Create a new account'}
@@ -158,6 +158,24 @@ export default function Login() {
                         </div>
                     </div>
                 </div>
+
+                {/*
+                  Outside the card, so it reads as a note about the site rather than part of
+                  signing in. Deliberately worded as "ask how to use it" rather than "request
+                  access" - this instance holds one person's medical record, and the offer is
+                  help with the tool, not an invitation to browse the data.
+                */}
+                <p className="text-center text-sm text-gray-600">
+                    This tool was built for one patient and her family. If that is not you and
+                    you would like to know how to use it, email{' '}
+                    <a
+                        href="mailto:jeb.seibel@yahoo.com"
+                        className="font-medium text-green-700 hover:text-green-800 underline"
+                    >
+                        jeb.seibel@yahoo.com
+                    </a>
+                    .
+                </p>
             </div>
         </div>
     );

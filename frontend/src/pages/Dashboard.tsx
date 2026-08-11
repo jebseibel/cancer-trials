@@ -24,7 +24,7 @@ export default function Dashboard() {
 
     return (
         <div className="px-4 py-6 sm:px-0">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Tina Cancer Project</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Breast Cancer Trial Finder</h2>
             <h1 className="text-xl text-gray-600 mb-8">Search trials and track your status on each one</h1>
 
             {/* Stats Grid */}
