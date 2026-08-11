@@ -1,5 +1,9 @@
 # Production Deploy Runbook
 
+> **DEPLOYED 2026-08-11.** https://breastcancertrialfinder.com is live, HTTPS, with her record
+> seeded. What follows is the corrected procedure — every correction below came from doing it,
+> not from planning it. The corpus (Phase 4) is the one step not yet run.
+
 First deploy of this app to a public host, holding **one real person's medical record**.
 
 Written 2026-08-11, after the security work of that day. Supersedes
@@ -59,6 +63,17 @@ on 2369/2371. Nginx is already installed and fronting them.
 `scp` below uses it. Its hostname is `cpss`, a leftover from the project this repo was copied
 from — cosmetic, not a sign you are on the wrong box.
 
+⚠️ **That alias sets `RemoteCommand` and `RequestTTY yes`, which silently breaks `scp` and any
+scripted `ssh`.** Symptom: `Cannot execute command-line and remote command`, or an scp that
+appears to succeed while transferring nothing. Every transfer below needs the override:
+
+```bash
+scp -o RemoteCommand=none -o RequestTTY=no ...
+ssh -o RemoteCommand=none -o RequestTTY=no cancer '...'
+```
+
+The patient CSVs looked transferred and were not, which is a bad thing to be wrong about.
+
 ### Phase 0 — DNS, first, because it has to propagate
 
 Do this before anything else; certbot in Phase 6 fails outright if the name does not yet resolve
@@ -114,6 +129,22 @@ ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw enable
 
 MySQL (3306) and Qdrant (6333/6334) must never be open. Qdrant ships with **no authentication
 of any kind**; `docker-compose.yml` already binds it to `127.0.0.1` via `QDRANT_BIND`.
+
+---
+
+## Phase 1.5 — Swap, before anything memory-hungry
+
+The box had **no swap**, and with none the OOM killer terminates a process outright rather than
+degrading. That is the likeliest explanation for a backfill dying at ~58% with no error.
+
+```bash
+fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+sysctl -w vm.swappiness=10 && echo "vm.swappiness=10" >> /etc/sysctl.conf
+```
+
+`swappiness=10` makes swap a safety net rather than routine overflow — on 1 vCPU, eager
+swapping puts disk I/O in competition with the CPU-bound embedding.
 
 ---
 
@@ -298,17 +329,52 @@ Note `X-Forwarded-For $remote_addr` rather than `$proxy_add_x_forwarded_for`: th
 to a client-supplied header, and the rate limiter reads the first hop. Overwriting means a
 caller cannot spoof it.
 
-Then TLS:
+Then TLS. **certbot was not installed** — none of the eight existing sites used HTTPS:
 
 ```bash
-apt install -y certbot python3-certbot-nginx
-certbot --nginx -d breastcancertrialfinder.com -d www.breastcancertrialfinder.com
-certbot renew --dry-run
+apt-get install -y certbot python3-certbot-nginx
+certbot --nginx -d breastcancertrialfinder.com -d www.breastcancertrialfinder.com \
+  --non-interactive --agree-tos -m jeb.seibel@yahoo.com --redirect
 ```
+
+certbot rewrites the site file in place, adding the 443 block and the HTTP→HTTPS redirect, and
+arms `certbot.timer` for renewal. Verify with `systemctl is-active certbot.timer`.
+
+⚠️ **Do not test the vhost with `curl -H 'Host: ...' http://127.0.0.1`.** That matches nginx's
+*default* server block, not yours, and returns a 502 from whatever the default proxies to —
+which reads as "my app is broken" when nothing is wrong. Test against the real domain from
+off-box.
 
 ⚠️ **Until TLS is live, do not log in over the public IP.** The JWT crosses the network in
 cleartext on every request; anyone in path can lift and replay it. TLS is what makes the auth
 work mean anything.
+
+---
+
+## Phase 6.5 — Change the password, with the script
+
+**Use `hosting/change-password.sh`** (copy it to the server, `chmod 700`, run it there). It
+prompts rather than taking the password as an argument — an argument lands in shell history and
+in `ps` output — and it verifies the stored value is a real 60-character BCrypt hash before
+reporting success.
+
+⚠️ **That verification exists because of a real bug.** `UserService` did not hash passwords on
+create or update until 2026-08-11; only `AuthController.register` did. Changing the production
+password returned HTTP 200 with a normal-looking payload, wrote **plaintext** to the column, and
+the new password then failed with 401 — with `password123` also dead, and `admin`'s password
+unknown. Recovery took a full database rebuild.
+
+Two lessons worth keeping:
+
+- **Verify the stored hash, not the HTTP status.** A 200 from an update endpoint says the write
+  was accepted, not that it was correct.
+- **A rebuild is free before the corpus exists and expensive after.** If something needs
+  resetting, do it now rather than after hours of embedding.
+
+Also worth knowing: an interactive `mysql>` session holds an open transaction, so a `SELECT`
+there shows your own uncommitted write. Root on another connection saw the old value while the
+session showed the new one — an hour went into that. Use `mysql -e '...'` for verification, or
+`COMMIT;` explicitly.
 
 ---
 

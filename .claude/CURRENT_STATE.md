@@ -26,7 +26,37 @@ Verified 2026-08-10, end of session:
 **The demo happened and went well, and the corpus is complete and searchable.** Both blockers
 from the last session are gone.
 
+### 🚀 DEPLOYED — https://breastcancertrialfinder.com, 2026-08-11
+
+**The app is live on a public host with her real record on it.** HTTPS via Let's Encrypt (expires
+9 Nov, `certbot.timer` armed), HTTP redirects to HTTPS, both apex and `www`. She can sign in as
+`jeb` and open "Trials for You".
+
+| | |
+| --- | --- |
+| Host | Hostinger KVM, `ssh cancer`, 93.127.216.49, **1 vCPU / 3.9GB** |
+| App | `/opt/cancer/cancer.jar`, systemd `cancer.service`, **port 8081** |
+| Why 8081 | `/opt/cpss/cpss.jar` has owned 8080 for weeks — do not stop it |
+| Also on the box | MySQL, 2 Ghost containers, 8 nginx sites. **Not a dedicated box.** |
+| Swap | 4GB added (there was none), `vm.swappiness=10` |
+| Qdrant | container up, collection green, **0 points** |
+| Patient record | seeded from the 3 CSVs; prod AppUser extid regenerated |
+| Corpus | **EMPTY — this is the remaining work** |
+
+⚠️ **"Trials for You" returns nothing until the corpus is pulled.** Phase 4 of the runbook.
+The ~14-minute MySQL pull is all that page needs; the embedding backfill (hours on 1 vCPU) only
+powers semantic Trial Search.
+
+⚠️ **Still to do before showing anyone else:** `LOGIN_ALLOWED_USERNAMES=jeb` in `/opt/cancer/.env`
+then restart, to block the unused `admin` account. The code is deployed but the property is
+unset, so the allowlist is inactive.
+
+Full procedure and every correction found by doing it: `hosting/DEPLOY_RUNBOOK.md`.
+
 ### Do this first when you return
+
+**Pull the corpus on the server.** The app is deployed and empty; that one step turns a working
+site into a useful one. Everything below is superseded by that.
 
 **Wire up the Rank Trials page.** The matching service is built, measured against the full
 corpus, and its two worst bugs are fixed; the disease-type gate landed 2026-08-11 and took
@@ -1064,6 +1094,34 @@ knowing before locking yourself out of prod.
 There is now a **`login-rate-limit` skill** in `~/.claude/skills/` carrying this implementation,
 the IP+username trap as its first design point, and the test that catches it. The user asked for
 it so the pattern reaches his other projects.
+
+## Passwords were never hashed outside register — fixed 2026-08-11
+
+`UserService.create` and `.update` passed the raw password straight to the DB layer; only
+`AuthController.register` called `passwordEncoder.encode`. So **every password set through the
+user API was stored in plaintext**, and could never log in again, because authentication
+compares against a BCrypt hash.
+
+Found the hard way, changing the production password off `password123`: the PUT returned 200
+with a normal-looking payload, and the new password then failed with 401. With `password123`
+also dead and `admin`'s password unknown, there was no way back in through the API — recovery
+took a full database rebuild.
+
+`encodeIfPresent()` now hashes on both paths. Null still means "leave the password alone",
+matching every other field in this schema's update path.
+
+**`hosting/change-password.sh` is the safe way to do it**: prompts instead of taking an argument
+(so the password reaches neither shell history nor `ps`), and verifies the stored value is a
+real 60-character BCrypt hash before reporting success. That check turns this class of bug from
+an hour of confusion into an immediate failure.
+
+⚠️ **Two traps that cost time and are worth remembering:**
+
+- **An interactive `mysql>` session holds an open transaction.** A `SELECT` there shows your own
+  uncommitted write, so the session showed a correct 60-char hash while root on another
+  connection saw the 20-char plaintext. Verify with `mysql -e '...'`, not from inside the session.
+- **A database rebuild is free before the corpus exists and expensive after.** This one cost
+  nothing because Qdrant had 0 points. After the embed it would be hours.
 
 ## ⚠️ The authorization gap — found 2026-08-11, doors closed, gap deferred
 
