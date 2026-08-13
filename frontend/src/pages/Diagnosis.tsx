@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Save, Loader2 } from 'lucide-react';
-import { patientDiagnosisApi } from '../services/api';
+import { patientApi, patientDiagnosisApi } from '../services/api';
 import { BooleanSelect, Field, Section, Select, inputClass } from '../components/FormControls';
-import { useCurrentAppUser } from '../lib/useCurrentAppUser';
+import { useCurrentPatient } from '../lib/PatientContext';
 import { ageFromDateOfBirth, deriveReceptorSubtype } from '../lib/receptorSubtype';
 import {
     ECOG_VALUES,
@@ -61,8 +61,6 @@ function toForm(d: PatientDiagnosis): FormState {
         priorTreatments: str(d.priorTreatments),
         hasMeasurableDisease: str(d.hasMeasurableDisease),
         menopausalStatus: str(d.menopausalStatus),
-        dateOfBirth: str(d.dateOfBirth),
-        sex: str(d.sex),
         diagnosisDate: str(d.diagnosisDate),
         notes: str(d.notes),
     };
@@ -73,13 +71,13 @@ function toForm(d: PatientDiagnosis): FormState {
  * server-side, and for the text fields null is what the schema's clean_empty_strings()
  * would have produced anyway.
  */
-function toRequest(form: FormState, appUserExtid: string | undefined): PatientDiagnosisRequest {
+function toRequest(form: FormState, patientExtid: string | undefined): PatientDiagnosisRequest {
     const text = (v: string) => (v.trim() === '' ? undefined : v.trim());
     const num = (v: string) => (v === '' ? undefined : Number(v));
     const bool = (v: string) => (v === '' ? undefined : v === 'true');
 
     return {
-        appUserExtid,
+        patientExtid,
         cancerType: form.cancerType.trim(),
         stage: text(form.stage),
         stageSystem: text(form.stageSystem),
@@ -97,8 +95,6 @@ function toRequest(form: FormState, appUserExtid: string | undefined): PatientDi
         priorTreatments: text(form.priorTreatments),
         hasMeasurableDisease: bool(form.hasMeasurableDisease),
         menopausalStatus: text(form.menopausalStatus),
-        dateOfBirth: text(form.dateOfBirth),
-        sex: text(form.sex),
         diagnosisDate: text(form.diagnosisDate),
         notes: text(form.notes),
     };
@@ -106,17 +102,17 @@ function toRequest(form: FormState, appUserExtid: string | undefined): PatientDi
 
 export default function Diagnosis() {
     const queryClient = useQueryClient();
-    const { data: appUser, isLoading: appUserLoading } = useCurrentAppUser();
+    const { patient, isLoading: patientLoading } = useCurrentPatient();
     const [form, setForm] = useState<FormState>(EMPTY_FORM);
     const [saved, setSaved] = useState(false);
 
     const { data: existing, isLoading } = useQuery({
-        queryKey: ['patientDiagnosis', appUser?.extid],
+        queryKey: ['patientDiagnosis', patient?.extid],
         queryFn: async () => {
-            const rows = (await patientDiagnosisApi.getByAppUserExtid(appUser!.extid)).data;
+            const rows = (await patientDiagnosisApi.getByPatientExtid(patient!.extid)).data;
             return rows[0] ?? null;
         },
-        enabled: !!appUser?.extid,
+        enabled: !!patient?.extid,
     });
 
     // Populate the form once the existing record arrives. Deliberately keyed on extid alone,
@@ -127,16 +123,41 @@ export default function Diagnosis() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [existing?.extid]);
 
+    // Date of birth and sex describe the person, not the diagnosis, so they live on `patient`
+    // and are loaded and saved separately - the two Save buttons on this page write to two
+    // different tables, which is why they are not merged into one request.
+    useEffect(() => {
+        if (!patient) return;
+        setForm((f) => ({
+            ...f,
+            dateOfBirth: patient.dateOfBirth ?? '',
+            sex: patient.sex ?? '',
+        }));
+    }, [patient]);
+
     const saveMutation = useMutation({
         mutationFn: async () => {
-            const request = toRequest(form, appUser?.extid);
+            // Two tables, two writes. Date of birth and sex belong to the person and go to
+            // `patient`; everything else is the diagnosis. The patient write goes first so a
+            // failure there does not leave the person fields silently unsaved behind a
+            // successful-looking diagnosis save.
+            if (patient && (form.dateOfBirth !== (patient.dateOfBirth ?? '')
+                    || form.sex !== (patient.sex ?? ''))) {
+                await patientApi.update(patient.extid, {
+                    dateOfBirth: form.dateOfBirth || undefined,
+                    sex: form.sex || undefined,
+                });
+                await queryClient.invalidateQueries({ queryKey: ['patients', 'mine'] });
+            }
+
+            const request = toRequest(form, patient?.extid);
             return existing
                 ? (await patientDiagnosisApi.update(existing.extid, request)).data
                 : (await patientDiagnosisApi.create(request)).data;
         },
         onSuccess: async () => {
             setSaved(true);
-            await queryClient.invalidateQueries({ queryKey: ['patientDiagnosis', appUser?.extid] });
+            await queryClient.invalidateQueries({ queryKey: ['patientDiagnosis', patient?.extid] });
         },
     });
 
@@ -149,17 +170,19 @@ export default function Diagnosis() {
     const age = ageFromDateOfBirth(form.dateOfBirth);
     const saveError = saveMutation.error as { response?: { data?: { message?: string } } } | null;
 
-    if (appUserLoading || isLoading) {
+    if (patientLoading || isLoading) {
         return <p className="px-4 py-6 text-gray-500">Loading diagnosis...</p>;
     }
 
-    if (!appUser) {
+    if (!patient) {
         return (
-            <div className="px-4 py-6 sm:px-0">
+            <div>
                 <div className="bg-white shadow rounded-lg p-6">
-                    <p className="text-sm text-gray-500">
-                        No app-user profile linked to your login. Ask to have one seeded before
-                        entering a diagnosis.
+                    <p className="text-sm text-gray-700">
+                        No patient record yet. Create one to start recording a diagnosis.
+                    </p>
+                    <p className="mt-2 text-xs text-gray-500">
+                        A record can be for you or for someone you are helping.
                     </p>
                 </div>
             </div>

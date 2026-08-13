@@ -3,17 +3,17 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Bookmark, FlaskConical } from 'lucide-react';
 import { trialApi, trialStatusApi } from '../services/api';
-import { useCurrentAppUser } from '../lib/useCurrentAppUser';
+import { useCurrentPatient } from '../lib/PatientContext';
 import { TRIAL_STATUS_VALUES } from '../types/api';
 
 export default function SavedTrials() {
-    const { data: appUser } = useCurrentAppUser();
+    const { patient } = useCurrentPatient();
     const [statusFilter, setStatusFilter] = useState('');
 
     const { data: myStatuses, isLoading: statusesLoading } = useQuery({
-        queryKey: ['trialStatuses', appUser?.extid],
-        queryFn: async () => (await trialStatusApi.getByAppUserExtid(appUser!.extid)).data,
-        enabled: !!appUser?.extid,
+        queryKey: ['trialStatuses', patient?.extid],
+        queryFn: async () => (await trialStatusApi.getByPatientExtid(patient!.extid)).data,
+        enabled: !!patient?.extid,
     });
 
     const { data: trialsPage, isLoading: trialsLoading } = useQuery({
@@ -33,12 +33,14 @@ export default function SavedTrials() {
     const isLoading = statusesLoading || trialsLoading;
 
     return (
-        <div className="px-4 py-6 sm:px-0">
+        <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Saved Trials</h1>
             <p className="text-gray-600 mb-6">Trials you're tracking, by personal status.</p>
 
-            {!appUser ? (
-                <p className="text-gray-500">No app-user profile linked to your login yet.</p>
+            {!patient ? (
+                <p className="text-gray-500">
+                    No patient record yet. Create one to start tracking trials.
+                </p>
             ) : (
                 <>
                     <div className="bg-white shadow rounded-lg p-4 mb-6 flex gap-4">

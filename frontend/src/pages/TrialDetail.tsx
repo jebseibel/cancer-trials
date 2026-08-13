@@ -10,9 +10,8 @@ import {
     outcomeApi,
     overallOfficialApi,
     trialStatusApi,
-    patientDiagnosisApi,
 } from '../services/api';
-import { useCurrentAppUser } from '../lib/useCurrentAppUser';
+import { useCurrentPatient } from '../lib/PatientContext';
 import { runTier1Checks } from '../lib/tier1Matching';
 import type { CheckOutcome } from '../lib/tier1Matching';
 import { TRIAL_STATUS_VALUES } from '../types/api';
@@ -20,7 +19,7 @@ import { TRIAL_STATUS_VALUES } from '../types/api';
 export default function TrialDetail() {
     const { extid } = useParams<{ extid: string }>();
     const queryClient = useQueryClient();
-    const { data: appUser } = useCurrentAppUser();
+    const { patient } = useCurrentPatient();
     const [savingStatus, setSavingStatus] = useState(false);
     const [notesDraft, setNotesDraft] = useState<string | null>(null);
 
@@ -61,24 +60,16 @@ export default function TrialDetail() {
     });
 
     const { data: myStatuses } = useQuery({
-        queryKey: ['trialStatuses', appUser?.extid],
-        queryFn: async () => (await trialStatusApi.getByAppUserExtid(appUser!.extid)).data,
-        enabled: !!appUser?.extid,
+        queryKey: ['trialStatuses', patient?.extid],
+        queryFn: async () => (await trialStatusApi.getByPatientExtid(patient!.extid)).data,
+        enabled: !!patient?.extid,
     });
 
-    const { data: diagnosis } = useQuery({
-        queryKey: ['patientDiagnosis', appUser?.extid],
-        queryFn: async () => {
-            const rows = (await patientDiagnosisApi.getByAppUserExtid(appUser!.extid)).data;
-            return rows[0] ?? null;
-        },
-        enabled: !!appUser?.extid,
-    });
 
     const myStatus = myStatuses?.find((s) => s.trialExtid === extid);
 
     const handleStatusChange = async (newStatus: string) => {
-        if (!appUser?.extid || !extid) return;
+        if (!patient?.extid || !extid) return;
         setSavingStatus(true);
         try {
             if (myStatus) {
@@ -89,19 +80,19 @@ export default function TrialDetail() {
             } else {
                 await trialStatusApi.create({
                     trialExtid: extid,
-                    appUserExtid: appUser.extid,
+                    patientExtid: patient.extid,
                     status: newStatus,
                     statusChangedAt: new Date().toISOString(),
                 });
             }
-            await queryClient.invalidateQueries({ queryKey: ['trialStatuses', appUser.extid] });
+            await queryClient.invalidateQueries({ queryKey: ['trialStatuses', patient.extid] });
         } finally {
             setSavingStatus(false);
         }
     };
 
     const handleNotesBlur = async () => {
-        if (!appUser?.extid || !extid || notesDraft === null) return;
+        if (!patient?.extid || !extid || notesDraft === null) return;
         setSavingStatus(true);
         try {
             if (myStatus) {
@@ -109,12 +100,12 @@ export default function TrialDetail() {
             } else {
                 await trialStatusApi.create({
                     trialExtid: extid,
-                    appUserExtid: appUser.extid,
+                    patientExtid: patient.extid,
                     status: 'SAVED',
                     notes: notesDraft,
                 });
             }
-            await queryClient.invalidateQueries({ queryKey: ['trialStatuses', appUser.extid] });
+            await queryClient.invalidateQueries({ queryKey: ['trialStatuses', patient.extid] });
         } finally {
             setSavingStatus(false);
             setNotesDraft(null);
@@ -125,7 +116,7 @@ export default function TrialDetail() {
     if (isError || !trial) return <p className="px-4 py-6 text-red-600">Trial not found.</p>;
 
     return (
-        <div className="px-4 py-6 sm:px-0">
+        <div>
             <Link to="/trials" className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4">
                 <ArrowLeft className="h-4 w-4 mr-1" />
                 Back to search
@@ -173,9 +164,9 @@ export default function TrialDetail() {
             {/* Personal tracking */}
             <div className="bg-white shadow rounded-lg p-6 mb-6">
                 <h2 className="text-lg font-medium text-gray-900 mb-4">Your Tracking</h2>
-                {!appUser ? (
+                {!patient ? (
                     <p className="text-sm text-gray-500">
-                        No app-user profile linked to your login. Ask to have one seeded to enable tracking.
+                        No patient record yet. Create one to track this trial.
                     </p>
                 ) : (
                     <div className="space-y-4">
@@ -213,19 +204,19 @@ export default function TrialDetail() {
             </div>
 
             {/* Tier 1 matching - deterministic checks only, per DIAGNOSIS_MATCHING_DESIGN.md */}
-            {diagnosis && (
+            {patient && (
                 <div className="bg-white shadow rounded-lg p-6 mb-6">
                     <h2 className="text-lg font-medium text-gray-900 mb-1 flex items-center gap-2">
                         <Stethoscope className="h-5 w-5 text-green-600" />
                         Basic Eligibility Checks
                     </h2>
                     <p className="text-sm text-gray-500 mb-4">
-                        Compares your recorded diagnosis against this trial's stated age, sex, and
+                        Compares your recorded details against this trial's stated age, sex, and
                         recruitment status. These are the only checks that can be made
                         automatically — they are not an eligibility decision.
                     </p>
                     <ul className="space-y-3">
-                        {runTier1Checks(diagnosis, trial).map((check) => (
+                        {runTier1Checks(patient, trial).map((check) => (
                             <li key={check.label} className="flex items-start gap-3">
                                 <OutcomeIcon outcome={check.outcome} />
                                 <div className="text-sm">

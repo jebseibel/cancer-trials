@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Search, FlaskConical } from 'lucide-react';
-import { trialApi, patientDiagnosisApi } from '../services/api';
-import { useCurrentAppUser } from '../lib/useCurrentAppUser';
+import { trialApi } from '../services/api';
+import { useCurrentPatient } from '../lib/PatientContext';
 import { runTier1Checks, summariseTier1 } from '../lib/tier1Matching';
-import type { PatientDiagnosis, Trial } from '../types/api';
+import type { Patient, Trial } from '../types/api';
 
 const STATUS_OPTIONS = [
     'RECRUITING',
@@ -20,16 +20,8 @@ export default function TrialSearch() {
     const [term, setTerm] = useState('');
     const [status, setStatus] = useState('');
 
-    const { data: appUser } = useCurrentAppUser();
+    const { patient } = useCurrentPatient();
 
-    const { data: diagnosis } = useQuery({
-        queryKey: ['patientDiagnosis', appUser?.extid],
-        queryFn: async () => {
-            const rows = (await patientDiagnosisApi.getByAppUserExtid(appUser!.extid)).data;
-            return rows[0] ?? null;
-        },
-        enabled: !!appUser?.extid,
-    });
 
     const { data, isLoading, isError } = useQuery({
         queryKey: ['trials'],
@@ -54,7 +46,7 @@ export default function TrialSearch() {
     }, [data, term, status]);
 
     return (
-        <div className="px-4 py-6 sm:px-0">
+        <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Trial Search</h1>
             <p className="text-gray-600 mb-6">Search saved trials by title, NCT number, or status.</p>
 
@@ -107,7 +99,7 @@ export default function TrialSearch() {
                                 {trial.briefSummary && (
                                     <p className="text-sm text-gray-600 mt-1 line-clamp-2">{trial.briefSummary}</p>
                                 )}
-                                {diagnosis && <Tier1Badge diagnosis={diagnosis} trial={trial} />}
+                                {patient && <Tier1Badge patient={patient} trial={trial} />}
                             </div>
                             {trial.overallStatus && (
                                 <span className="flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -127,8 +119,8 @@ export default function TrialSearch() {
  * list - DIAGNOSIS_MATCHING_DESIGN.md section 5 forbids auto-excluding a trial because a
  * check did not match.
  */
-function Tier1Badge({ diagnosis, trial }: { diagnosis: PatientDiagnosis; trial: Trial }) {
-    const summary = summariseTier1(runTier1Checks(diagnosis, trial));
+function Tier1Badge({ patient, trial }: { patient: Patient; trial: Trial }) {
+    const summary = summariseTier1(runTier1Checks(patient, trial));
     const style =
         summary.outcome === 'pass'
             ? 'bg-green-50 text-green-800'
