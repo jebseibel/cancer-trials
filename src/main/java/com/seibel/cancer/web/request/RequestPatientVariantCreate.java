@@ -18,9 +18,9 @@ import java.time.LocalDate;
 @EqualsAndHashCode(callSuper = true)
 public class RequestPatientVariantCreate extends BaseRequest {
 
-    @NotEmpty(message = "The appUserExtid is required.")
-    @Size(max = 36, message = "The appUserExtid must be at most 36 characters.")
-    private String appUserExtid;
+    @NotEmpty(message = "The patientExtid is required.")
+    @Size(max = 36, message = "The patientExtid must be at most 36 characters.")
+    private String patientExtid;
 
     @Size(max = 36, message = "The patientDiagnosisExtid must be at most 36 characters.")
     private String patientDiagnosisExtid;

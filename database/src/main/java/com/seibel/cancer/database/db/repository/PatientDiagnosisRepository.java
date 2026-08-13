@@ -24,10 +24,10 @@ public interface PatientDiagnosisRepository extends JpaRepository<PatientDiagnos
      * filter, replacing a diagnosis leaves the deleted row in the list, and the Diagnosis
      * page takes rows[0] - so it would display and edit the deleted record.
      */
-    List<PatientDiagnosisDb> findByAppUserIdAndActive(Long appUserId, ActiveEnum active);
+    List<PatientDiagnosisDb> findByPatientIdAndActive(Long patientId, ActiveEnum active);
 
-    default List<PatientDiagnosisDb> findByAppUserId(Long appUserId) {
-        return findByAppUserIdAndActive(appUserId, ActiveEnum.ACTIVE);
+    default List<PatientDiagnosisDb> findByPatientId(Long patientId) {
+        return findByPatientIdAndActive(patientId, ActiveEnum.ACTIVE);
     }
 
     default List<PatientDiagnosisDb> findAllActive() {

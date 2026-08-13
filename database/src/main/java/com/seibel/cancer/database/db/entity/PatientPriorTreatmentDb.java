@@ -25,8 +25,8 @@ public class PatientPriorTreatmentDb extends BaseDb {
 
     private static final long serialVersionUID = 1234567890123456827L;
 
-    @Column(name = "app_user_id", nullable = false)
-    private Long appUserId;
+    @Column(name = "patient_id", nullable = false)
+    private Long patientId;
 
     /** Nullable on purpose: must survive the diagnosis row being deleted and recreated. */
     @Column(name = "patient_diagnosis_id")

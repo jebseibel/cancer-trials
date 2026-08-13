@@ -101,7 +101,7 @@ class PatientDiagnosisDbServiceTest {
     void update_shouldOnlyOverwriteNonNullFields() {
         PatientDiagnosisDb existing = DomainBuilderDatabase.getPatientDiagnosisDb();
         String originalStage = existing.getStage();
-        Long originalAppUserId = existing.getAppUserId();
+        Long originalPatientId = existing.getPatientId();
         String extid = existing.getExtid();
 
         PatientDiagnosis changes = PatientDiagnosis.builder().cancerType("Lung Cancer").build();
@@ -117,7 +117,7 @@ class PatientDiagnosisDbServiceTest {
 
         assertEquals("Lung Cancer", captor.getValue().getCancerType());
         assertEquals(originalStage, captor.getValue().getStage());
-        assertEquals(originalAppUserId, captor.getValue().getAppUserId());
+        assertEquals(originalPatientId, captor.getValue().getPatientId());
     }
 
     @Test
@@ -193,26 +193,26 @@ class PatientDiagnosisDbServiceTest {
     }
 
     @Test
-    void findByAppUserId_shouldReturnEntities() {
+    void findByPatientId_shouldReturnEntities() {
         List<PatientDiagnosisDb> records = List.of(
                 DomainBuilderDatabase.getPatientDiagnosisDb(4242L, "Breast Cancer"));
 
-        when(repository.findByAppUserId(4242L)).thenReturn(records);
+        when(repository.findByPatientId(4242L)).thenReturn(records);
         when(mapper.toModelList(records)).thenReturn(List.of(
                 DomainBuilderDatabase.getPatientDiagnosis(records.get(0))));
 
-        List<PatientDiagnosis> found = service.findByAppUserId(4242L);
+        List<PatientDiagnosis> found = service.findByPatientId(4242L);
 
         assertEquals(1, found.size());
         assertEquals("Breast Cancer", found.get(0).getCancerType());
     }
 
     @Test
-    void findByAppUserId_shouldReturnEmptyList_whenNoneFound() {
-        when(repository.findByAppUserId(123456L)).thenReturn(List.of());
+    void findByPatientId_shouldReturnEmptyList_whenNoneFound() {
+        when(repository.findByPatientId(123456L)).thenReturn(List.of());
         when(mapper.toModelList(List.of())).thenReturn(List.of());
 
-        assertTrue(service.findByAppUserId(123456L).isEmpty());
+        assertTrue(service.findByPatientId(123456L).isEmpty());
     }
 
     @Test

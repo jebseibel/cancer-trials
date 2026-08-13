@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = true)
 public class TrialStatus extends BaseDomain {
     private Long trialId;
-    private Long appUserId;
+    private Long patientId;
     private String status;
     private String notes;
     private LocalDateTime statusChangedAt;

@@ -23,8 +23,8 @@ public class PatientVariantDb extends BaseDb {
 
     private static final long serialVersionUID = 1234567890123456826L;
 
-    @Column(name = "app_user_id", nullable = false)
-    private Long appUserId;
+    @Column(name = "patient_id", nullable = false)
+    private Long patientId;
 
     /** Nullable on purpose: a variant row must survive the diagnosis being deleted and recreated. */
     @Column(name = "patient_diagnosis_id")

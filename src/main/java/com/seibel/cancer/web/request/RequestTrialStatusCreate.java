@@ -14,8 +14,8 @@ public class RequestTrialStatusCreate extends BaseRequest {
     @NotEmpty(message = "The trialExtid is required.")
     private String trialExtid;
 
-    @NotEmpty(message = "The appUserExtid is required.")
-    private String appUserExtid;
+    @NotEmpty(message = "The patientExtid is required.")
+    private String patientExtid;
 
     @NotEmpty(message = "The status is required.")
     @Size(max = 16, message = "The status must be at most 16 characters.")

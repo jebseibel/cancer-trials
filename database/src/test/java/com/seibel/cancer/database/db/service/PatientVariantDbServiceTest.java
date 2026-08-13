@@ -180,13 +180,13 @@ class PatientVariantDbServiceTest {
     }
 
     @Test
-    void findByAppUserId_shouldReturnPatientRows() {
+    void findByPatientId_shouldReturnPatientRows() {
         List<PatientVariantDb> records = List.of(DomainBuilderDatabase.getPatientVariantDb(4242L, "DETECTED"));
 
-        when(repository.findByAppUserId(4242L)).thenReturn(records);
+        when(repository.findByPatientId(4242L)).thenReturn(records);
         when(mapper.toModelList(records)).thenReturn(List.of(DomainBuilderDatabase.getPatientVariant(records.get(0))));
 
-        List<PatientVariant> found = service.findByAppUserId(4242L);
+        List<PatientVariant> found = service.findByPatientId(4242L);
 
         assertEquals(1, found.size());
         assertEquals("DETECTED", found.get(0).getPik3caStatus());

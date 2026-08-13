@@ -14,7 +14,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class PatientDiagnosis extends BaseDomain {
-    private Long appUserId;
+    private Long patientId;
     private String cancerType;
     private String stage;
     private String stageSystem;
@@ -31,8 +31,6 @@ public class PatientDiagnosis extends BaseDomain {
     private String priorTreatments;
     private Boolean hasMeasurableDisease;
     private String menopausalStatus;
-    private LocalDate dateOfBirth;
-    private String sex;
     private LocalDate diagnosisDate;
     private String notes;
 }

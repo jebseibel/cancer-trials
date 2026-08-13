@@ -63,7 +63,7 @@ public class PatientVariantDbService extends BaseDbService {
                 .orElseThrow(() -> new ServiceException(getFoundFailureMessage(extid)));
 
         try {
-            if (item.getAppUserId() != null) record.setAppUserId(item.getAppUserId());
+            if (item.getPatientId() != null) record.setPatientId(item.getPatientId());
             if (item.getPatientDiagnosisId() != null) record.setPatientDiagnosisId(item.getPatientDiagnosisId());
             if (item.getPik3caStatus() != null) record.setPik3caStatus(item.getPik3caStatus());
             if (item.getEsr1Status() != null) record.setEsr1Status(item.getEsr1Status());
@@ -140,9 +140,9 @@ public class PatientVariantDbService extends BaseDbService {
         return repository.findByActive(activeEnum, pageable).map(mapper::toModel);
     }
 
-    public List<PatientVariant> findByAppUserId(@NonNull Long appUserId) {
-        return findAndLog(repository.findByAppUserId(appUserId),
-                String.format("appUserId (%d)", appUserId));
+    public List<PatientVariant> findByPatientId(@NonNull Long patientId) {
+        return findAndLog(repository.findByPatientId(patientId),
+                String.format("patientId (%d)", patientId));
     }
 
     public List<PatientVariant> findByPatientDiagnosisId(@NonNull Long patientDiagnosisId) {

@@ -10,8 +10,8 @@ import java.time.LocalDate;
 @Data
 public class RequestPatientDiagnosisUpdate extends BaseRequest {
 
-    @Size(max = 36, message = "The appUserExtid must be at most 36 characters.")
-    private String appUserExtid;
+    @Size(max = 36, message = "The patientExtid must be at most 36 characters.")
+    private String patientExtid;
 
     @Size(max = 255, message = "The cancerType must be at most 255 characters.")
     private String cancerType;
@@ -56,10 +56,7 @@ public class RequestPatientDiagnosisUpdate extends BaseRequest {
     @Size(max = 16, message = "The menopausalStatus must be at most 16 characters.")
     private String menopausalStatus;
 
-    private LocalDate dateOfBirth;
 
-    @Size(max = 16, message = "The sex must be at most 16 characters.")
-    private String sex;
 
     private LocalDate diagnosisDate;
 

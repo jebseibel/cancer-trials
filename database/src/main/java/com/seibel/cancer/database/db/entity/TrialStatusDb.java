@@ -19,8 +19,8 @@ public class TrialStatusDb extends BaseDb {
     @Column(name = "trial_id", nullable = false)
     private Long trialId;
 
-    @Column(name = "app_user_id", nullable = false)
-    private Long appUserId;
+    @Column(name = "patient_id", nullable = false)
+    private Long patientId;
 
     @Column(name = "status", length = 16, nullable = false)
     private String status;

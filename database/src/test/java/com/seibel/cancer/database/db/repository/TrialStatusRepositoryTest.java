@@ -13,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -79,13 +80,13 @@ class TrialStatusRepositoryTest {
     }
 
     @Test
-    void findByAppUserId_shouldReturnTrialStatuses_whenExists() {
+    void findByPatientId_shouldReturnTrialStatuses_whenExists() {
         // Arrange
         TrialStatusDb trialStatus = DomainBuilderDatabase.getTrialStatusDb(null, 700L);
         repository.save(trialStatus);
 
         // Act
-        List<TrialStatusDb> result = repository.findByAppUserId(700L);
+        List<TrialStatusDb> result = repository.findByPatientId(700L);
 
         // Assert
         assertEquals(1, result.size());
@@ -93,12 +94,37 @@ class TrialStatusRepositoryTest {
     }
 
     @Test
-    void findByAppUserId_shouldReturnEmpty_whenNotExists() {
+    void findByPatientId_shouldReturnEmpty_whenNotExists() {
         // Act
-        List<TrialStatusDb> result = repository.findByAppUserId(999999L);
+        List<TrialStatusDb> result = repository.findByPatientId(999999L);
 
         // Assert
         assertTrue(result.isEmpty());
+    }
+
+    /**
+     * This finder shipped with no active filter and returned soft-deleted rows - the same bug
+     * PatientDiagnosisRepository had, fixed 2026-08-08, and predicted for this one in
+     * CURRENT_STATE.md. A delete that a read ignores reports success and changes nothing the
+     * caller can see.
+     */
+    @Test
+    void findByPatientId_shouldExcludeSoftDeletedRows() {
+        // Arrange
+        TrialStatusDb live = DomainBuilderDatabase.getTrialStatusDb(null, 701L);
+        repository.save(live);
+
+        TrialStatusDb deleted = DomainBuilderDatabase.getTrialStatusDb(null, 701L);
+        deleted.setActive(ActiveEnum.INACTIVE);
+        deleted.setDeletedAt(LocalDateTime.now());
+        repository.save(deleted);
+
+        // Act
+        List<TrialStatusDb> result = repository.findByPatientId(701L);
+
+        // Assert
+        assertEquals(1, result.size());
+        assertEquals(live.getExtid(), result.get(0).getExtid());
     }
 
     @Test

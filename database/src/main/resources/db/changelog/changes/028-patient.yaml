@@ -1,0 +1,26 @@
+databaseChangeLog:
+  - changeSet:
+      id: 028-patient
+      author: jeb
+      changes:
+        # The person a trial search is FOR. Deliberately carries no username and no
+        # password_hash: a patient does not log in. Which logins may see which patients is
+        # recorded in user_patient. Replaces app_user, which had both and was therefore a
+        # second login table. See .claude/access/PATIENT_ACCESS_PLAN.md
+        - createTable:
+            tableName: patient
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: display_name, type: varchar(128), constraints: { nullable: false } }
+              # The name the clinic holds, distinct from the short switcher label.
+              - column: { name: full_name, type: varchar(255) }
+              # date_of_birth and sex live here rather than on patient_diagnosis: they are
+              # properties of a person, not of a diagnosis.
+              - column: { name: date_of_birth, type: date }
+              - column: { name: sex, type: varchar(16) }
+              - column: { name: notes, type: varchar(1000) }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }

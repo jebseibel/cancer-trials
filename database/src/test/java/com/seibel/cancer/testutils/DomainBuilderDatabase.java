@@ -1,6 +1,5 @@
 package com.seibel.cancer.testutils;
 
-import com.seibel.cancer.common.domain.AppUser;
 import com.seibel.cancer.common.domain.ArmGroup;
 import com.seibel.cancer.common.domain.Condition;
 import com.seibel.cancer.common.domain.Customer;
@@ -12,6 +11,7 @@ import com.seibel.cancer.common.domain.LabResultComponent;
 import com.seibel.cancer.common.domain.Location;
 import com.seibel.cancer.common.domain.Medication;
 import com.seibel.cancer.common.domain.Outcome;
+import com.seibel.cancer.common.domain.Patient;
 import com.seibel.cancer.common.domain.PatientDiagnosis;
 import com.seibel.cancer.common.domain.PatientMedication;
 import com.seibel.cancer.common.domain.PatientPriorTreatment;
@@ -26,9 +26,11 @@ import com.seibel.cancer.common.domain.SavedTrialMatchCriterion;
 import com.seibel.cancer.common.domain.TrialSource;
 import com.seibel.cancer.common.domain.TrialStatus;
 import com.seibel.cancer.common.domain.User;
-import com.seibel.cancer.database.db.entity.AppUserDb;
+import com.seibel.cancer.common.domain.UserPatient;
+import com.seibel.cancer.common.enums.AccessLevel;
 import com.seibel.cancer.database.db.entity.ArmGroupDb;
 import com.seibel.cancer.database.db.entity.MedicalConditionDb;
+import com.seibel.cancer.database.db.entity.PatientDb;
 import com.seibel.cancer.database.db.entity.PatientDiagnosisDb;
 import com.seibel.cancer.database.db.entity.PatientMedicationDb;
 import com.seibel.cancer.database.db.entity.PatientPriorTreatmentDb;
@@ -52,7 +54,7 @@ import com.seibel.cancer.database.db.entity.SavedTrialMatchDb;
 import com.seibel.cancer.database.db.entity.TrialSourceDb;
 import com.seibel.cancer.database.db.entity.TrialStatusDb;
 import com.seibel.cancer.database.db.entity.UserDb;
-import com.seibel.cancer.database.db.mapper.AppUserMapper;
+import com.seibel.cancer.database.db.entity.UserPatientDb;
 import com.seibel.cancer.database.db.mapper.ArmGroupMapper;
 import com.seibel.cancer.database.db.mapper.ConditionMapper;
 import com.seibel.cancer.database.db.mapper.CustomerMapper;
@@ -455,15 +457,15 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
         return getTrialStatusDb(null, null, null, null);
     }
 
-    public static TrialStatusDb getTrialStatusDb(Long trialId, Long appUserId) {
-        return getTrialStatusDb(trialId, appUserId, null, null);
+    public static TrialStatusDb getTrialStatusDb(Long trialId, Long patientId) {
+        return getTrialStatusDb(trialId, patientId, null, null);
     }
 
-    public static TrialStatusDb getTrialStatusDb(Long trialId, Long appUserId, String status, String extid) {
+    public static TrialStatusDb getTrialStatusDb(Long trialId, Long patientId, String status, String extid) {
         TrialStatusDb item = new TrialStatusDb();
         item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
         item.setTrialId(trialId != null ? trialId : ThreadLocalRandom.current().nextLong(1, 100000));
-        item.setAppUserId(appUserId != null ? appUserId : ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setPatientId(patientId != null ? patientId : ThreadLocalRandom.current().nextLong(1, 100000));
         item.setStatus(status != null ? status : getStatusRandom("Sta_"));
         item.setNotes(getDescriptionRandom("Notes "));
         item.setStatusChangedAt(LocalDateTime.now());
@@ -588,34 +590,6 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
     }
 
     // ///////////////////////////////////////////////////////////////////
-    // AppUser
-    public static AppUser getAppUser() {
-        AppUserDb item = getAppUserDb();
-        return new AppUserMapper().toModel(item);
-    }
-
-    public static AppUser getAppUser(AppUserDb item) {
-        return new AppUserMapper().toModel(item);
-    }
-
-    public static AppUserDb getAppUserDb() {
-        return getAppUserDb(null, null, null, null);
-    }
-
-    public static AppUserDb getAppUserDb(String username, String passwordHash) {
-        return getAppUserDb(username, passwordHash, null, null);
-    }
-
-    public static AppUserDb getAppUserDb(String username, String passwordHash, String displayName, String extid) {
-        AppUserDb item = new AppUserDb();
-        item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
-        item.setUsername(username != null ? username : getCodeRandom("APU_"));
-        item.setPasswordHash(passwordHash != null ? passwordHash : getUniqueRandom("Hash_"));
-        item.setDisplayName(displayName != null ? displayName : getNameRandom("Display_"));
-        setBaseSyncFields(item);
-        return item;
-    }
-
     // ///////////////////////////////////////////////////////////////////
     // OverallOfficial
     public static OverallOfficial getOverallOfficial() {
@@ -788,8 +762,8 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
         return getPatientDiagnosisDb(null, null, null);
     }
 
-    public static PatientDiagnosisDb getPatientDiagnosisDb(Long appUserId, String cancerType) {
-        return getPatientDiagnosisDb(appUserId, cancerType, null);
+    public static PatientDiagnosisDb getPatientDiagnosisDb(Long patientId, String cancerType) {
+        return getPatientDiagnosisDb(patientId, cancerType, null);
     }
 
     /**
@@ -797,10 +771,10 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
      * positionally - the other 19 columns get type-matched random defaults, since a
      * 21-parameter signature would be unreadable and easy to transpose.
      */
-    public static PatientDiagnosisDb getPatientDiagnosisDb(Long appUserId, String cancerType, String extid) {
+    public static PatientDiagnosisDb getPatientDiagnosisDb(Long patientId, String cancerType, String extid) {
         PatientDiagnosisDb item = new PatientDiagnosisDb();
         item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
-        item.setAppUserId(appUserId != null ? appUserId : ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setPatientId(patientId != null ? patientId : ThreadLocalRandom.current().nextLong(1, 100000));
         item.setCancerType(cancerType != null ? cancerType : getDescriptionRandom("Cancer_"));
         item.setStage(getVersionRandom("Stg_"));
         item.setStageSystem(getVersionRandom("Sys_"));
@@ -817,8 +791,6 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
         item.setPriorTreatments(getDescriptionRandom("Prior_"));
         item.setHasMeasurableDisease(getBooleanRandom());
         item.setMenopausalStatus(getVersionRandom("Meno_"));
-        item.setDateOfBirth(getDateRandom());
-        item.setSex(getVersionRandom("Sex_"));
         item.setDiagnosisDate(getDateRandom());
         item.setNotes(getDescriptionRandom("Notes_"));
         setBaseSyncFields(item);
@@ -851,7 +823,7 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
         item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
         item.setTrialId(trialId != null ? trialId : ThreadLocalRandom.current().nextLong(1, 100000));
         item.setSearchRunId(searchRunId != null ? searchRunId : UUID.randomUUID().toString());
-        item.setAppUserId(ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setPatientId(ThreadLocalRandom.current().nextLong(1, 100000));
         item.setPatientDiagnosisId(ThreadLocalRandom.current().nextLong(1, 100000));
         item.setQueryText(getDescriptionRandom("Query_"));
         // Bounded 0..1: top_score is decimal(6,4) and getDecimalRandom's 0..10000 range
@@ -924,7 +896,7 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
         return PatientVariant.builder()
                 .id(item.getId())
                 .extid(item.getExtid())
-                .appUserId(item.getAppUserId())
+                .patientId(item.getPatientId())
                 .patientDiagnosisId(item.getPatientDiagnosisId())
                 .pik3caStatus(item.getPik3caStatus())
                 .esr1Status(item.getEsr1Status())
@@ -957,14 +929,14 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
         return getPatientVariantDb(null, null);
     }
 
-    public static PatientVariantDb getPatientVariantDb(Long appUserId, String pik3caStatus) {
-        return getPatientVariantDb(appUserId, pik3caStatus, null);
+    public static PatientVariantDb getPatientVariantDb(Long patientId, String pik3caStatus) {
+        return getPatientVariantDb(patientId, pik3caStatus, null);
     }
 
-    public static PatientVariantDb getPatientVariantDb(Long appUserId, String pik3caStatus, String extid) {
+    public static PatientVariantDb getPatientVariantDb(Long patientId, String pik3caStatus, String extid) {
         PatientVariantDb item = new PatientVariantDb();
         item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
-        item.setAppUserId(appUserId != null ? appUserId : ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setPatientId(patientId != null ? patientId : ThreadLocalRandom.current().nextLong(1, 100000));
         item.setPatientDiagnosisId(ThreadLocalRandom.current().nextLong(1, 100000));
         item.setPik3caStatus(pik3caStatus != null ? pik3caStatus : getVariantStatusRandom());
         item.setEsr1Status(getVariantStatusRandom());
@@ -1009,7 +981,7 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
         return PatientPriorTreatment.builder()
                 .id(item.getId())
                 .extid(item.getExtid())
-                .appUserId(item.getAppUserId())
+                .patientId(item.getPatientId())
                 .patientDiagnosisId(item.getPatientDiagnosisId())
                 .cdk46Status(item.getCdk46Status())
                 .endocrineStatus(item.getEndocrineStatus())
@@ -1046,14 +1018,14 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
         return getPatientPriorTreatmentDb(null, null);
     }
 
-    public static PatientPriorTreatmentDb getPatientPriorTreatmentDb(Long appUserId, String cdk46Status) {
-        return getPatientPriorTreatmentDb(appUserId, cdk46Status, null);
+    public static PatientPriorTreatmentDb getPatientPriorTreatmentDb(Long patientId, String cdk46Status) {
+        return getPatientPriorTreatmentDb(patientId, cdk46Status, null);
     }
 
-    public static PatientPriorTreatmentDb getPatientPriorTreatmentDb(Long appUserId, String cdk46Status, String extid) {
+    public static PatientPriorTreatmentDb getPatientPriorTreatmentDb(Long patientId, String cdk46Status, String extid) {
         PatientPriorTreatmentDb item = new PatientPriorTreatmentDb();
         item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
-        item.setAppUserId(appUserId != null ? appUserId : ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setPatientId(patientId != null ? patientId : ThreadLocalRandom.current().nextLong(1, 100000));
         item.setPatientDiagnosisId(ThreadLocalRandom.current().nextLong(1, 100000));
         item.setCdk46Status(cdk46Status != null ? cdk46Status : getTreatmentStatusRandom());
         item.setEndocrineStatus(getTreatmentStatusRandom());
@@ -1079,6 +1051,97 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
         item.setCurrentlyOnTreatment(getBooleanRandom());
         item.setOtherTreatments(getDescriptionRandom("Oth_"));
         item.setNotes(getDescriptionRandom("Note_"));
+        setBaseSyncFields(item);
+        return item;
+    }
+
+    // ///////////////////////////////////////////////////////////////////
+    // Patient
+    public static Patient getPatient() {
+        return getPatient(getPatientDb());
+    }
+
+    public static Patient getPatient(PatientDb item) {
+        return Patient.builder()
+                .id(item.getId())
+                .extid(item.getExtid())
+                .displayName(item.getDisplayName())
+                .fullName(item.getFullName())
+                .dateOfBirth(item.getDateOfBirth())
+                .sex(item.getSex())
+                .notes(item.getNotes())
+                .createdAt(item.getCreatedAt())
+                .updatedAt(item.getUpdatedAt())
+                .deletedAt(item.getDeletedAt())
+                .active(item.getActive())
+                .build();
+    }
+
+    public static PatientDb getPatientDb() {
+        return getPatientDb(null, null);
+    }
+
+    public static PatientDb getPatientDb(String displayName, String sex) {
+        return getPatientDb(displayName, sex, null);
+    }
+
+    public static PatientDb getPatientDb(String displayName, String sex, String extid) {
+        PatientDb item = new PatientDb();
+        item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
+        item.setDisplayName(displayName != null ? displayName : getNameRandom("Patient_"));
+        item.setFullName(getNameRandom("Full_"));
+        item.setDateOfBirth(getDateRandom());
+        // getCodeRandom, not getNameRandom: sex is varchar(16) and a 32-char name overflows it.
+        item.setSex(sex != null ? sex : getCodeRandom("S_"));
+        item.setNotes(getDescriptionRandom("Note_"));
+        setBaseSyncFields(item);
+        return item;
+    }
+
+    // ///////////////////////////////////////////////////////////////////
+    // UserPatient
+    public static UserPatient getUserPatient() {
+        return getUserPatient(getUserPatientDb());
+    }
+
+    public static UserPatient getUserPatient(UserPatientDb item) {
+        return UserPatient.builder()
+                .id(item.getId())
+                .extid(item.getExtid())
+                .userId(item.getUserId())
+                .patientId(item.getPatientId())
+                .accessLevel(item.getAccessLevel())
+                .grantedByUserId(item.getGrantedByUserId())
+                .grantedAt(item.getGrantedAt())
+                .revokedAt(item.getRevokedAt())
+                .note(item.getNote())
+                .createdAt(item.getCreatedAt())
+                .updatedAt(item.getUpdatedAt())
+                .deletedAt(item.getDeletedAt())
+                .active(item.getActive())
+                .build();
+    }
+
+    public static UserPatientDb getUserPatientDb() {
+        return getUserPatientDb(null, null);
+    }
+
+    public static UserPatientDb getUserPatientDb(Long userId, Long patientId) {
+        return getUserPatientDb(userId, patientId, null, null);
+    }
+
+    public static UserPatientDb getUserPatientDb(Long userId, Long patientId,
+                                                 AccessLevel accessLevel, String extid) {
+        UserPatientDb item = new UserPatientDb();
+        item.setExtid(extid != null ? extid : UUID.randomUUID().toString());
+        item.setUserId(userId != null ? userId : ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setPatientId(patientId != null ? patientId : ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setAccessLevel(accessLevel != null ? accessLevel : AccessLevel.VIEW_RECORD);
+        item.setGrantedByUserId(ThreadLocalRandom.current().nextLong(1, 100000));
+        item.setGrantedAt(LocalDateTime.now());
+        // Active by default: revokedAt stays null unless a test sets it deliberately.
+        item.setRevokedAt(null);
+        item.setNote(getDescriptionRandom("Note_"));
         setBaseSyncFields(item);
         return item;
     }

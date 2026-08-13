@@ -29,7 +29,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class PatientPriorTreatment extends BaseDomain {
-    private Long appUserId;
+    private Long patientId;
     private Long patientDiagnosisId;
 
     // Priority 1 drug classes - the gates that appear most across this corpus

@@ -17,8 +17,8 @@ public class PatientDiagnosisDb extends BaseDb {
     private static final long serialVersionUID = 1234567890123456823L;
 
     // FK -> app_user.id. Plain Long, no @ManyToOne, per the project convention.
-    @Column(name = "app_user_id")
-    private Long appUserId;
+    @Column(name = "patient_id")
+    private Long patientId;
 
     @Column(name = "cancer_type", length = 255, nullable = false)
     private String cancerType;
@@ -68,11 +68,7 @@ public class PatientDiagnosisDb extends BaseDb {
     @Column(name = "menopausal_status", length = 16)
     private String menopausalStatus;
 
-    @Column(name = "date_of_birth")
-    private LocalDate dateOfBirth;
 
-    @Column(name = "sex", length = 16)
-    private String sex;
 
     @Column(name = "diagnosis_date")
     private LocalDate diagnosisDate;

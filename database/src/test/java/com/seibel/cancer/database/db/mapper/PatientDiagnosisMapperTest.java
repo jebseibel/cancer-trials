@@ -30,7 +30,7 @@ class PatientDiagnosisMapperTest {
 
         assertNotNull(model);
         assertEquals(db.getExtid(), model.getExtid());
-        assertEquals(db.getAppUserId(), model.getAppUserId());
+        assertEquals(db.getPatientId(), model.getPatientId());
         assertEquals(db.getCancerType(), model.getCancerType());
         assertEquals(db.getStage(), model.getStage());
         assertEquals(db.getStageSystem(), model.getStageSystem());
@@ -47,8 +47,6 @@ class PatientDiagnosisMapperTest {
         assertEquals(db.getPriorTreatments(), model.getPriorTreatments());
         assertEquals(db.getHasMeasurableDisease(), model.getHasMeasurableDisease());
         assertEquals(db.getMenopausalStatus(), model.getMenopausalStatus());
-        assertEquals(db.getDateOfBirth(), model.getDateOfBirth());
-        assertEquals(db.getSex(), model.getSex());
         assertEquals(db.getDiagnosisDate(), model.getDiagnosisDate());
         assertEquals(db.getNotes(), model.getNotes());
         assertEquals(db.getCreatedAt(), model.getCreatedAt());
@@ -65,7 +63,7 @@ class PatientDiagnosisMapperTest {
 
         assertNotNull(db);
         assertEquals(model.getExtid(), db.getExtid());
-        assertEquals(model.getAppUserId(), db.getAppUserId());
+        assertEquals(model.getPatientId(), db.getPatientId());
         assertEquals(model.getCancerType(), db.getCancerType());
         assertEquals(model.getStage(), db.getStage());
         assertEquals(model.getStageSystem(), db.getStageSystem());
@@ -82,8 +80,6 @@ class PatientDiagnosisMapperTest {
         assertEquals(model.getPriorTreatments(), db.getPriorTreatments());
         assertEquals(model.getHasMeasurableDisease(), db.getHasMeasurableDisease());
         assertEquals(model.getMenopausalStatus(), db.getMenopausalStatus());
-        assertEquals(model.getDateOfBirth(), db.getDateOfBirth());
-        assertEquals(model.getSex(), db.getSex());
         assertEquals(model.getDiagnosisDate(), db.getDiagnosisDate());
         assertEquals(model.getNotes(), db.getNotes());
         assertEquals(model.getCreatedAt(), db.getCreatedAt());

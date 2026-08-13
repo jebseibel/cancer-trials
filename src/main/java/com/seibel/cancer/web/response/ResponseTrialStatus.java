@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 public class ResponseTrialStatus {
     private String extid;
     private String trialExtid;
-    private String appUserExtid;
+    private String patientExtid;
     private String status;
     private String notes;
     private LocalDateTime statusChangedAt;

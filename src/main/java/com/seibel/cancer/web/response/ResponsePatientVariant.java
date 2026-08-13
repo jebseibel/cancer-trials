@@ -9,7 +9,7 @@ import java.time.LocalDate;
 @Builder
 public class ResponsePatientVariant {
     private String extid;
-    private String appUserExtid;
+    private String patientExtid;
     private String patientDiagnosisExtid;
     private String pik3caStatus;
     private String esr1Status;

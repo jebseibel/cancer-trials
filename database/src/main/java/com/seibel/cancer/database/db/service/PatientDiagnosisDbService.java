@@ -60,7 +60,7 @@ public class PatientDiagnosisDbService extends BaseDbService {
                 .orElseThrow(() -> new ServiceException(getFoundFailureMessage(extid)));
 
         try {
-            if (item.getAppUserId() != null) record.setAppUserId(item.getAppUserId());
+            if (item.getPatientId() != null) record.setPatientId(item.getPatientId());
             if (item.getCancerType() != null) record.setCancerType(item.getCancerType());
             if (item.getStage() != null) record.setStage(item.getStage());
             if (item.getStageSystem() != null) record.setStageSystem(item.getStageSystem());
@@ -77,8 +77,6 @@ public class PatientDiagnosisDbService extends BaseDbService {
             if (item.getPriorTreatments() != null) record.setPriorTreatments(item.getPriorTreatments());
             if (item.getHasMeasurableDisease() != null) record.setHasMeasurableDisease(item.getHasMeasurableDisease());
             if (item.getMenopausalStatus() != null) record.setMenopausalStatus(item.getMenopausalStatus());
-            if (item.getDateOfBirth() != null) record.setDateOfBirth(item.getDateOfBirth());
-            if (item.getSex() != null) record.setSex(item.getSex());
             if (item.getDiagnosisDate() != null) record.setDiagnosisDate(item.getDiagnosisDate());
             if (item.getNotes() != null) record.setNotes(item.getNotes());
             record.setUpdatedAt(LocalDateTime.now());
@@ -120,9 +118,9 @@ public class PatientDiagnosisDbService extends BaseDbService {
     }
 
     /** One patient's diagnosis, looked up by the owning app user. */
-    public List<PatientDiagnosis> findByAppUserId(@NonNull Long appUserId) {
-        return findAndLog(repository.findByAppUserId(appUserId),
-                String.format("appUserId (%d)", appUserId));
+    public List<PatientDiagnosis> findByPatientId(@NonNull Long patientId) {
+        return findAndLog(repository.findByPatientId(patientId),
+                String.format("patientId (%d)", patientId));
     }
 
     public List<PatientDiagnosis> findAll() {

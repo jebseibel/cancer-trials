@@ -52,14 +52,14 @@ class PatientVariantRepositoryTest {
     }
 
     @Test
-    void findByAppUserId_shouldReturnOnlyActiveRows() {
+    void findByPatientId_shouldReturnOnlyActiveRows() {
         repository.save(DomainBuilderDatabase.getPatientVariantDb(4242L, "DETECTED"));
 
         PatientVariantDb deleted = DomainBuilderDatabase.getPatientVariantDb(4242L, "NOT_DETECTED");
         deleted.setActive(ActiveEnum.INACTIVE);
         repository.save(deleted);
 
-        List<PatientVariantDb> found = repository.findByAppUserId(4242L);
+        List<PatientVariantDb> found = repository.findByPatientId(4242L);
 
         // The soft-delete filter is the point: PatientDiagnosisRepository shipped without it
         // and the Diagnosis page edited a deleted row.

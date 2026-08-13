@@ -24,7 +24,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class PatientVariant extends BaseDomain {
-    private Long appUserId;
+    private Long patientId;
     private Long patientDiagnosisId;
 
     // Somatic (tumor) findings

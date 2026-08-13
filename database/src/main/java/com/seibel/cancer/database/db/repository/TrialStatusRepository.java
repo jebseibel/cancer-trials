@@ -17,7 +17,19 @@ public interface TrialStatusRepository extends JpaRepository<TrialStatusDb, Long
     Page<TrialStatusDb> findByActive(ActiveEnum active, Pageable pageable);
     boolean existsByExtid(String extid);
     List<TrialStatusDb> findByTrialId(Long trialId);
-    List<TrialStatusDb> findByAppUserId(Long appUserId);
+
+    /**
+     * Filters on active. This finder shipped without that filter and returned soft-deleted
+     * rows - the same bug {@code PatientDiagnosisRepository.findByPatientId} had, fixed
+     * 2026-08-08, and predicted for this one in {@code .claude/CURRENT_STATE.md}. A delete
+     * that a read ignores is worse than no delete: it reports success and changes nothing
+     * the caller can see.
+     */
+    List<TrialStatusDb> findByPatientIdAndActive(Long patientId, ActiveEnum active);
+
+    default List<TrialStatusDb> findByPatientId(Long patientId) {
+        return findByPatientIdAndActive(patientId, ActiveEnum.ACTIVE);
+    }
 
     default List<TrialStatusDb> findAllActive() {
         return findByActive(ActiveEnum.ACTIVE);

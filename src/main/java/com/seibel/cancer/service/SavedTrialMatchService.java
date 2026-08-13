@@ -136,13 +136,13 @@ public class SavedTrialMatchService extends BaseService {
         }
     }
 
-    public List<SavedTrialMatch> findByAppUserId(Long appUserId) {
-        requireNonNull(appUserId, "appUserId");
+    public List<SavedTrialMatch> findByPatientId(Long patientId) {
+        requireNonNull(patientId, "patientId");
 
         try {
-            return dbService.findByAppUserId(appUserId);
+            return dbService.findByPatientId(patientId);
         } catch (Exception e) {
-            log.error("Failed to find trialMatches by appUserId: {}", appUserId, e);
+            log.error("Failed to find trialMatches by patientId: {}", patientId, e);
             throw new ServiceException("Unable to find trialMatches", e);
         }
     }

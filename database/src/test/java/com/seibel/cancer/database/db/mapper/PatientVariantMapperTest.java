@@ -28,7 +28,7 @@ class PatientVariantMapperTest {
         PatientVariant model = mapper.toModel(db);
 
         assertEquals(db.getExtid(), model.getExtid());
-        assertEquals(db.getAppUserId(), model.getAppUserId());
+        assertEquals(db.getPatientId(), model.getPatientId());
         assertEquals(db.getPatientDiagnosisId(), model.getPatientDiagnosisId());
         assertEquals(db.getPik3caStatus(), model.getPik3caStatus());
         assertEquals(db.getEsr1Status(), model.getEsr1Status());
@@ -63,7 +63,7 @@ class PatientVariantMapperTest {
         PatientVariantDb db = mapper.toDb(model);
 
         assertEquals(model.getExtid(), db.getExtid());
-        assertEquals(model.getAppUserId(), db.getAppUserId());
+        assertEquals(model.getPatientId(), db.getPatientId());
         assertEquals(model.getPatientDiagnosisId(), db.getPatientDiagnosisId());
         assertEquals(model.getPik3caStatus(), db.getPik3caStatus());
         assertEquals(model.getEsr1Status(), db.getEsr1Status());

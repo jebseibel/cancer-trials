@@ -20,14 +20,14 @@ public interface PatientPriorTreatmentRepository extends JpaRepository<PatientPr
     /**
      * The patient's treatment row, newest first.
      *
-     * Filters on active: PatientDiagnosisRepository.findByAppUserId shipped without that
+     * Filters on active: PatientDiagnosisRepository.findByPatientId shipped without that
      * filter and the Diagnosis page displayed and edited a soft-deleted record. Same shape
      * here, so the same guard from the start.
      */
-    List<PatientPriorTreatmentDb> findByAppUserIdAndActiveOrderByCreatedAtDesc(Long appUserId, ActiveEnum active);
+    List<PatientPriorTreatmentDb> findByPatientIdAndActiveOrderByCreatedAtDesc(Long patientId, ActiveEnum active);
 
-    default List<PatientPriorTreatmentDb> findByAppUserId(Long appUserId) {
-        return findByAppUserIdAndActiveOrderByCreatedAtDesc(appUserId, ActiveEnum.ACTIVE);
+    default List<PatientPriorTreatmentDb> findByPatientId(Long patientId) {
+        return findByPatientIdAndActiveOrderByCreatedAtDesc(patientId, ActiveEnum.ACTIVE);
     }
 
     List<PatientPriorTreatmentDb> findByPatientDiagnosisIdAndActive(Long patientDiagnosisId, ActiveEnum active);

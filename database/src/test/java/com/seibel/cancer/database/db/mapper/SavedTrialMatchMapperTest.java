@@ -29,7 +29,7 @@ class TrialMatchMapperTest {
 
         assertEquals(db.getExtid(), model.getExtid());
         assertEquals(db.getTrialId(), model.getTrialId());
-        assertEquals(db.getAppUserId(), model.getAppUserId());
+        assertEquals(db.getPatientId(), model.getPatientId());
         assertEquals(db.getPatientDiagnosisId(), model.getPatientDiagnosisId());
         assertEquals(db.getSearchRunId(), model.getSearchRunId());
         assertEquals(db.getQueryText(), model.getQueryText());
@@ -55,7 +55,7 @@ class TrialMatchMapperTest {
 
         assertEquals(model.getExtid(), db.getExtid());
         assertEquals(model.getTrialId(), db.getTrialId());
-        assertEquals(model.getAppUserId(), db.getAppUserId());
+        assertEquals(model.getPatientId(), db.getPatientId());
         assertEquals(model.getPatientDiagnosisId(), db.getPatientDiagnosisId());
         assertEquals(model.getSearchRunId(), db.getSearchRunId());
         assertEquals(model.getQueryText(), db.getQueryText());

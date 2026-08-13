@@ -63,7 +63,7 @@ public class SavedTrialMatchDbService extends BaseDbService {
 
         try {
             if (item.getTrialId() != null) record.setTrialId(item.getTrialId());
-            if (item.getAppUserId() != null) record.setAppUserId(item.getAppUserId());
+            if (item.getPatientId() != null) record.setPatientId(item.getPatientId());
             if (item.getPatientDiagnosisId() != null) record.setPatientDiagnosisId(item.getPatientDiagnosisId());
             if (item.getSearchRunId() != null) record.setSearchRunId(item.getSearchRunId());
             if (item.getQueryText() != null) record.setQueryText(item.getQueryText());
@@ -135,9 +135,9 @@ public class SavedTrialMatchDbService extends BaseDbService {
                 String.format("searchRunId (%s)", searchRunId));
     }
 
-    public List<SavedTrialMatch> findByAppUserId(@NonNull Long appUserId) {
-        return findAndLog(repository.findByAppUserId(appUserId),
-                String.format("appUserId (%d)", appUserId));
+    public List<SavedTrialMatch> findByPatientId(@NonNull Long patientId) {
+        return findAndLog(repository.findByPatientId(patientId),
+                String.format("patientId (%d)", patientId));
     }
 
     public List<SavedTrialMatch> findByTrialId(@NonNull Long trialId) {
