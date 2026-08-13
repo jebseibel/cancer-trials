@@ -93,14 +93,14 @@ public class PatientDiagnosisService extends BaseService {
     }
 
     /** One patient's diagnosis, looked up by the owning app user. */
-    public List<PatientDiagnosis> findByAppUserId(Long appUserId) {
-        requireNonNull(appUserId, "appUserId");
-        log.info("findByAppUserId(): appUserId={}", appUserId);
+    public List<PatientDiagnosis> findByPatientId(Long patientId) {
+        requireNonNull(patientId, "patientId");
+        log.info("findByPatientId(): patientId={}", patientId);
 
         try {
-            return dbService.findByAppUserId(appUserId);
+            return dbService.findByPatientId(patientId);
         } catch (Exception e) {
-            log.error("Failed to retrieve patientDiagnoses by appUserId: {}", appUserId, e);
+            log.error("Failed to retrieve patientDiagnoses by patientId: {}", patientId, e);
             throw new ServiceException("Unable to retrieve patientDiagnoses", e);
         }
     }

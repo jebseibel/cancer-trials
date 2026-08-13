@@ -88,19 +88,19 @@ class TrialMatchRepositoryTest {
     }
 
     @Test
-    void findByAppUserId_shouldReturnMatchesForThatUserOnly() {
-        Long appUserId = 4242L;
+    void findByPatientId_shouldReturnMatchesForThatUserOnly() {
+        Long patientId = 4242L;
 
         SavedTrialMatchDb mine = DomainBuilderDatabase.getSavedTrialMatchDb();
-        mine.setAppUserId(appUserId);
+        mine.setPatientId(patientId);
         repository.save(mine);
 
         repository.save(DomainBuilderDatabase.getSavedTrialMatchDb());
 
-        List<SavedTrialMatchDb> found = repository.findByAppUserId(appUserId);
+        List<SavedTrialMatchDb> found = repository.findByPatientId(patientId);
 
         assertEquals(1, found.size());
-        assertEquals(appUserId, found.get(0).getAppUserId());
+        assertEquals(patientId, found.get(0).getPatientId());
     }
 
     @Test

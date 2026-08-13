@@ -4,7 +4,9 @@ import com.seibel.cancer.common.domain.PatientPriorTreatment;
 import com.seibel.cancer.common.enums.ActiveEnum;
 import com.seibel.cancer.common.exceptions.ResourceNotFoundException;
 import com.seibel.cancer.common.exceptions.ValidationException;
-import com.seibel.cancer.database.db.repository.AppUserRepository;
+import com.seibel.cancer.common.enums.AccessLevel;
+import com.seibel.cancer.database.db.repository.PatientRepository;
+import com.seibel.cancer.service.CurrentUserService;
 import com.seibel.cancer.database.db.repository.PatientDiagnosisRepository;
 import com.seibel.cancer.service.PatientPriorTreatmentService;
 import com.seibel.cancer.web.request.RequestPatientPriorTreatmentCreate;
@@ -40,13 +42,16 @@ import java.util.List;
 public class PatientPriorTreatmentController {
 
     private final PatientPriorTreatmentService patientPriorTreatmentService;
+    private final CurrentUserService currentUserService;
     private final PatientPriorTreatmentConverter converter;
 
     public PatientPriorTreatmentController(PatientPriorTreatmentService patientPriorTreatmentService,
-                                           AppUserRepository appUserRepository,
+                                           CurrentUserService currentUserService,
+                                           PatientRepository patientRepository,
                                            PatientDiagnosisRepository patientDiagnosisRepository) {
         this.patientPriorTreatmentService = patientPriorTreatmentService;
-        this.converter = new PatientPriorTreatmentConverter(appUserRepository, patientDiagnosisRepository);
+        this.currentUserService = currentUserService;
+        this.converter = new PatientPriorTreatmentConverter(patientRepository, patientDiagnosisRepository);
     }
 
     @GetMapping
@@ -63,11 +68,11 @@ public class PatientPriorTreatmentController {
         return converter.toResponse(patientPriorTreatmentService.findByExtid(extid));
     }
 
-    @GetMapping("/by-appuser/{appUserExtid}")
+    @GetMapping("/by-patient/{patientExtid}")
     @Operation(summary = "Get the treatment history for one app user")
-    public List<ResponsePatientPriorTreatment> getByAppUserExtid(@PathVariable String appUserExtid) {
-        Long appUserId = converter.resolveAppUserId(appUserExtid);
-        return converter.toResponse(patientPriorTreatmentService.findByAppUserId(appUserId));
+    public List<ResponsePatientPriorTreatment> getByPatientExtid(@PathVariable String patientExtid) {
+        Long patientId = currentUserService.requireAccessId(patientExtid, AccessLevel.VIEW_RECORD);
+        return converter.toResponse(patientPriorTreatmentService.findByPatientId(patientId));
     }
 
     @GetMapping("/by-diagnosis/{patientDiagnosisExtid}")
@@ -112,18 +117,18 @@ public class PatientPriorTreatmentController {
 
 class PatientPriorTreatmentConverter {
 
-    private final AppUserRepository appUserRepository;
+    private final PatientRepository patientRepository;
     private final PatientDiagnosisRepository patientDiagnosisRepository;
 
-    PatientPriorTreatmentConverter(AppUserRepository appUserRepository,
+    PatientPriorTreatmentConverter(PatientRepository patientRepository,
                                    PatientDiagnosisRepository patientDiagnosisRepository) {
-        this.appUserRepository = appUserRepository;
+        this.patientRepository = patientRepository;
         this.patientDiagnosisRepository = patientDiagnosisRepository;
     }
 
-    Long resolveAppUserId(String appUserExtid) {
-        return appUserRepository.findByExtid(appUserExtid)
-                .orElseThrow(() -> new ResourceNotFoundException("AppUser", appUserExtid))
+    Long resolvePatientId(String patientExtid) {
+        return patientRepository.findByExtid(patientExtid)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", patientExtid))
                 .getId();
     }
 
@@ -133,9 +138,9 @@ class PatientPriorTreatmentConverter {
                 .getId();
     }
 
-    private String resolveAppUserExtid(Long appUserId) {
-        if (appUserId == null) return null;
-        return appUserRepository.findById(appUserId).map(u -> u.getExtid()).orElse(null);
+    private String resolvePatientExtid(Long patientId) {
+        if (patientId == null) return null;
+        return patientRepository.findById(patientId).map(u -> u.getExtid()).orElse(null);
     }
 
     private String resolvePatientDiagnosisExtid(Long patientDiagnosisId) {
@@ -145,7 +150,7 @@ class PatientPriorTreatmentConverter {
 
     PatientPriorTreatment toDomain(RequestPatientPriorTreatmentCreate request) {
         return PatientPriorTreatment.builder()
-                .appUserId(request.getAppUserExtid() != null ? resolveAppUserId(request.getAppUserExtid()) : null)
+                .patientId(request.getPatientExtid() != null ? resolvePatientId(request.getPatientExtid()) : null)
                 .patientDiagnosisId(request.getPatientDiagnosisExtid() != null
                         ? resolvePatientDiagnosisId(request.getPatientDiagnosisExtid()) : null)
                 .cdk46Status(request.getCdk46Status())
@@ -177,7 +182,7 @@ class PatientPriorTreatmentConverter {
 
     PatientPriorTreatment toDomain(RequestPatientPriorTreatmentUpdate request) {
         return PatientPriorTreatment.builder()
-                .appUserId(request.getAppUserExtid() != null ? resolveAppUserId(request.getAppUserExtid()) : null)
+                .patientId(request.getPatientExtid() != null ? resolvePatientId(request.getPatientExtid()) : null)
                 .patientDiagnosisId(request.getPatientDiagnosisExtid() != null
                         ? resolvePatientDiagnosisId(request.getPatientDiagnosisExtid()) : null)
                 .cdk46Status(request.getCdk46Status())
@@ -210,7 +215,7 @@ class PatientPriorTreatmentConverter {
     ResponsePatientPriorTreatment toResponse(PatientPriorTreatment item) {
         return ResponsePatientPriorTreatment.builder()
                 .extid(item.getExtid())
-                .appUserExtid(resolveAppUserExtid(item.getAppUserId()))
+                .patientExtid(resolvePatientExtid(item.getPatientId()))
                 .patientDiagnosisExtid(resolvePatientDiagnosisExtid(item.getPatientDiagnosisId()))
                 .cdk46Status(item.getCdk46Status())
                 .endocrineStatus(item.getEndocrineStatus())
@@ -244,7 +249,7 @@ class PatientPriorTreatmentConverter {
     }
 
     void validateUpdateRequest(RequestPatientPriorTreatmentUpdate request) {
-        if (request.getAppUserExtid() == null
+        if (request.getPatientExtid() == null
                 && request.getPatientDiagnosisExtid() == null
                 && request.getCdk46Status() == null
                 && request.getEndocrineStatus() == null

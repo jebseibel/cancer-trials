@@ -85,12 +85,12 @@ public class TrialMatchingService extends BaseService {
     }
 
     /** Loads the most recent active row from each patient table for this user. */
-    public PatientRecord loadPatientRecord(Long appUserId) {
-        requireNonNull(appUserId, "appUserId");
+    public PatientRecord loadPatientRecord(Long patientId) {
+        requireNonNull(patientId, "patientId");
         return new PatientRecord(
-                firstOrNull(diagnosisDbService.findByAppUserId(appUserId)),
-                firstOrNull(variantDbService.findByAppUserId(appUserId)),
-                firstOrNull(treatmentDbService.findByAppUserId(appUserId)));
+                firstOrNull(diagnosisDbService.findByPatientId(patientId)),
+                firstOrNull(variantDbService.findByPatientId(patientId)),
+                firstOrNull(treatmentDbService.findByPatientId(patientId)));
     }
 
     /**
@@ -171,12 +171,12 @@ public class TrialMatchingService extends BaseService {
      * demotion is the caller's decision to make from {@code concernCount}. Re-sorting here
      * would bury a highly-relevant trial behind an unparsed location field.
      */
-    public List<TrialAssessment> assessAll(List<Trial> trials, Long appUserId) {
+    public List<TrialAssessment> assessAll(List<Trial> trials, Long patientId) {
         requireNonNull(trials, "trials");
-        PatientRecord record = loadPatientRecord(appUserId);
+        PatientRecord record = loadPatientRecord(patientId);
         if (!record.hasAnything()) {
-            log.info("assessAll: appUserId={} has no patient record; signals will be unknown",
-                    appUserId);
+            log.info("assessAll: patientId={} has no patient record; signals will be unknown",
+                    patientId);
         }
 
         // Locations for every trial up front, in batches. Fetching them per trial made ranking

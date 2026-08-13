@@ -12,7 +12,7 @@ public class RequestTrialStatusUpdate extends BaseRequest {
 
     private String trialExtid;
 
-    private String appUserExtid;
+    private String patientExtid;
 
     @Size(max = 16, message = "The status must be at most 16 characters.")
     private String status;

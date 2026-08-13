@@ -35,12 +35,12 @@ public class PatientPriorTreatmentService extends BaseService {
     @Transactional
     public PatientPriorTreatment create(PatientPriorTreatment item) {
         requireNonNull(item, "PatientPriorTreatment");
-        log.info("create(): appUserId={}", item.getAppUserId());
+        log.info("create(): patientId={}", item.getPatientId());
 
         try {
             return dbService.create(item);
         } catch (Exception e) {
-            log.error("Failed to create patientPriorTreatment for appUserId: {}", item.getAppUserId(), e);
+            log.error("Failed to create patientPriorTreatment for patientId: {}", item.getPatientId(), e);
             throw new ServiceException("Unable to create patientPriorTreatment", e);
         }
     }
@@ -125,13 +125,13 @@ public class PatientPriorTreatmentService extends BaseService {
     }
 
     /** The patient's treatment row - the primary read for matching. */
-    public List<PatientPriorTreatment> findByAppUserId(Long appUserId) {
-        requireNonNull(appUserId, "appUserId");
+    public List<PatientPriorTreatment> findByPatientId(Long patientId) {
+        requireNonNull(patientId, "patientId");
 
         try {
-            return dbService.findByAppUserId(appUserId);
+            return dbService.findByPatientId(patientId);
         } catch (Exception e) {
-            log.error("Failed to find patientPriorTreatments by appUserId: {}", appUserId, e);
+            log.error("Failed to find patientPriorTreatments by patientId: {}", patientId, e);
             throw new ServiceException("Unable to find patientPriorTreatments", e);
         }
     }

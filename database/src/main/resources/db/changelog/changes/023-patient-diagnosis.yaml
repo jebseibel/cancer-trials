@@ -11,7 +11,7 @@ databaseChangeLog:
             columns:
               - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
               - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
-              - column: { name: app_user_id, type: bigint }
+              - column: { name: patient_id, type: bigint }
               - column: { name: cancer_type, type: varchar(255), constraints: { nullable: false } }
               - column: { name: stage, type: varchar(16) }
               - column: { name: stage_system, type: varchar(16) }
@@ -28,8 +28,6 @@ databaseChangeLog:
               - column: { name: prior_treatments, type: varchar(2000) }
               - column: { name: has_measurable_disease, type: "tinyint(1)" }
               - column: { name: menopausal_status, type: varchar(16) }
-              - column: { name: date_of_birth, type: date }
-              - column: { name: sex, type: varchar(16) }
               - column: { name: diagnosis_date, type: date }
               - column: { name: notes, type: longtext }
               - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
@@ -39,6 +37,6 @@ databaseChangeLog:
 
         - createIndex:
             tableName: patient_diagnosis
-            indexName: idx_patient_diagnosis_app_user_id
+            indexName: idx_patient_diagnosis_patient_id
             columns:
-              - column: { name: app_user_id }
+              - column: { name: patient_id }

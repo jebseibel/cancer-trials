@@ -20,8 +20,8 @@ public class SavedTrialMatchDb extends BaseDb {
     @Column(name = "trial_id", nullable = false)
     private Long trialId;
 
-    @Column(name = "app_user_id", nullable = false)
-    private Long appUserId;
+    @Column(name = "patient_id", nullable = false)
+    private Long patientId;
 
     /** Nullable on purpose: a match must survive the diagnosis row being deleted and recreated. */
     @Column(name = "patient_diagnosis_id")

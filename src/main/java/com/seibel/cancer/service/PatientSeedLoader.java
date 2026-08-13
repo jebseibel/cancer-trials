@@ -1,11 +1,14 @@
 package com.seibel.cancer.service;
 
-import com.seibel.cancer.common.domain.AppUser;
+import com.seibel.cancer.common.domain.Patient;
 import com.seibel.cancer.common.domain.PatientDiagnosis;
 import com.seibel.cancer.common.domain.PatientPriorTreatment;
 import com.seibel.cancer.common.domain.PatientVariant;
-import com.seibel.cancer.database.db.repository.AppUserRepository;
-import com.seibel.cancer.database.db.service.AppUserDbService;
+import com.seibel.cancer.common.enums.AccessLevel;
+import com.seibel.cancer.database.db.repository.PatientRepository;
+import com.seibel.cancer.database.db.repository.UserRepository;
+import com.seibel.cancer.database.db.service.PatientDbService;
+import com.seibel.cancer.database.db.service.UserPatientDbService;
 import com.seibel.cancer.database.db.service.PatientDiagnosisDbService;
 import com.seibel.cancer.database.db.service.PatientPriorTreatmentDbService;
 import com.seibel.cancer.database.db.service.PatientSeedProperties;
@@ -25,7 +28,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Recreates the hand-entered patient rows on startup: AppUser, PatientDiagnosis,
+ * Recreates the hand-entered patient rows on startup: Patient, PatientDiagnosis,
  * PatientVariant, PatientPriorTreatment.
  *
  * <p><b>Why this exists.</b> Those four are the only rows in this schema created through the
@@ -48,8 +51,10 @@ import java.util.Optional;
 public class PatientSeedLoader implements CommandLineRunner {
 
     private final PatientSeedProperties properties;
-    private final AppUserRepository appUserRepository;
-    private final AppUserDbService appUserDbService;
+    private final UserRepository userRepository;
+    private final PatientRepository patientRepository;
+    private final PatientDbService patientDbService;
+    private final UserPatientDbService userPatientDbService;
     private final PatientDiagnosisDbService diagnosisDbService;
     private final PatientVariantDbService variantDbService;
     private final PatientPriorTreatmentDbService priorTreatmentDbService;
@@ -91,14 +96,21 @@ public class PatientSeedLoader implements CommandLineRunner {
                 continue;
             }
 
-            Long appUserId = resolveOrCreateAppUser(username);
-            if (hasExisting(diagnosisDbService.findByAppUserId(appUserId).size(),
+            // These four describe the person, not the diagnosis, so they land on `patient` -
+            // but the diagnosis CSV is where they are recorded, making this the only seed
+            // that can supply them.
+            Long patientId = resolveOrCreatePatient(username, new PersonFields(
+                    get(row, "displayName"),
+                    get(row, "fullName"),
+                    date(row, "dateOfBirth"),
+                    get(row, "sex")));
+            if (hasExisting(diagnosisDbService.findByPatientId(patientId).size(),
                     "PatientDiagnosis", username)) {
                 continue;
             }
 
             diagnosisDbService.create(PatientDiagnosis.builder()
-                    .appUserId(appUserId)
+                    .patientId(patientId)
                     .cancerType(get(row, "cancerType"))
                     .stage(get(row, "stage"))
                     .stageSystem(get(row, "stageSystem"))
@@ -115,8 +127,6 @@ public class PatientSeedLoader implements CommandLineRunner {
                     .priorTreatments(get(row, "priorTreatments"))
                     .hasMeasurableDisease(bool(row, "hasMeasurableDisease"))
                     .menopausalStatus(get(row, "menopausalStatus"))
-                    .dateOfBirth(date(row, "dateOfBirth"))
-                    .sex(get(row, "sex"))
                     .diagnosisDate(date(row, "diagnosisDate"))
                     .notes(get(row, "notes"))
                     .build());
@@ -138,14 +148,14 @@ public class PatientSeedLoader implements CommandLineRunner {
                 continue;
             }
 
-            Long appUserId = resolveOrCreateAppUser(username);
-            if (hasExisting(variantDbService.findByAppUserId(appUserId).size(),
+            Long patientId = resolveOrCreatePatient(username);
+            if (hasExisting(variantDbService.findByPatientId(patientId).size(),
                     "PatientVariant", username)) {
                 continue;
             }
 
             variantDbService.create(PatientVariant.builder()
-                    .appUserId(appUserId)
+                    .patientId(patientId)
                     .pik3caStatus(get(row, "pik3caStatus"))
                     .esr1Status(get(row, "esr1Status"))
                     .tp53Status(get(row, "tp53Status"))
@@ -185,14 +195,14 @@ public class PatientSeedLoader implements CommandLineRunner {
                 continue;
             }
 
-            Long appUserId = resolveOrCreateAppUser(username);
-            if (hasExisting(priorTreatmentDbService.findByAppUserId(appUserId).size(),
+            Long patientId = resolveOrCreatePatient(username);
+            if (hasExisting(priorTreatmentDbService.findByPatientId(patientId).size(),
                     "PatientPriorTreatment", username)) {
                 continue;
             }
 
             priorTreatmentDbService.create(PatientPriorTreatment.builder()
-                    .appUserId(appUserId)
+                    .patientId(patientId)
                     .cdk46Status(get(row, "cdk46Status"))
                     .endocrineStatus(get(row, "endocrineStatus"))
                     .serdStatus(get(row, "serdStatus"))
@@ -226,26 +236,124 @@ public class PatientSeedLoader implements CommandLineRunner {
     // ------------------------------------------------------------------ helpers
 
     /**
-     * AppUser and User (login) are separate tables matched by username, with no FK. The seed
+     * The seed
      * files key on username for the same reason: extids regenerate on every rebuild.
      */
-    private Long resolveOrCreateAppUser(String username) {
-        Optional<Long> existing = appUserRepository.findByUsername(username)
-                .map(u -> u.getId());
-        if (existing.isPresent()) {
-            return existing.get();
+    /** The person fields carried by the diagnosis CSV, all optional. */
+    private record PersonFields(String displayName, String fullName, LocalDate dateOfBirth, String sex) {
+        static PersonFields none() {
+            return new PersonFields(null, null, null, null);
         }
 
-        // passwordHash is required by the entity even though AppUser never authenticates -
-        // a known design flaw, documented in PATIENT_MODEL_PLAN.md.
-        AppUser created = appUserDbService.create(AppUser.builder()
-                .username(username)
-                .passwordHash("seeded-app-user-does-not-authenticate")
-                .displayName(username)
+        boolean isEmpty() {
+            return displayName == null && fullName == null && dateOfBirth == null && sex == null;
+        }
+    }
+
+    /**
+     * Resolve the patient this login owns, creating it and the OWNER grant if absent.
+     *
+     * <p>The CSV's {@code username} column names the <em>owning login</em>, not the patient -
+     * the person entering the data is often not the person the data is about.
+     *
+     * <p>Only the diagnosis CSV carries the person fields, so the variant and prior-treatment
+     * seeds call this overload and resolve the same patient through its OWNER grant.
+     */
+    private Long resolveOrCreatePatient(String username) {
+        return resolveOrCreatePatient(username, PersonFields.none());
+    }
+
+    /**
+     * Resolve the patient this login owns, creating it and the OWNER grant if absent.
+     *
+     * <p>{@code displayName}, {@code fullName}, {@code dateOfBirth} and {@code sex} are
+     * properties of the <em>person</em> and live on {@code patient} - but they are recorded in
+     * the diagnosis CSV, so this is the only seed that can supply them.
+     *
+     * <p><strong>An existing patient is backfilled, not left alone.</strong> This is the one
+     * deliberate exception to the loader's seed-if-absent rule, and it exists because these
+     * columns arrived through schema changes: a patient created earlier has them null, and
+     * Tier 1 matching needs the date of birth and sex. <strong>Only null fields are filled</strong>
+     * - anything edited through the UI is never overwritten.
+     *
+     * <p>Writes the grant as well as the patient: a patient with no grant is unreachable by
+     * everyone including its owner, since every read goes through a grant lookup.
+     */
+    private Long resolveOrCreatePatient(String username, PersonFields person) {
+        Long userId = userRepository.findByUsername(username)
+                .map(u -> u.getId())
+                .orElse(null);
+        if (userId == null) {
+            log.warn("Seed row names username={} with no user row - patient will have no owner", username);
+        }
+
+        if (userId != null) {
+            Optional<Long> owned = userPatientDbService.findActiveGrantsForUser(userId).stream()
+                    .filter(g -> g.getAccessLevel() == AccessLevel.OWNER)
+                    .map(g -> g.getPatientId())
+                    .findFirst();
+            if (owned.isPresent()) {
+                backfillPersonFields(owned.get(), person);
+                return owned.get();
+            }
+        }
+
+        // Falls back to the username only when the CSV gives no displayName - the column is
+        // not null, so something has to be there, but a login handle is a poor name for a
+        // person and should be treated as a missing value to fix rather than a default.
+        String displayName = person.displayName() != null ? person.displayName() : username;
+        if (person.displayName() == null) {
+            log.warn("Seed row for username={} has no displayName - falling back to the username",
+                    username);
+        }
+
+        Patient created = patientDbService.create(Patient.builder()
+                .displayName(displayName)
+                .fullName(person.fullName())
+                .dateOfBirth(person.dateOfBirth())
+                .sex(person.sex())
                 .build());
 
-        log.info("Seeded AppUser username={}", username);
+        if (userId != null) {
+            userPatientDbService.grant(userId, created.getId(), AccessLevel.OWNER, userId,
+                    "seeded from patient CSV");
+        }
+
+        log.info("Seeded Patient displayName={} owned by username={}", displayName, username);
         return created.getId();
+    }
+
+    /** Fill person fields on an existing patient, but only where they are still null. */
+    private void backfillPersonFields(Long patientId, PersonFields person) {
+        if (person.isEmpty()) return;
+
+        patientRepository.findById(patientId).ifPresent(existing -> {
+            // displayName is not null in the schema, so "still null" for it means "still the
+            // username fallback" - that is the value the CSV should be allowed to correct.
+            boolean displayNameIsFallback = existing.getDisplayName() == null
+                    || existing.getDisplayName().equals(existing.getFullName())
+                    || isUsernameFallback(existing.getDisplayName());
+
+            String display = displayNameIsFallback ? person.displayName() : null;
+            String full = existing.getFullName() == null ? person.fullName() : null;
+            LocalDate dob = existing.getDateOfBirth() == null ? person.dateOfBirth() : null;
+            String sex = existing.getSex() == null ? person.sex() : null;
+
+            if (display == null && full == null && dob == null && sex == null) return;
+
+            patientDbService.update(existing.getExtid(), Patient.builder()
+                    .displayName(display)
+                    .fullName(full)
+                    .dateOfBirth(dob)
+                    .sex(sex)
+                    .build());
+            log.info("Backfilled patient extid={} from the diagnosis CSV", existing.getExtid());
+        });
+    }
+
+    /** True when displayName still holds an owning login's username rather than a person's name. */
+    private boolean isUsernameFallback(String displayName) {
+        return userRepository.findByUsername(displayName).isPresent();
     }
 
     private boolean hasExisting(int count, String type, String username) {

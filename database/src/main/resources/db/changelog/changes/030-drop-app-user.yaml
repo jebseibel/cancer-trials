@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: 030-drop-app-user
+      author: jeb
+      changes:
+        # app_user is gone. It was a second login table wearing a patient's clothes: it carried
+        # its own username and password_hash, had no FK to `user`, and the two were reconciled
+        # by string-matching usernames. Every clinical table now hangs off `patient`, and which
+        # logins may see which patients is recorded in `user_patient`.
+        #
+        # A new changeset rather than an edit to 006-app-user.yaml: editing an applied changeset
+        # breaks its checksum, and `drop-first` is false here.
+        #
+        # See .claude/access/PATIENT_ACCESS_PLAN.md
+        - dropTable:
+            tableName: app_user

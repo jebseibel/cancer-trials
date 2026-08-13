@@ -25,7 +25,7 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = true)
 public class SavedTrialMatch extends BaseDomain {
     private Long trialId;
-    private Long appUserId;
+    private Long patientId;
     private Long patientDiagnosisId;
     private String searchRunId;
     private String queryText;

@@ -33,7 +33,7 @@ class TrialStatusMapperTest {
         assertNotNull(domain);
         assertEquals(db.getExtid(), domain.getExtid());
         assertEquals(db.getTrialId(), domain.getTrialId());
-        assertEquals(db.getAppUserId(), domain.getAppUserId());
+        assertEquals(db.getPatientId(), domain.getPatientId());
         assertEquals(db.getStatus(), domain.getStatus());
         assertEquals(db.getNotes(), domain.getNotes());
         assertEquals(db.getStatusChangedAt(), domain.getStatusChangedAt());
@@ -55,7 +55,7 @@ class TrialStatusMapperTest {
         assertNotNull(db);
         assertEquals(domain.getExtid(), db.getExtid());
         assertEquals(domain.getTrialId(), db.getTrialId());
-        assertEquals(domain.getAppUserId(), db.getAppUserId());
+        assertEquals(domain.getPatientId(), db.getPatientId());
         assertEquals(domain.getStatus(), db.getStatus());
         assertEquals(domain.getNotes(), db.getNotes());
         assertEquals(domain.getStatusChangedAt(), db.getStatusChangedAt());

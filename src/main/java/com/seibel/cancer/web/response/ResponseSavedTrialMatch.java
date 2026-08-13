@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 public class ResponseSavedTrialMatch {
     private String extid;
     private String trialExtid;
-    private String appUserExtid;
+    private String patientExtid;
     private String patientDiagnosisExtid;
     private String searchRunId;
     private String queryText;

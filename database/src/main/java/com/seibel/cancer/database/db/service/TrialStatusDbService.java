@@ -51,7 +51,7 @@ public class TrialStatusDbService extends BaseDbService {
         }
     }
 
-    public TrialStatus create(@NonNull Long trialId, @NonNull Long appUserId, @NonNull String status,
+    public TrialStatus create(@NonNull Long trialId, @NonNull Long patientId, @NonNull String status,
                                String notes, LocalDateTime statusChangedAt) {
 
         String extid = UUID.randomUUID().toString();
@@ -61,7 +61,7 @@ public class TrialStatusDbService extends BaseDbService {
             TrialStatusDb record = new TrialStatusDb();
             record.setExtid(extid);
             record.setTrialId(trialId);
-            record.setAppUserId(appUserId);
+            record.setPatientId(patientId);
             record.setStatus(status);
             record.setNotes(notes);
             record.setStatusChangedAt(statusChangedAt);
@@ -79,7 +79,7 @@ public class TrialStatusDbService extends BaseDbService {
         }
     }
 
-    public TrialStatus update(@NonNull String extid, Long trialId, Long appUserId, String status,
+    public TrialStatus update(@NonNull String extid, Long trialId, Long patientId, String status,
                                String notes, LocalDateTime statusChangedAt) {
 
         TrialStatusDb record = repository.findByExtid(extid)
@@ -87,7 +87,7 @@ public class TrialStatusDbService extends BaseDbService {
 
         try {
             if (trialId != null) record.setTrialId(trialId);
-            if (appUserId != null) record.setAppUserId(appUserId);
+            if (patientId != null) record.setPatientId(patientId);
             if (status != null) record.setStatus(status);
             if (notes != null) record.setNotes(notes);
             if (statusChangedAt != null) record.setStatusChangedAt(statusChangedAt);
@@ -133,8 +133,8 @@ public class TrialStatusDbService extends BaseDbService {
         return findAndLog(repository.findAllActive(), "findAll");
     }
 
-    public List<TrialStatus> findByAppUserId(@NonNull Long appUserId) {
-        return findAndLog(repository.findByAppUserId(appUserId), String.format("appUserId (%d)", appUserId));
+    public List<TrialStatus> findByPatientId(@NonNull Long patientId) {
+        return findAndLog(repository.findByPatientId(patientId), String.format("patientId (%d)", patientId));
     }
 
     public Page<TrialStatus> findAll(Pageable pageable) {

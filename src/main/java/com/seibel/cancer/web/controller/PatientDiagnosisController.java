@@ -4,7 +4,9 @@ import com.seibel.cancer.common.domain.PatientDiagnosis;
 import com.seibel.cancer.common.enums.ActiveEnum;
 import com.seibel.cancer.common.exceptions.ResourceNotFoundException;
 import com.seibel.cancer.common.exceptions.ValidationException;
-import com.seibel.cancer.database.db.repository.AppUserRepository;
+import com.seibel.cancer.common.enums.AccessLevel;
+import com.seibel.cancer.database.db.repository.PatientRepository;
+import com.seibel.cancer.service.CurrentUserService;
 import com.seibel.cancer.service.PatientDiagnosisService;
 import com.seibel.cancer.web.request.RequestPatientDiagnosisCreate;
 import com.seibel.cancer.web.request.RequestPatientDiagnosisUpdate;
@@ -33,6 +35,7 @@ import java.util.List;
 public class PatientDiagnosisController {
 
     private final PatientDiagnosisService patientDiagnosisService;
+    private final CurrentUserService currentUserService;
     private final PatientDiagnosisConverter converter;
 
     @GetMapping
@@ -50,11 +53,17 @@ public class PatientDiagnosisController {
         return converter.toResponse(patientDiagnosisService.findByExtid(extid));
     }
 
-    @GetMapping("/by-appuser/{appUserExtid}")
-    @Operation(summary = "List all patientDiagnoses for an app user (unpaginated)")
-    public List<ResponsePatientDiagnosis> getByAppUserExtid(@PathVariable String appUserExtid) {
-        Long appUserId = converter.resolveAppUserId(appUserExtid);
-        return converter.toResponse(patientDiagnosisService.findByAppUserId(appUserId));
+    /**
+     * The diagnosis for one patient.
+     *
+     * <p>Requires VIEW_RECORD: this is clinical detail, so a VIEW_TRIALS grantee - someone
+     * helping look for trials - is refused with a 404 like any other caller without access.
+     */
+    @GetMapping("/by-patient/{patientExtid}")
+    @Operation(summary = "List all patientDiagnoses for a patient (unpaginated)")
+    public List<ResponsePatientDiagnosis> getByPatientExtid(@PathVariable String patientExtid) {
+        Long patientId = currentUserService.requireAccessId(patientExtid, AccessLevel.VIEW_RECORD);
+        return converter.toResponse(patientDiagnosisService.findByPatientId(patientId));
     }
 
     @PostMapping
@@ -91,22 +100,22 @@ public class PatientDiagnosisController {
 @RequiredArgsConstructor
 class PatientDiagnosisConverter {
 
-    private final AppUserRepository appUserRepository;
+    private final PatientRepository patientRepository;
 
-    Long resolveAppUserId(String appUserExtid) {
-        return appUserRepository.findByExtid(appUserExtid)
-                .orElseThrow(() -> new ResourceNotFoundException("AppUser", appUserExtid))
+    Long resolvePatientId(String patientExtid) {
+        return patientRepository.findByExtid(patientExtid)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", patientExtid))
                 .getId();
     }
 
-    private String resolveAppUserExtid(Long appUserId) {
-        if (appUserId == null) return null;
-        return appUserRepository.findById(appUserId).map(u -> u.getExtid()).orElse(null);
+    private String resolvePatientExtid(Long patientId) {
+        if (patientId == null) return null;
+        return patientRepository.findById(patientId).map(p -> p.getExtid()).orElse(null);
     }
 
     PatientDiagnosis toDomain(RequestPatientDiagnosisCreate request) {
         return PatientDiagnosis.builder()
-                .appUserId(request.getAppUserExtid() != null ? resolveAppUserId(request.getAppUserExtid()) : null)
+                .patientId(request.getPatientExtid() != null ? resolvePatientId(request.getPatientExtid()) : null)
                 .cancerType(request.getCancerType())
                 .stage(request.getStage())
                 .stageSystem(request.getStageSystem())
@@ -123,8 +132,6 @@ class PatientDiagnosisConverter {
                 .priorTreatments(request.getPriorTreatments())
                 .hasMeasurableDisease(request.getHasMeasurableDisease())
                 .menopausalStatus(request.getMenopausalStatus())
-                .dateOfBirth(request.getDateOfBirth())
-                .sex(request.getSex())
                 .diagnosisDate(request.getDiagnosisDate())
                 .notes(request.getNotes())
                 .build();
@@ -132,7 +139,7 @@ class PatientDiagnosisConverter {
 
     PatientDiagnosis toDomain(RequestPatientDiagnosisUpdate request) {
         return PatientDiagnosis.builder()
-                .appUserId(request.getAppUserExtid() != null ? resolveAppUserId(request.getAppUserExtid()) : null)
+                .patientId(request.getPatientExtid() != null ? resolvePatientId(request.getPatientExtid()) : null)
                 .cancerType(request.getCancerType())
                 .stage(request.getStage())
                 .stageSystem(request.getStageSystem())
@@ -149,8 +156,6 @@ class PatientDiagnosisConverter {
                 .priorTreatments(request.getPriorTreatments())
                 .hasMeasurableDisease(request.getHasMeasurableDisease())
                 .menopausalStatus(request.getMenopausalStatus())
-                .dateOfBirth(request.getDateOfBirth())
-                .sex(request.getSex())
                 .diagnosisDate(request.getDiagnosisDate())
                 .notes(request.getNotes())
                 .build();
@@ -159,7 +164,7 @@ class PatientDiagnosisConverter {
     ResponsePatientDiagnosis toResponse(PatientDiagnosis item) {
         return ResponsePatientDiagnosis.builder()
                 .extid(item.getExtid())
-                .appUserExtid(resolveAppUserExtid(item.getAppUserId()))
+                .patientExtid(resolvePatientExtid(item.getPatientId()))
                 .cancerType(item.getCancerType())
                 .stage(item.getStage())
                 .stageSystem(item.getStageSystem())
@@ -176,8 +181,6 @@ class PatientDiagnosisConverter {
                 .priorTreatments(item.getPriorTreatments())
                 .hasMeasurableDisease(item.getHasMeasurableDisease())
                 .menopausalStatus(item.getMenopausalStatus())
-                .dateOfBirth(item.getDateOfBirth())
-                .sex(item.getSex())
                 .diagnosisDate(item.getDiagnosisDate())
                 .notes(item.getNotes())
                 .build();
@@ -188,7 +191,7 @@ class PatientDiagnosisConverter {
     }
 
     void validateUpdateRequest(RequestPatientDiagnosisUpdate request) {
-        if (request.getAppUserExtid() == null
+        if (request.getPatientExtid() == null
                 && request.getCancerType() == null
                 && request.getStage() == null
                 && request.getStageSystem() == null
@@ -205,8 +208,6 @@ class PatientDiagnosisConverter {
                 && request.getPriorTreatments() == null
                 && request.getHasMeasurableDisease() == null
                 && request.getMenopausalStatus() == null
-                && request.getDateOfBirth() == null
-                && request.getSex() == null
                 && request.getDiagnosisDate() == null
                 && request.getNotes() == null) {
             throw new ValidationException("At least one field must be provided for update.");

@@ -15,7 +15,7 @@ databaseChangeLog:
               - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
               - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
               - column: { name: trial_id, type: bigint, constraints: { nullable: false } }
-              - column: { name: app_user_id, type: bigint, constraints: { nullable: false } }
+              - column: { name: patient_id, type: bigint, constraints: { nullable: false } }
               - column: { name: patient_diagnosis_id, type: bigint }
               - column: { name: search_run_id, type: varchar(36), constraints: { nullable: false } }
               - column: { name: query_text, type: text, constraints: { nullable: false } }
@@ -41,9 +41,9 @@ databaseChangeLog:
 
         - createIndex:
             tableName: trial_match
-            indexName: idx_trial_match_app_user_id
+            indexName: idx_trial_match_patient_id
             columns:
-              - column: { name: app_user_id }
+              - column: { name: patient_id }
 
         - createIndex:
             tableName: trial_match

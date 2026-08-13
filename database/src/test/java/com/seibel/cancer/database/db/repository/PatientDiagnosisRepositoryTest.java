@@ -41,7 +41,7 @@ class PatientDiagnosisRepositoryTest {
         PatientDiagnosisDb saved = repository.save(item);
 
         assertNotNull(saved.getId());
-        assertEquals(item.getAppUserId(), saved.getAppUserId());
+        assertEquals(item.getPatientId(), saved.getPatientId());
         assertEquals(item.getCancerType(), saved.getCancerType());
     }
 
@@ -61,12 +61,12 @@ class PatientDiagnosisRepositoryTest {
     }
 
     @Test
-    void findByAppUserId_shouldReturnPatientDiagnosis_whenExists() {
+    void findByPatientId_shouldReturnPatientDiagnosis_whenExists() {
         PatientDiagnosisDb saved = repository.save(
                 DomainBuilderDatabase.getPatientDiagnosisDb(4242L, "Breast Cancer"));
         repository.save(DomainBuilderDatabase.getPatientDiagnosisDb(9999L, "Lung Cancer"));
 
-        List<PatientDiagnosisDb> found = repository.findByAppUserId(4242L);
+        List<PatientDiagnosisDb> found = repository.findByPatientId(4242L);
 
         assertEquals(1, found.size());
         assertEquals(saved.getExtid(), found.get(0).getExtid());
@@ -74,10 +74,10 @@ class PatientDiagnosisRepositoryTest {
     }
 
     @Test
-    void findByAppUserId_shouldReturnEmpty_whenNotExists() {
+    void findByPatientId_shouldReturnEmpty_whenNotExists() {
         repository.save(DomainBuilderDatabase.getPatientDiagnosisDb(4242L, "Breast Cancer"));
 
-        assertTrue(repository.findByAppUserId(123456L).isEmpty());
+        assertTrue(repository.findByPatientId(123456L).isEmpty());
     }
 
     @Test

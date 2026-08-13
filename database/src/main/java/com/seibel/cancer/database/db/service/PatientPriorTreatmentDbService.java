@@ -64,7 +64,7 @@ public class PatientPriorTreatmentDbService extends BaseDbService {
                 .orElseThrow(() -> new ServiceException(getFoundFailureMessage(extid)));
 
         try {
-            if (item.getAppUserId() != null) record.setAppUserId(item.getAppUserId());
+            if (item.getPatientId() != null) record.setPatientId(item.getPatientId());
             if (item.getPatientDiagnosisId() != null) record.setPatientDiagnosisId(item.getPatientDiagnosisId());
             if (item.getCdk46Status() != null) record.setCdk46Status(item.getCdk46Status());
             if (item.getEndocrineStatus() != null) record.setEndocrineStatus(item.getEndocrineStatus());
@@ -146,9 +146,9 @@ public class PatientPriorTreatmentDbService extends BaseDbService {
         return repository.findByActive(activeEnum, pageable).map(mapper::toModel);
     }
 
-    public List<PatientPriorTreatment> findByAppUserId(@NonNull Long appUserId) {
-        return findAndLog(repository.findByAppUserId(appUserId),
-                String.format("appUserId (%d)", appUserId));
+    public List<PatientPriorTreatment> findByPatientId(@NonNull Long patientId) {
+        return findAndLog(repository.findByPatientId(patientId),
+                String.format("patientId (%d)", patientId));
     }
 
     public List<PatientPriorTreatment> findByPatientDiagnosisId(@NonNull Long patientDiagnosisId) {

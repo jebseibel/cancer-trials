@@ -1,7 +1,7 @@
 package com.seibel.cancer.database.db.mapper;
 
-import com.seibel.cancer.common.domain.AppUser;
-import com.seibel.cancer.database.db.entity.AppUserDb;
+import com.seibel.cancer.common.domain.UserPatient;
+import com.seibel.cancer.database.db.entity.UserPatientDb;
 import lombok.NoArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Component;
@@ -10,24 +10,24 @@ import java.util.List;
 
 @Component
 @NoArgsConstructor
-public class AppUserMapper {
+public class UserPatientMapper {
 
     private final ModelMapper modelMapper = new ModelMapper();
 
-    public AppUser toModel(AppUserDb item) {
-        return modelMapper.map(item, AppUser.class);
+    public UserPatient toModel(UserPatientDb item) {
+        return modelMapper.map(item, UserPatient.class);
     }
 
-    public AppUserDb toDb(AppUser item) {
-        return modelMapper.map(item, AppUserDb.class);
+    public UserPatientDb toDb(UserPatient item) {
+        return modelMapper.map(item, UserPatientDb.class);
     }
 
-    public List<AppUser> toModelList(List<AppUserDb> items) {
+    public List<UserPatient> toModelList(List<UserPatientDb> items) {
         if (items == null) return List.of();
         return items.stream().map(this::toModel).toList();
     }
 
-    public List<AppUserDb> toDbList(List<AppUser> items) {
+    public List<UserPatientDb> toDbList(List<UserPatient> items) {
         if (items == null) return List.of();
         return items.stream().map(this::toDb).toList();
     }

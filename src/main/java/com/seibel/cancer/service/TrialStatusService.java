@@ -37,7 +37,7 @@ public class TrialStatusService extends BaseService {
         log.info("create(): {}", item);
 
         try {
-            return dbService.create(item.getTrialId(), item.getAppUserId(), item.getStatus(),
+            return dbService.create(item.getTrialId(), item.getPatientId(), item.getStatus(),
                     item.getNotes(), item.getStatusChangedAt());
         } catch (Exception e) {
             log.error("Failed to create trial status: {}", item, e);
@@ -52,7 +52,7 @@ public class TrialStatusService extends BaseService {
         log.info("update(): extid={}, {}", extid, item);
 
         try {
-            TrialStatus updated = dbService.update(extid, item.getTrialId(), item.getAppUserId(),
+            TrialStatus updated = dbService.update(extid, item.getTrialId(), item.getPatientId(),
                     item.getStatus(), item.getNotes(), item.getStatusChangedAt());
             if (updated == null) {
                 throw new ResourceNotFoundException("TrialStatus", extid);
@@ -104,14 +104,14 @@ public class TrialStatusService extends BaseService {
         }
     }
 
-    public List<TrialStatus> findByAppUserId(Long appUserId) {
-        requireNonNull(appUserId, "appUserId");
-        log.info("findByAppUserId(): appUserId={}", appUserId);
+    public List<TrialStatus> findByPatientId(Long patientId) {
+        requireNonNull(patientId, "patientId");
+        log.info("findByPatientId(): patientId={}", patientId);
 
         try {
-            return dbService.findByAppUserId(appUserId);
+            return dbService.findByPatientId(patientId);
         } catch (Exception e) {
-            log.error("Failed to retrieve trial statuses by appUserId: {}", appUserId, e);
+            log.error("Failed to retrieve trial statuses by patientId: {}", patientId, e);
             throw new ServiceException("Unable to retrieve trial statuses", e);
         }
     }

@@ -14,8 +14,8 @@ public class RequestSavedTrialMatchUpdate extends BaseRequest {
     @Size(max = 36, message = "The trialExtid must be at most 36 characters.")
     private String trialExtid;
 
-    @Size(max = 36, message = "The appUserExtid must be at most 36 characters.")
-    private String appUserExtid;
+    @Size(max = 36, message = "The patientExtid must be at most 36 characters.")
+    private String patientExtid;
 
     @Size(max = 36, message = "The patientDiagnosisExtid must be at most 36 characters.")
     private String patientDiagnosisExtid;

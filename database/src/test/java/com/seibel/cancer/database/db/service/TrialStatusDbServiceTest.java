@@ -39,7 +39,7 @@ class TrialStatusDbServiceTest {
     void create_shouldGenerateUuidAndSetFields() {
         // Arrange
         TrialStatus input = DomainBuilderDatabase.getTrialStatus();
-        TrialStatusDb savedDb = DomainBuilderDatabase.getTrialStatusDb(input.getTrialId(), input.getAppUserId());
+        TrialStatusDb savedDb = DomainBuilderDatabase.getTrialStatusDb(input.getTrialId(), input.getPatientId());
         TrialStatus expectedDomain = DomainBuilderDatabase.getTrialStatus(savedDb);
 
         when(mapper.toDb(input)).thenReturn(new TrialStatusDb());
@@ -79,19 +79,19 @@ class TrialStatusDbServiceTest {
     void create_positional_shouldGenerateUuidAndSetFields() {
         // Arrange
         Long trialId = 10L;
-        Long appUserId = 20L;
+        Long patientId = 20L;
         String status = "ENROLLED";
         String notes = "Some notes";
         LocalDateTime statusChangedAt = LocalDateTime.now();
 
-        TrialStatusDb savedDb = DomainBuilderDatabase.getTrialStatusDb(trialId, appUserId, status, null);
+        TrialStatusDb savedDb = DomainBuilderDatabase.getTrialStatusDb(trialId, patientId, status, null);
         TrialStatus expectedDomain = DomainBuilderDatabase.getTrialStatus(savedDb);
 
         when(repository.save(any(TrialStatusDb.class))).thenReturn(savedDb);
         when(mapper.toModel(savedDb)).thenReturn(expectedDomain);
 
         // Act
-        TrialStatus result = service.create(trialId, appUserId, status, notes, statusChangedAt);
+        TrialStatus result = service.create(trialId, patientId, status, notes, statusChangedAt);
 
         // Assert
         assertNotNull(result);
@@ -101,7 +101,7 @@ class TrialStatusDbServiceTest {
         TrialStatusDb captured = captor.getValue();
         assertNotNull(captured.getExtid());
         assertEquals(trialId, captured.getTrialId());
-        assertEquals(appUserId, captured.getAppUserId());
+        assertEquals(patientId, captured.getPatientId());
         assertEquals(status, captured.getStatus());
         assertEquals(notes, captured.getNotes());
         assertEquals(statusChangedAt, captured.getStatusChangedAt());

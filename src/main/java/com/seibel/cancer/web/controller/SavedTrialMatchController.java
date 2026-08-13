@@ -4,7 +4,9 @@ import com.seibel.cancer.common.domain.SavedTrialMatch;
 import com.seibel.cancer.common.enums.ActiveEnum;
 import com.seibel.cancer.common.exceptions.ResourceNotFoundException;
 import com.seibel.cancer.common.exceptions.ValidationException;
-import com.seibel.cancer.database.db.repository.AppUserRepository;
+import com.seibel.cancer.common.enums.AccessLevel;
+import com.seibel.cancer.database.db.repository.PatientRepository;
+import com.seibel.cancer.service.CurrentUserService;
 import com.seibel.cancer.database.db.repository.PatientDiagnosisRepository;
 import com.seibel.cancer.database.db.repository.TrialRepository;
 import com.seibel.cancer.service.SavedTrialMatchService;
@@ -41,14 +43,17 @@ import java.util.List;
 public class SavedTrialMatchController {
 
     private final SavedTrialMatchService trialMatchService;
+    private final CurrentUserService currentUserService;
     private final SavedTrialMatchConverter converter;
 
     public SavedTrialMatchController(SavedTrialMatchService trialMatchService,
+                                           CurrentUserService currentUserService,
                                 TrialRepository trialRepository,
-                                AppUserRepository appUserRepository,
+                                PatientRepository patientRepository,
                                 PatientDiagnosisRepository patientDiagnosisRepository) {
         this.trialMatchService = trialMatchService;
-        this.converter = new SavedTrialMatchConverter(trialRepository, appUserRepository, patientDiagnosisRepository);
+        this.currentUserService = currentUserService;
+        this.converter = new SavedTrialMatchConverter(trialRepository, patientRepository, patientDiagnosisRepository);
     }
 
     @GetMapping
@@ -71,11 +76,11 @@ public class SavedTrialMatchController {
         return converter.toResponse(trialMatchService.findBySearchRunId(searchRunId));
     }
 
-    @GetMapping("/by-appuser/{appUserExtid}")
+    @GetMapping("/by-patient/{patientExtid}")
     @Operation(summary = "Every match ever recorded for an app user, newest first (unpaginated)")
-    public List<ResponseSavedTrialMatch> getByAppUserExtid(@PathVariable String appUserExtid) {
-        Long appUserId = converter.resolveAppUserId(appUserExtid);
-        return converter.toResponse(trialMatchService.findByAppUserId(appUserId));
+    public List<ResponseSavedTrialMatch> getByPatientExtid(@PathVariable String patientExtid) {
+        Long patientId = currentUserService.requireAccessId(patientExtid, AccessLevel.VIEW_TRIALS);
+        return converter.toResponse(trialMatchService.findByPatientId(patientId));
     }
 
     @GetMapping("/by-trial/{trialExtid}")
@@ -120,14 +125,14 @@ public class SavedTrialMatchController {
 class SavedTrialMatchConverter {
 
     private final TrialRepository trialRepository;
-    private final AppUserRepository appUserRepository;
+    private final PatientRepository patientRepository;
     private final PatientDiagnosisRepository patientDiagnosisRepository;
 
     SavedTrialMatchConverter(TrialRepository trialRepository,
-                        AppUserRepository appUserRepository,
+                        PatientRepository patientRepository,
                         PatientDiagnosisRepository patientDiagnosisRepository) {
         this.trialRepository = trialRepository;
-        this.appUserRepository = appUserRepository;
+        this.patientRepository = patientRepository;
         this.patientDiagnosisRepository = patientDiagnosisRepository;
     }
 
@@ -137,9 +142,9 @@ class SavedTrialMatchConverter {
                 .getId();
     }
 
-    Long resolveAppUserId(String appUserExtid) {
-        return appUserRepository.findByExtid(appUserExtid)
-                .orElseThrow(() -> new ResourceNotFoundException("AppUser", appUserExtid))
+    Long resolvePatientId(String patientExtid) {
+        return patientRepository.findByExtid(patientExtid)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", patientExtid))
                 .getId();
     }
 
@@ -154,9 +159,9 @@ class SavedTrialMatchConverter {
         return trialRepository.findById(trialId).map(t -> t.getExtid()).orElse(null);
     }
 
-    private String resolveAppUserExtid(Long appUserId) {
-        if (appUserId == null) return null;
-        return appUserRepository.findById(appUserId).map(u -> u.getExtid()).orElse(null);
+    private String resolvePatientExtid(Long patientId) {
+        if (patientId == null) return null;
+        return patientRepository.findById(patientId).map(u -> u.getExtid()).orElse(null);
     }
 
     private String resolvePatientDiagnosisExtid(Long patientDiagnosisId) {
@@ -167,7 +172,7 @@ class SavedTrialMatchConverter {
     SavedTrialMatch toDomain(RequestSavedTrialMatchCreate request) {
         return SavedTrialMatch.builder()
                 .trialId(request.getTrialExtid() != null ? resolveTrialId(request.getTrialExtid()) : null)
-                .appUserId(request.getAppUserExtid() != null ? resolveAppUserId(request.getAppUserExtid()) : null)
+                .patientId(request.getPatientExtid() != null ? resolvePatientId(request.getPatientExtid()) : null)
                 .patientDiagnosisId(request.getPatientDiagnosisExtid() != null
                         ? resolvePatientDiagnosisId(request.getPatientDiagnosisExtid()) : null)
                 .searchRunId(request.getSearchRunId())
@@ -186,7 +191,7 @@ class SavedTrialMatchConverter {
     SavedTrialMatch toDomain(RequestSavedTrialMatchUpdate request) {
         return SavedTrialMatch.builder()
                 .trialId(request.getTrialExtid() != null ? resolveTrialId(request.getTrialExtid()) : null)
-                .appUserId(request.getAppUserExtid() != null ? resolveAppUserId(request.getAppUserExtid()) : null)
+                .patientId(request.getPatientExtid() != null ? resolvePatientId(request.getPatientExtid()) : null)
                 .patientDiagnosisId(request.getPatientDiagnosisExtid() != null
                         ? resolvePatientDiagnosisId(request.getPatientDiagnosisExtid()) : null)
                 .searchRunId(request.getSearchRunId())
@@ -206,7 +211,7 @@ class SavedTrialMatchConverter {
         return ResponseSavedTrialMatch.builder()
                 .extid(item.getExtid())
                 .trialExtid(resolveTrialExtid(item.getTrialId()))
-                .appUserExtid(resolveAppUserExtid(item.getAppUserId()))
+                .patientExtid(resolvePatientExtid(item.getPatientId()))
                 .patientDiagnosisExtid(resolvePatientDiagnosisExtid(item.getPatientDiagnosisId()))
                 .searchRunId(item.getSearchRunId())
                 .queryText(item.getQueryText())
@@ -227,7 +232,7 @@ class SavedTrialMatchConverter {
 
     void validateUpdateRequest(RequestSavedTrialMatchUpdate request) {
         if (request.getTrialExtid() == null
-                && request.getAppUserExtid() == null
+                && request.getPatientExtid() == null
                 && request.getPatientDiagnosisExtid() == null
                 && request.getSearchRunId() == null
                 && request.getQueryText() == null

@@ -20,14 +20,14 @@ public interface PatientVariantRepository extends JpaRepository<PatientVariantDb
     /**
      * The patient's variant row, newest first.
      *
-     * Filters on active: PatientDiagnosisRepository.findByAppUserId shipped without that
+     * Filters on active: PatientDiagnosisRepository.findByPatientId shipped without that
      * filter and the Diagnosis page displayed and edited a soft-deleted record. Same shape
      * here, so the same guard from the start.
      */
-    List<PatientVariantDb> findByAppUserIdAndActiveOrderByCreatedAtDesc(Long appUserId, ActiveEnum active);
+    List<PatientVariantDb> findByPatientIdAndActiveOrderByCreatedAtDesc(Long patientId, ActiveEnum active);
 
-    default List<PatientVariantDb> findByAppUserId(Long appUserId) {
-        return findByAppUserIdAndActiveOrderByCreatedAtDesc(appUserId, ActiveEnum.ACTIVE);
+    default List<PatientVariantDb> findByPatientId(Long patientId) {
+        return findByPatientIdAndActiveOrderByCreatedAtDesc(patientId, ActiveEnum.ACTIVE);
     }
 
     List<PatientVariantDb> findByPatientDiagnosisIdAndActive(Long patientDiagnosisId, ActiveEnum active);

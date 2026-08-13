@@ -180,15 +180,15 @@ class PatientPriorTreatmentDbServiceTest {
     }
 
     @Test
-    void findByAppUserId_shouldReturnPatientRows() {
+    void findByPatientId_shouldReturnPatientRows() {
         List<PatientPriorTreatmentDb> records =
                 List.of(DomainBuilderDatabase.getPatientPriorTreatmentDb(4242L, "CURRENT"));
 
-        when(repository.findByAppUserId(4242L)).thenReturn(records);
+        when(repository.findByPatientId(4242L)).thenReturn(records);
         when(mapper.toModelList(records))
                 .thenReturn(List.of(DomainBuilderDatabase.getPatientPriorTreatment(records.get(0))));
 
-        List<PatientPriorTreatment> found = service.findByAppUserId(4242L);
+        List<PatientPriorTreatment> found = service.findByPatientId(4242L);
 
         assertEquals(1, found.size());
         // CURRENT, not a bare "has taken it" - the distinction this table exists for.

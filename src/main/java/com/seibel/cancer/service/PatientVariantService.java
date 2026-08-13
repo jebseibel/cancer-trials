@@ -35,12 +35,12 @@ public class PatientVariantService extends BaseService {
     @Transactional
     public PatientVariant create(PatientVariant item) {
         requireNonNull(item, "PatientVariant");
-        log.info("create(): appUserId={}", item.getAppUserId());
+        log.info("create(): patientId={}", item.getPatientId());
 
         try {
             return dbService.create(item);
         } catch (Exception e) {
-            log.error("Failed to create patientVariant for appUserId: {}", item.getAppUserId(), e);
+            log.error("Failed to create patientVariant for patientId: {}", item.getPatientId(), e);
             throw new ServiceException("Unable to create patientVariant", e);
         }
     }
@@ -125,13 +125,13 @@ public class PatientVariantService extends BaseService {
     }
 
     /** The patient's variant row - the primary read for matching. */
-    public List<PatientVariant> findByAppUserId(Long appUserId) {
-        requireNonNull(appUserId, "appUserId");
+    public List<PatientVariant> findByPatientId(Long patientId) {
+        requireNonNull(patientId, "patientId");
 
         try {
-            return dbService.findByAppUserId(appUserId);
+            return dbService.findByPatientId(patientId);
         } catch (Exception e) {
-            log.error("Failed to find patientVariants by appUserId: {}", appUserId, e);
+            log.error("Failed to find patientVariants by patientId: {}", patientId, e);
             throw new ServiceException("Unable to find patientVariants", e);
         }
     }

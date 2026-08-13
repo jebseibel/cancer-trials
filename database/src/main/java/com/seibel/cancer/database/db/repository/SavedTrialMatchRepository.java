@@ -31,10 +31,10 @@ public interface SavedTrialMatchRepository extends JpaRepository<SavedTrialMatch
     }
 
     /** Every match ever recorded for one user, newest first - the history view. */
-    List<SavedTrialMatchDb> findByAppUserIdAndActiveOrderByMatchedAtDesc(Long appUserId, ActiveEnum active);
+    List<SavedTrialMatchDb> findByPatientIdAndActiveOrderByMatchedAtDesc(Long patientId, ActiveEnum active);
 
-    default List<SavedTrialMatchDb> findByAppUserId(Long appUserId) {
-        return findByAppUserIdAndActiveOrderByMatchedAtDesc(appUserId, ActiveEnum.ACTIVE);
+    default List<SavedTrialMatchDb> findByPatientId(Long patientId) {
+        return findByPatientIdAndActiveOrderByMatchedAtDesc(patientId, ActiveEnum.ACTIVE);
     }
 
     /** Every run this trial has appeared in - "why did this surface, and when?" */

@@ -28,7 +28,7 @@ class PatientPriorTreatmentMapperTest {
         PatientPriorTreatment model = mapper.toModel(db);
 
         assertEquals(db.getExtid(), model.getExtid());
-        assertEquals(db.getAppUserId(), model.getAppUserId());
+        assertEquals(db.getPatientId(), model.getPatientId());
         assertEquals(db.getPatientDiagnosisId(), model.getPatientDiagnosisId());
         assertEquals(db.getCdk46Status(), model.getCdk46Status());
         assertEquals(db.getEndocrineStatus(), model.getEndocrineStatus());
@@ -67,7 +67,7 @@ class PatientPriorTreatmentMapperTest {
         PatientPriorTreatmentDb db = mapper.toDb(model);
 
         assertEquals(model.getExtid(), db.getExtid());
-        assertEquals(model.getAppUserId(), db.getAppUserId());
+        assertEquals(model.getPatientId(), db.getPatientId());
         assertEquals(model.getPatientDiagnosisId(), db.getPatientDiagnosisId());
         assertEquals(model.getCdk46Status(), db.getCdk46Status());
         assertEquals(model.getEndocrineStatus(), db.getEndocrineStatus());

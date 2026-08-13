@@ -197,13 +197,13 @@ class TrialMatchDbServiceTest {
     }
 
     @Test
-    void findByAppUserId_shouldReturnEntities() {
+    void findByPatientId_shouldReturnEntities() {
         List<SavedTrialMatchDb> records = List.of(DomainBuilderDatabase.getSavedTrialMatchDb());
 
-        when(repository.findByAppUserId(4242L)).thenReturn(records);
+        when(repository.findByPatientId(4242L)).thenReturn(records);
         when(mapper.toModelList(records)).thenReturn(List.of(DomainBuilderDatabase.getSavedTrialMatch()));
 
-        assertEquals(1, service.findByAppUserId(4242L).size());
+        assertEquals(1, service.findByPatientId(4242L).size());
     }
 
     @Test

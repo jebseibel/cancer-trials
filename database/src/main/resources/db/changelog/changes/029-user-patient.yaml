@@ -1,0 +1,62 @@
+databaseChangeLog:
+  - changeSet:
+      id: 029-user-patient
+      author: jeb
+      changes:
+        # Which login may see which patient, and at what level. This is the join user and
+        # app_user never had - they were reconciled by string-matching usernames.
+        #
+        # Ownership is a grant (access_level = OWNER), not a column on patient, so "my own
+        # record" is not a special case anywhere in the code.
+        # See .claude/access/PATIENT_ACCESS_PLAN.md
+        - createTable:
+            tableName: user_patient
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: user_id, type: bigint, constraints: { nullable: false } }
+              - column: { name: patient_id, type: bigint, constraints: { nullable: false } }
+              # Stored as the enum name (VIEW_TRIALS, VIEW_RECORD, EDIT_RECORD, OWNER), never
+              # an ordinal - an ordinal would silently re-map every stored grant if a level
+              # were inserted into the middle of the enum.
+              - column: { name: access_level, type: varchar(24), constraints: { nullable: false } }
+              - column: { name: granted_by_user_id, type: bigint }
+              - column: { name: granted_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              # Null means the grant is in force. Revoking writes this; the row is never deleted,
+              # because who had access to a medical record and when is worth keeping.
+              - column: { name: revoked_at, type: datetime }
+              - column: { name: note, type: varchar(255) }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }
+
+        # Deliberately NOT a unique constraint on (user_id, patient_id).
+        #
+        # Revoking keeps the row, so a grant that is revoked and later re-issued produces a
+        # second row for the same pair - which a unique constraint would reject, making
+        # "share again with my sister" fail with a database error. MySQL cannot express
+        # "unique among rows where revoked_at is null" as a constraint, so uniqueness among
+        # active grants is enforced in the service layer instead.
+        #
+        # These indexes serve the authorisation lookup, which runs on every patient request.
+        - createIndex:
+            tableName: user_patient
+            indexName: idx_user_patient_user_id
+            columns:
+              - column: { name: user_id }
+
+        - createIndex:
+            tableName: user_patient
+            indexName: idx_user_patient_patient_id
+            columns:
+              - column: { name: patient_id }
+
+        # The exact shape of findActiveGrant(userId, patientId) - the hot path.
+        - createIndex:
+            tableName: user_patient
+            indexName: idx_user_patient_user_patient
+            columns:
+              - column: { name: user_id }
+              - column: { name: patient_id }
+              - column: { name: revoked_at }

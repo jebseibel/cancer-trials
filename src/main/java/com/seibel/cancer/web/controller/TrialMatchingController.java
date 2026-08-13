@@ -6,7 +6,8 @@ import com.seibel.cancer.common.domain.matching.SignalOutcome;
 import com.seibel.cancer.common.domain.matching.TrialAssessment;
 import com.seibel.cancer.common.enums.ActiveEnum;
 import com.seibel.cancer.common.exceptions.ResourceNotFoundException;
-import com.seibel.cancer.database.db.repository.AppUserRepository;
+import com.seibel.cancer.common.enums.AccessLevel;
+import com.seibel.cancer.service.CurrentUserService;
 import com.seibel.cancer.service.TrialService;
 import com.seibel.cancer.service.matching.CriteriaSignalEvaluator;
 import com.seibel.cancer.service.matching.TrialMatchingService;
@@ -47,24 +48,25 @@ public class TrialMatchingController {
 
     private final TrialMatchingService matchingService;
     private final TrialService trialService;
+    private final CurrentUserService currentUserService;
     private final TrialMatchingConverter converter;
 
     /**
      * Ranks the corpus for one patient, best first.
      *
-     * @param appUserExtid whose record to match against
+     * @param patientExtid whose record to match against
      * @param breastOnly   drop trials that do not appear to be about breast cancer. Default
      *                     false, so the caller opts in to the one filter that hides anything.
      * @param limit        how many assessments to return after ranking
      */
-    @GetMapping("/rank/{appUserExtid}")
+    @GetMapping("/rank/{patientExtid}")
     @Operation(summary = "Rank trials against a patient's record, best first")
     public List<ResponseTrialAssessment> rank(
-            @PathVariable String appUserExtid,
+            @PathVariable String patientExtid,
             @RequestParam(required = false, defaultValue = "false") boolean breastOnly,
             @RequestParam(required = false, defaultValue = "50") int limit
     ) {
-        Long appUserId = converter.resolveAppUserId(appUserExtid);
+        Long patientId = currentUserService.requireAccessId(patientExtid, AccessLevel.VIEW_TRIALS);
         List<Trial> trials = trialService.findByActive(ActiveEnum.ACTIVE);
 
         // Narrow before assessing, not after. assess() runs one location query per trial, so
@@ -76,7 +78,7 @@ public class TrialMatchingController {
                 ? trials.stream().filter(converter::looksLikeBreastTrial).toList()
                 : trials;
 
-        List<TrialAssessment> assessments = matchingService.assessAll(candidates, appUserId);
+        List<TrialAssessment> assessments = matchingService.assessAll(candidates, patientId);
 
         return assessments.stream()
                 .sorted(converter.ranking())
@@ -86,15 +88,15 @@ public class TrialMatchingController {
     }
 
     /** Assesses a single trial, for the Trial Detail page. */
-    @GetMapping("/trial/{trialExtid}/for/{appUserExtid}")
+    @GetMapping("/trial/{trialExtid}/for/{patientExtid}")
     @Operation(summary = "Assess one trial against a patient's record")
     public ResponseTrialAssessment assessOne(
             @PathVariable String trialExtid,
-            @PathVariable String appUserExtid
+            @PathVariable String patientExtid
     ) {
-        Long appUserId = converter.resolveAppUserId(appUserExtid);
+        Long patientId = currentUserService.requireAccessId(patientExtid, AccessLevel.VIEW_TRIALS);
         TrialAssessment assessment = matchingService.assess(
-                trialExtid, matchingService.loadPatientRecord(appUserId));
+                trialExtid, matchingService.loadPatientRecord(patientId));
         if (assessment == null) {
             throw new ResourceNotFoundException("Trial", trialExtid);
         }
@@ -108,15 +110,8 @@ class TrialMatchingConverter {
 
     private static final String DISEASE_TYPE_SIGNAL = "Disease type";
 
-    private final AppUserRepository appUserRepository;
     private final TrialService trialService;
     private final CriteriaSignalEvaluator evaluator;
-
-    Long resolveAppUserId(String appUserExtid) {
-        return appUserRepository.findByExtid(appUserExtid)
-                .orElseThrow(() -> new ResourceNotFoundException("AppUser", appUserExtid))
-                .getId();
-    }
 
     /**
      * Ranking order, and the reasoning behind each tier.
