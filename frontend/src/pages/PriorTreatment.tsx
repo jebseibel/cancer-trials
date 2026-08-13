@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Save, Loader2 } from 'lucide-react';
 import { patientPriorTreatmentApi } from '../services/api';
 import { BooleanSelect, Field, Section, Select, inputClass } from '../components/FormControls';
-import { useCurrentAppUser } from '../lib/useCurrentAppUser';
+import { useCurrentPatient } from '../lib/PatientContext';
 import { TREATMENT_STATUS_LABELS, TREATMENT_STATUS_VALUES } from '../types/api';
 import type { PatientPriorTreatment, PatientPriorTreatmentRequest } from '../types/api';
 
@@ -71,14 +71,14 @@ function toForm(t: PatientPriorTreatment): FormState {
 /** Blank inputs become undefined, never "" - an empty date string fails to parse server-side. */
 function toRequest(
     form: FormState,
-    appUserExtid: string | undefined,
+    patientExtid: string | undefined,
 ): PatientPriorTreatmentRequest {
     const text = (v: string) => (v.trim() === '' ? undefined : v.trim());
     const num = (v: string) => (v === '' ? undefined : Number(v));
     const bool = (v: string) => (v === '' ? undefined : v === 'true');
 
     return {
-        appUserExtid,
+        patientExtid,
         cdk46Status: text(form.cdk46Status),
         endocrineStatus: text(form.endocrineStatus),
         serdStatus: text(form.serdStatus),
@@ -108,17 +108,17 @@ function toRequest(
 
 export default function PriorTreatment() {
     const queryClient = useQueryClient();
-    const { data: appUser, isLoading: appUserLoading } = useCurrentAppUser();
+    const { patient, isLoading: patientLoading } = useCurrentPatient();
     const [form, setForm] = useState<FormState>(EMPTY_FORM);
     const [saved, setSaved] = useState(false);
 
     const { data: existing, isLoading } = useQuery({
-        queryKey: ['patientPriorTreatment', appUser?.extid],
+        queryKey: ['patientPriorTreatment', patient?.extid],
         queryFn: async () => {
-            const rows = (await patientPriorTreatmentApi.getByAppUserExtid(appUser!.extid)).data;
+            const rows = (await patientPriorTreatmentApi.getByPatientExtid(patient!.extid)).data;
             return rows[0] ?? null;
         },
-        enabled: !!appUser?.extid,
+        enabled: !!patient?.extid,
     });
 
     // Keyed on extid alone, not the whole object: a refetch returning the same row must not
@@ -130,7 +130,7 @@ export default function PriorTreatment() {
 
     const saveMutation = useMutation({
         mutationFn: async () => {
-            const request = toRequest(form, appUser?.extid);
+            const request = toRequest(form, patient?.extid);
             return existing
                 ? (await patientPriorTreatmentApi.update(existing.extid, request)).data
                 : (await patientPriorTreatmentApi.create(request)).data;
@@ -138,7 +138,7 @@ export default function PriorTreatment() {
         onSuccess: async () => {
             setSaved(true);
             await queryClient.invalidateQueries({
-                queryKey: ['patientPriorTreatment', appUser?.extid],
+                queryKey: ['patientPriorTreatment', patient?.extid],
             });
         },
     });
@@ -150,17 +150,19 @@ export default function PriorTreatment() {
 
     const saveError = saveMutation.error as { response?: { data?: { message?: string } } } | null;
 
-    if (appUserLoading || isLoading) {
+    if (patientLoading || isLoading) {
         return <p className="px-4 py-6 text-gray-500">Loading prior treatment...</p>;
     }
 
-    if (!appUser) {
+    if (!patient) {
         return (
-            <div className="px-4 py-6 sm:px-0">
+            <div>
                 <div className="bg-white shadow rounded-lg p-6">
-                    <p className="text-sm text-gray-500">
-                        No app-user profile linked to your login. Ask to have one seeded before
-                        entering treatment history.
+                    <p className="text-sm text-gray-700">
+                        No patient record yet. Create one to start recording past treatments.
+                    </p>
+                    <p className="mt-2 text-xs text-gray-500">
+                        A record can be for you or for someone you are helping.
                     </p>
                 </div>
             </div>

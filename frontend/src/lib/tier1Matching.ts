@@ -1,4 +1,4 @@
-import type { PatientDiagnosis, Trial } from '../types/api';
+import type { Patient, Trial } from '../types/api';
 import { ageFromDateOfBirth } from './receptorSubtype';
 
 /**
@@ -63,14 +63,14 @@ function describeAge(years: number): string {
     return months >= 1 ? `${months} months` : `${Math.round(years * 365)} days`;
 }
 
-function checkAge(diagnosis: PatientDiagnosis, trial: Trial): Tier1Check {
+function checkAge(patient: Patient | null, trial: Trial): Tier1Check {
     const label = 'Age';
-    const age = diagnosis.dateOfBirth ? ageFromDateOfBirth(diagnosis.dateOfBirth) : null;
+    const age = patient?.dateOfBirth ? ageFromDateOfBirth(patient.dateOfBirth) : null;
     const min = parseCtGovAge(trial.minimumAge);
     const max = parseCtGovAge(trial.maximumAge);
 
     if (age === null) {
-        return { label, outcome: 'unknown', detail: 'No date of birth recorded on the diagnosis.' };
+        return { label, outcome: 'unknown', detail: 'No date of birth recorded on the patient.' };
     }
 
     // Absent bounds are the common case - 62% of trials state no maximum - and mean "no limit",
@@ -100,13 +100,13 @@ function checkAge(diagnosis: PatientDiagnosis, trial: Trial): Tier1Check {
     return { label, outcome: 'pass', detail: `Age ${age} is within the trial's range of ${range}.` };
 }
 
-function checkSex(diagnosis: PatientDiagnosis, trial: Trial): Tier1Check {
+function checkSex(patient: Patient | null, trial: Trial): Tier1Check {
     const label = 'Sex';
-    const patientSex = diagnosis.sex?.trim().toUpperCase();
+    const patientSex = patient?.sex?.trim().toUpperCase();
     const trialSex = trial.sex?.trim().toUpperCase();
 
     if (!patientSex) {
-        return { label, outcome: 'unknown', detail: 'No sex recorded on the diagnosis.' };
+        return { label, outcome: 'unknown', detail: 'No sex recorded on the patient.' };
     }
     if (!trialSex) {
         return { label, outcome: 'unknown', detail: 'Trial does not state a sex requirement.' };
@@ -143,9 +143,16 @@ function checkRecruiting(trial: Trial): Tier1Check {
 
 /**
  * Run every Tier 1 check. Order is fixed so the UI reads consistently across trials.
+ *
+ * Takes the patient rather than the diagnosis: age and sex are properties of the person, and
+ * moved onto `patient` when the backend split the two. Nothing here reads a clinical field,
+ * so the diagnosis is no longer a parameter at all.
  */
-export function runTier1Checks(diagnosis: PatientDiagnosis, trial: Trial): Tier1Check[] {
-    return [checkAge(diagnosis, trial), checkSex(diagnosis, trial), checkRecruiting(trial)];
+export function runTier1Checks(
+    patient: Patient | null,
+    trial: Trial
+): Tier1Check[] {
+    return [checkAge(patient, trial), checkSex(patient, trial), checkRecruiting(trial)];
 }
 
 /**

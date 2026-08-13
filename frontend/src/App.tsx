@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import { PatientProvider } from './lib/PatientContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import TrialSearch from './pages/TrialSearch';
@@ -31,7 +32,9 @@ function App() {
                         path="/"
                         element={
                             <ProtectedRoute>
-                                <Layout />
+                                <PatientProvider>
+                                    <Layout />
+                                </PatientProvider>
                             </ProtectedRoute>
                         }
                     >

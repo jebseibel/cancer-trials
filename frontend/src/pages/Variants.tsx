@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Save, Loader2 } from 'lucide-react';
 import { patientVariantApi } from '../services/api';
 import { Field, Section, Select, inputClass } from '../components/FormControls';
-import { useCurrentAppUser } from '../lib/useCurrentAppUser';
+import { useCurrentPatient } from '../lib/PatientContext';
 import { VARIANT_STATUS_LABELS, VARIANT_STATUS_VALUES } from '../types/api';
 import type { PatientVariant, PatientVariantRequest } from '../types/api';
 
@@ -60,12 +60,12 @@ function toForm(v: PatientVariant): FormState {
 }
 
 /** Blank inputs become undefined, never "" - an empty date string fails to parse server-side. */
-function toRequest(form: FormState, appUserExtid: string | undefined): PatientVariantRequest {
+function toRequest(form: FormState, patientExtid: string | undefined): PatientVariantRequest {
     const text = (v: string) => (v.trim() === '' ? undefined : v.trim());
     const num = (v: string) => (v === '' ? undefined : Number(v));
 
     return {
-        appUserExtid,
+        patientExtid,
         pik3caStatus: text(form.pik3caStatus),
         esr1Status: text(form.esr1Status),
         tp53Status: text(form.tp53Status),
@@ -91,17 +91,17 @@ function toRequest(form: FormState, appUserExtid: string | undefined): PatientVa
 
 export default function Variants() {
     const queryClient = useQueryClient();
-    const { data: appUser, isLoading: appUserLoading } = useCurrentAppUser();
+    const { patient, isLoading: patientLoading } = useCurrentPatient();
     const [form, setForm] = useState<FormState>(EMPTY_FORM);
     const [saved, setSaved] = useState(false);
 
     const { data: existing, isLoading } = useQuery({
-        queryKey: ['patientVariant', appUser?.extid],
+        queryKey: ['patientVariant', patient?.extid],
         queryFn: async () => {
-            const rows = (await patientVariantApi.getByAppUserExtid(appUser!.extid)).data;
+            const rows = (await patientVariantApi.getByPatientExtid(patient!.extid)).data;
             return rows[0] ?? null;
         },
-        enabled: !!appUser?.extid,
+        enabled: !!patient?.extid,
     });
 
     // Keyed on extid alone, not the whole object: a refetch returning the same row must not
@@ -113,14 +113,14 @@ export default function Variants() {
 
     const saveMutation = useMutation({
         mutationFn: async () => {
-            const request = toRequest(form, appUser?.extid);
+            const request = toRequest(form, patient?.extid);
             return existing
                 ? (await patientVariantApi.update(existing.extid, request)).data
                 : (await patientVariantApi.create(request)).data;
         },
         onSuccess: async () => {
             setSaved(true);
-            await queryClient.invalidateQueries({ queryKey: ['patientVariant', appUser?.extid] });
+            await queryClient.invalidateQueries({ queryKey: ['patientVariant', patient?.extid] });
         },
     });
 
@@ -131,17 +131,19 @@ export default function Variants() {
 
     const saveError = saveMutation.error as { response?: { data?: { message?: string } } } | null;
 
-    if (appUserLoading || isLoading) {
+    if (patientLoading || isLoading) {
         return <p className="px-4 py-6 text-gray-500">Loading variants...</p>;
     }
 
-    if (!appUser) {
+    if (!patient) {
         return (
-            <div className="px-4 py-6 sm:px-0">
+            <div>
                 <div className="bg-white shadow rounded-lg p-6">
-                    <p className="text-sm text-gray-500">
-                        No app-user profile linked to your login. Ask to have one seeded before
-                        entering variants.
+                    <p className="text-sm text-gray-700">
+                        No patient record yet. Create one to start recording genetic and biomarker results.
+                    </p>
+                    <p className="mt-2 text-xs text-gray-500">
+                        A record can be for you or for someone you are helping.
                     </p>
                 </div>
             </div>

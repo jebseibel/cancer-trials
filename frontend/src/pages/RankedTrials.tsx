@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ListChecks, AlertTriangle, HelpCircle, Check, ChevronDown, ChevronRight, MapPin } from 'lucide-react';
 import { matchingApi } from '../services/api';
-import { useCurrentAppUser } from '../lib/useCurrentAppUser';
+import { useCurrentPatient } from '../lib/PatientContext';
 import type { EligibilitySignal, TrialAssessment } from '../types/api';
 
 // Run on demand, never on page load. Ranking assesses thousands of trials in one request and
@@ -34,7 +34,7 @@ function SignalRow({ signal }: { signal: EligibilitySignal }) {
                         <button
                             type="button"
                             onClick={() => setShowEvidence((v) => !v)}
-                            className="ml-2 inline-flex items-center gap-1 text-xs underline opacity-80 hover:opacity-100"
+                            className="ml-2 inline-flex min-h-6 items-center gap-1 px-1 py-0.5 align-baseline text-xs underline opacity-80 hover:opacity-100"
                         >
                             {showEvidence ? 'hide' : 'why?'}
                         </button>
@@ -85,7 +85,7 @@ function TrialSites({ assessment }: { assessment: TrialAssessment }) {
                     <button
                         type="button"
                         onClick={() => setShowAllSites(true)}
-                        className="ml-1 underline hover:no-underline"
+                        className="ml-1 inline-flex min-h-6 items-center px-1 py-0.5 underline hover:no-underline"
                     >
                         and {hidden} more
                     </button>
@@ -123,8 +123,10 @@ function AssessmentCard({ assessment }: { assessment: TrialAssessment }) {
                         rather than inside a signal a reader has to expand. */}
                     <TrialSites assessment={assessment} />
                 </div>
-                {/* Counts, never a percentage. There is no fit score by design. */}
-                <div className="flex shrink-0 gap-3 text-xs text-gray-600">
+                {/* Counts, never a percentage. There is no fit score by design.
+                    They wrap to their own line on a narrow screen rather than holding width
+                    against the title - the trial name is what a reader scans for. */}
+                <div className="flex w-full shrink-0 flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600 sm:w-auto">
                     {assessment.concernCount > 0 && (
                         <span className="text-amber-700">
                             {assessment.concernCount} to check
@@ -160,7 +162,7 @@ function AssessmentCard({ assessment }: { assessment: TrialAssessment }) {
                     <button
                         type="button"
                         onClick={() => setShowAll((v) => !v)}
-                        className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+                        className="inline-flex min-h-8 items-center gap-1 py-1 text-xs text-gray-500 hover:text-gray-700"
                     >
                         {showAll ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                         What matched
@@ -182,12 +184,12 @@ function AssessmentCard({ assessment }: { assessment: TrialAssessment }) {
 }
 
 export default function RankedTrials() {
-    const { data: appUser } = useCurrentAppUser();
+    const { patient } = useCurrentPatient();
     const [breastOnly, setBreastOnly] = useState(true);
 
     const rank = useMutation({
         mutationFn: async () => {
-            const response = await matchingApi.rank(appUser!.extid, { breastOnly, limit: 50 });
+            const response = await matchingApi.rank(patient!.extid, { breastOnly, limit: 50 });
             return response.data;
         },
     });
@@ -222,7 +224,7 @@ export default function RankedTrials() {
                 <button
                     type="button"
                     onClick={() => rank.mutate()}
-                    disabled={!appUser || rank.isPending}
+                    disabled={!patient || rank.isPending}
                     className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
                 >
                     {rank.isPending ? 'Looking through the trials…' : 'Find trials for me'}

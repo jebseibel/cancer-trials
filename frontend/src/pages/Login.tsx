@@ -22,11 +22,13 @@ export default function Login() {
                 const response = await authApi.login({ username, password });
                 authHelpers.saveToken(response.data.token);
                 authHelpers.saveUsername(response.data.username);
+                authHelpers.saveRole(response.data.role);
                 navigate('/');
             } else {
                 const response = await authApi.register({ username, password, email });
                 authHelpers.saveToken(response.data.token);
                 authHelpers.saveUsername(response.data.username);
+                authHelpers.saveRole(response.data.role);
                 navigate('/');
             }
         } catch (err: any) {

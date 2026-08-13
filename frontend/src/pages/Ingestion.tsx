@@ -130,7 +130,7 @@ export default function Ingestion() {
     const elapsed = useElapsedSeconds(busy);
 
     return (
-        <div className="px-4 py-6 sm:px-0">
+        <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Process Trials</h1>
             <p className="text-gray-600 mb-6">
                 Download trials from ClinicalTrials.gov and prepare them so search can find them.
@@ -193,7 +193,7 @@ export default function Ingestion() {
                         max={50000}
                         value={maxStudies}
                         onChange={(e) => setMaxStudies(Number(e.target.value))}
-                        className="w-32 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                        className="w-full sm:w-32 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                     />
                     {maxStudies > 2000 && (
                         <p className="mt-1 text-xs text-amber-700">
@@ -204,12 +204,15 @@ export default function Ingestion() {
                     )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
+                {/* Stacked and full-width on a phone, inline from `sm` up. Wrapping three
+                    buttons of very different label lengths produced a ragged two-then-one
+                    arrangement that read as accidental. */}
+                <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                     <button
                         type="button"
                         onClick={() => setConfirmOpen(true)}
                         disabled={busy}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md shadow-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md shadow-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {processAllMutation.isPending ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -224,7 +227,7 @@ export default function Ingestion() {
                     <button
                         type="submit"
                         disabled={busy}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {ingestMutation.isPending ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -238,7 +241,7 @@ export default function Ingestion() {
                         type="button"
                         onClick={() => backfillMutation.mutate()}
                         disabled={busy}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {backfillMutation.isPending ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -249,7 +252,7 @@ export default function Ingestion() {
                     </button>
 
                     {busy && (
-                        <span className="text-sm text-gray-500 tabular-nums">
+                        <span className="text-center text-sm text-gray-500 tabular-nums sm:text-left">
                             {elapsed}s elapsed
                         </span>
                     )}

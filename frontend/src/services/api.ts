@@ -5,7 +5,8 @@ import type {
     TrialSource,
     TrialStatus,
     TrialStatusRequest,
-    AppUser,
+    Patient,
+    PatientAccess,
     Location,
     ArmGroup,
     Intervention,
@@ -90,10 +91,10 @@ export const trialApi = {
 // Ranks the whole corpus against the patient record already on file, so nobody has to know
 // what to type into a search box. Slow by nature - it assesses thousands of trials per call.
 export const matchingApi = {
-    rank: (appUserExtid: string, params?: { breastOnly?: boolean; limit?: number }) =>
-        apiClient.get<TrialAssessment[]>(`/matching/rank/${appUserExtid}`, { params }),
-    assessTrial: (trialExtid: string, appUserExtid: string) =>
-        apiClient.get<TrialAssessment>(`/matching/trial/${trialExtid}/for/${appUserExtid}`),
+    rank: (patientExtid: string, params?: { breastOnly?: boolean; limit?: number }) =>
+        apiClient.get<TrialAssessment[]>(`/matching/rank/${patientExtid}`, { params }),
+    assessTrial: (trialExtid: string, patientExtid: string) =>
+        apiClient.get<TrialAssessment>(`/matching/trial/${trialExtid}/for/${patientExtid}`),
 };
 
 export const trialSourceApi = {
@@ -104,16 +105,27 @@ export const trialStatusApi = {
     getAll: (params?: { page?: number; size?: number }) =>
         apiClient.get<PageResponse<TrialStatus>>('/trialstatus', { params: { size: 100, ...params } }),
     getByExtid: (extid: string) => apiClient.get<TrialStatus>(`/trialstatus/${extid}`),
-    getByAppUserExtid: (appUserExtid: string) =>
-        apiClient.get<TrialStatus[]>(`/trialstatus/by-appuser/${appUserExtid}`),
+    getByPatientExtid: (patientExtid: string) =>
+        apiClient.get<TrialStatus[]>(`/trialstatus/by-patient/${patientExtid}`),
     create: (status: TrialStatusRequest) => apiClient.post<TrialStatus>('/trialstatus', status),
     update: (extid: string, status: Partial<TrialStatusRequest>) =>
         apiClient.put<TrialStatus>(`/trialstatus/${extid}`, status),
     delete: (extid: string) => apiClient.delete(`/trialstatus/${extid}`),
 };
 
-export const appUserApi = {
-    getAll: () => apiClient.get<PageResponse<AppUser>>('/appuser', { params: { size: 100 } }),
+/**
+ * Patients the signed-in user may see.
+ *
+ * `/mine` names nobody - the server resolves the caller from the token - so there is no extid
+ * for a caller to substitute. It replaces fetching every app_user and filtering by username
+ * client-side, which returned other people's rows to the browser to find one.
+ */
+export const patientApi = {
+    mine: () => apiClient.get<PatientAccess[]>('/patient/mine'),
+    getByExtid: (patientExtid: string) => apiClient.get<Patient>(`/patient/${patientExtid}`),
+    create: (patient: Partial<Patient>) => apiClient.post<Patient>('/patient', patient),
+    update: (patientExtid: string, patient: Partial<Patient>) =>
+        apiClient.put<Patient>(`/patient/${patientExtid}`, patient),
 };
 
 export const locationApi = {
@@ -162,11 +174,11 @@ export const ragApi = {
         apiClient.post<BackfillResult>(`/rag/reindex/${trialExtid}`),
 };
 
-// One diagnosis per patient in practice, so the page loads the app user's list and edits
+// One diagnosis per patient in practice, so the page loads the patient's list and edits
 // the first row rather than offering a list/detail flow.
 export const patientDiagnosisApi = {
-    getByAppUserExtid: (appUserExtid: string) =>
-        apiClient.get<PatientDiagnosis[]>(`/patientdiagnosis/by-appuser/${appUserExtid}`),
+    getByPatientExtid: (patientExtid: string) =>
+        apiClient.get<PatientDiagnosis[]>(`/patientdiagnosis/by-patient/${patientExtid}`),
     create: (diagnosis: PatientDiagnosisRequest) =>
         apiClient.post<PatientDiagnosis>('/patientdiagnosis', diagnosis),
     update: (extid: string, diagnosis: Partial<PatientDiagnosisRequest>) =>
@@ -175,8 +187,8 @@ export const patientDiagnosisApi = {
 
 // One variant row per patient, same list-and-edit-the-first-row flow as the diagnosis.
 export const patientVariantApi = {
-    getByAppUserExtid: (appUserExtid: string) =>
-        apiClient.get<PatientVariant[]>(`/patientvariant/by-appuser/${appUserExtid}`),
+    getByPatientExtid: (patientExtid: string) =>
+        apiClient.get<PatientVariant[]>(`/patientvariant/by-patient/${patientExtid}`),
     create: (variant: PatientVariantRequest) =>
         apiClient.post<PatientVariant>('/patientvariant', variant),
     update: (extid: string, variant: Partial<PatientVariantRequest>) =>
@@ -185,8 +197,8 @@ export const patientVariantApi = {
 
 // One prior-treatment row per patient, same flow again.
 export const patientPriorTreatmentApi = {
-    getByAppUserExtid: (appUserExtid: string) =>
-        apiClient.get<PatientPriorTreatment[]>(`/patientpriortreatment/by-appuser/${appUserExtid}`),
+    getByPatientExtid: (patientExtid: string) =>
+        apiClient.get<PatientPriorTreatment[]>(`/patientpriortreatment/by-patient/${patientExtid}`),
     create: (treatment: PatientPriorTreatmentRequest) =>
         apiClient.post<PatientPriorTreatment>('/patientpriortreatment', treatment),
     update: (extid: string, treatment: Partial<PatientPriorTreatmentRequest>) =>
@@ -207,4 +219,11 @@ export const authHelpers = {
     saveUsername: (username: string) => localStorage.setItem('username', username),
     getUsername: () => localStorage.getItem('username'),
     removeUsername: () => localStorage.removeItem('username'),
+    // A UI hint only. It lives in localStorage, so a user can edit it and reveal a hidden
+    // menu item - the backend refuses the call regardless. The frontend must never be the
+    // only thing standing between a user and a capability.
+    saveRole: (role: string) => localStorage.setItem('role', role),
+    getRole: () => localStorage.getItem('role'),
+    removeRole: () => localStorage.removeItem('role'),
+    isAdmin: () => localStorage.getItem('role') === 'ADMIN',
 };

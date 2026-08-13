@@ -2,10 +2,10 @@ import { FlaskConical, Bookmark, Heart, Download } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { trialApi, trialStatusApi } from '../services/api';
-import { useCurrentAppUser } from '../lib/useCurrentAppUser';
+import { useCurrentPatient } from '../lib/PatientContext';
 
 export default function Dashboard() {
-    const { data: appUser } = useCurrentAppUser();
+    const { patient } = useCurrentPatient();
 
     const { data: trialsPage } = useQuery({
         queryKey: ['trials'],
@@ -13,9 +13,9 @@ export default function Dashboard() {
     });
 
     const { data: myStatuses } = useQuery({
-        queryKey: ['trialStatuses', appUser?.extid],
-        queryFn: async () => (await trialStatusApi.getByAppUserExtid(appUser!.extid)).data,
-        enabled: !!appUser?.extid,
+        queryKey: ['trialStatuses', patient?.extid],
+        queryFn: async () => (await trialStatusApi.getByPatientExtid(patient!.extid)).data,
+        enabled: !!patient?.extid,
     });
 
     const totalTrials = trialsPage?.totalElements ?? 0;
@@ -23,7 +23,7 @@ export default function Dashboard() {
     const interestedCount = myStatuses?.filter((s) => s.status === 'INTERESTED').length ?? 0;
 
     return (
-        <div className="px-4 py-6 sm:px-0">
+        <div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2">Breast Cancer Trial Finder</h2>
             <h1 className="text-xl text-gray-600 mb-8">Search trials and track your status on each one</h1>
 

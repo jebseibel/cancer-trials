@@ -88,7 +88,7 @@ export type TrialStatusValue = (typeof TRIAL_STATUS_VALUES)[number];
 export interface TrialStatus {
     extid: string;
     trialExtid: string;
-    appUserExtid: string;
+    patientExtid: string;
     status: TrialStatusValue | string;
     notes?: string;
     statusChangedAt?: string;
@@ -96,16 +96,36 @@ export interface TrialStatus {
 
 export interface TrialStatusRequest {
     trialExtid: string;
-    appUserExtid: string;
+    patientExtid: string;
     status: string;
     notes?: string;
     statusChangedAt?: string;
 }
 
-export interface AppUser {
+/** What one login may do with one patient's record. Ranked: OWNER covers every check. */
+export const ACCESS_LEVELS = ['VIEW_TRIALS', 'VIEW_RECORD', 'EDIT_RECORD', 'OWNER'] as const;
+export type AccessLevel = (typeof ACCESS_LEVELS)[number];
+
+/** A person with a medical record. Replaces AppUser, which was a second login table. */
+export interface Patient {
     extid: string;
-    username: string;
-    displayName?: string;
+    /** Short label for the switcher and page headers. */
+    displayName: string;
+    /** The name the clinic holds. */
+    fullName?: string;
+    dateOfBirth?: string;
+    sex?: string;
+    notes?: string;
+}
+
+/**
+ * A patient plus the level the signed-in user holds on it.
+ *
+ * The level is what lets the UI decide between an editable form and a read-only view without
+ * discovering a refusal by attempting a save and failing.
+ */
+export interface PatientAccess extends Patient {
+    accessLevel: AccessLevel;
 }
 
 // Trial child records (linked by trial extid, fetched via /by-trial/{trialExtid})
@@ -240,7 +260,7 @@ export type ReceptorStatus = (typeof RECEPTOR_STATUS_VALUES)[number];
 
 export interface PatientDiagnosis {
     extid: string;
-    appUserExtid?: string;
+    patientExtid?: string;
     cancerType: string;
     stage?: string;
     stageSystem?: string;
@@ -257,8 +277,6 @@ export interface PatientDiagnosis {
     priorTreatments?: string;
     hasMeasurableDisease?: boolean;
     menopausalStatus?: string;
-    dateOfBirth?: string;
-    sex?: string;
     diagnosisDate?: string;
     notes?: string;
 }
@@ -293,7 +311,7 @@ export type VariantStatus = (typeof VARIANT_STATUS_VALUES)[number];
 
 export interface PatientVariant {
     extid: string;
-    appUserExtid?: string;
+    patientExtid?: string;
     patientDiagnosisExtid?: string;
     pik3caStatus?: string;
     esr1Status?: string;
@@ -346,7 +364,7 @@ export type TreatmentStatus = (typeof TREATMENT_STATUS_VALUES)[number];
 
 export interface PatientPriorTreatment {
     extid: string;
-    appUserExtid?: string;
+    patientExtid?: string;
     patientDiagnosisExtid?: string;
     cdk46Status?: string;
     endocrineStatus?: string;
