@@ -5,23 +5,31 @@ Where the project stands, what is deliberately unfinished, and what that blocks.
 (schema design). This is the "where are we right now" view — update it as things change rather
 than keeping it as history.
 
-**Last verified against the code: 2026-08-10** (afternoon session — corpus pull, backfill
-fixes, two chunker bugs, first two security items).
+**Last verified against the code: 2026-08-14.** Status facts below (security, authorization,
+the `AppUser` → `Patient` rename, Tier 2 wiring, git state) were re-checked against the source
+on that date. **Everything in "What's built" further down is engineering narrative kept for its
+reasoning and is dated where it happened — treat those sections as history, not as current
+state.**
+
+⚠️ **Runtime numbers in this document are stale unless marked otherwise.** Trial counts, Qdrant
+chunk counts, and prod contents were last observed 2026-08-11 and have not been re-verified
+since. They are kept because the ratios are still informative, not because the absolutes are
+current.
 
 ---
 
 ## Picking the project back up
 
-Verified 2026-08-10, end of session:
+Code facts verified 2026-08-14; runtime figures last observed 2026-08-11 and **not re-checked**:
 
 | | |
 | --- | --- |
-| Trials in MySQL | **4,634** — 2,108 mention breast in title/summary (45.5%) |
-| Qdrant | **136,345 chunks**, 133,140 HNSW-indexed, 384 dims, Cosine. 60/60 sampled trials covered |
-| AppUser / PatientDiagnosis / PatientVariant / PatientPriorTreatment | 1 row each — **auto-seeded** |
-| SavedTrialMatch | 0 |
-| Tests | `:database` 820, `:datafetcher` 55, root **71**, `:common` 12, `:rag` 35 — all passing, 0 skipped (2026-08-11). `RetrievalEvaluation` needs a running backend, see below |
-| Branch | `qdrant-fixes`, committed, **not pushed**. `main` is 6 behind. |
+| Trials in MySQL | ~**4,634** — 2,108 mention breast in title/summary (45.5%). *Unverified since 2026-08-11.* |
+| Qdrant | ~**136,345 chunks**, 384 dims, Cosine. *Unverified since 2026-08-11.* |
+| Patient / PatientDiagnosis / PatientVariant / PatientPriorTreatment | 1 row each — **auto-seeded**. *Unverified since 2026-08-11.* |
+| SavedTrialMatch | 0. *Unverified since 2026-08-11.* |
+| Tests | `:database` 820, `:datafetcher` 55, root **71**, `:common` 12, `:rag` 35 (2026-08-11). *Not re-run since; counts will have moved with the ownership and mobile work.* |
+| Branch | **`frontend-mobile`** — **3 ahead of `main`, 0 behind**; the access model, mobile work and docs are unmerged. Verified 2026-08-14. |
 
 **The demo happened and went well, and the corpus is complete and searchable.** Both blockers
 from the last session are gone.
@@ -47,22 +55,26 @@ from the last session are gone.
 The ~14-minute MySQL pull is all that page needs; the embedding backfill (hours on 1 vCPU) only
 powers semantic Trial Search.
 
-⚠️ **Still to do before showing anyone else:** `LOGIN_ALLOWED_USERNAMES=jeb` in `/opt/cancer/.env`
-then restart, to block the unused `admin` account. The code is deployed but the property is
-unset, so the allowlist is inactive.
+✅ **The login allowlist shipped** in `1b663cb` ("Hash passwords on user create/update, and add a
+login allowlist"). Whether `LOGIN_ALLOWED_USERNAMES` is actually set in `/opt/cancer/.env` on the
+server is a *deployment* question this document cannot answer — check the box, not the code.
 
 Full procedure and every correction found by doing it: `hosting/DEPLOY_RUNBOOK.md`.
 
 ### Do this first when you return
 
-**Pull the corpus on the server.** The app is deployed and empty; that one step turns a working
-site into a useful one. Everything below is superseded by that.
+⚠️ **Merge this branch to `main`.** `frontend-mobile` is **3 commits ahead of `main` and 0
+behind** (verified 2026-08-14) — the authorization model, the mobile work and the current docs
+are all unmerged, so `main` still reflects the app as deployed on 2026-08-11.
 
-**Wire up the Rank Trials page.** The matching service is built, measured against the full
-corpus, and its two worst bugs are fixed; the disease-type gate landed 2026-08-11 and took
-receptor silence from 77% down to 55%. What stands between here and a usable page is the REST
-boundary — a controller, a converter, and a response DTO, none of which exist. The
-backend-vs-frontend decision is settled: it is in the backend, in code.
+**Check whether the corpus was ever pulled on the server.** As of 2026-08-11 prod had 0 Qdrant
+points and "Trials for You" would return nothing. Nothing in the code tells you whether that was
+done since — verify against the running site rather than trusting this line.
+
+✅ **The Rank Trials page is built and wired.** `TrialMatchingController`,
+`ResponseTrialAssessment`, and `frontend/src/pages/RankedTrials.tsx` all exist; the REST boundary
+this section used to list as missing was closed in `3152d32` and `9e9719e`. The
+backend-vs-frontend decision is settled: matching is in the backend, in code.
 
 ⚠️ **Run `CorpusSweep` after any pattern change.** The 41 unit tests passed while the treatment
 signal was producing 550 false concerns; only the corpus caught it.
@@ -259,7 +271,11 @@ Consistent with the no-verdicts rule: a receptor mismatch should **demote and fl
 trial, never silently remove it. Those three trials are wrong for her today, but receptor
 status can be re-tested and the tool should not make that call for her.
 
-### The unfinished task — pick this up first
+### The unfinished task — resolved, kept for context
+
+> **Updated 2026-08-14.** Both fixes listed below shipped: strict receptor polarity landed with
+> the Tier 2 evaluator (`89f3960`) and the US location filter is a signal on every assessment.
+> This section is history now, not a to-do.
 
 **The user was trying to answer a real question about a family member's trial options and did not
 get there.** The blocker was tooling, not design.
@@ -297,10 +313,12 @@ now that the database holds a real medical record rather than sample data.
 
 ## What's built
 
-### Tier 2 matching is half-built and uncommitted — 2026-08-11
+### Tier 2 matching — service layer, 2026-08-11
 
-The service layer exists on disk and **nothing calls it**. No controller, no converter, no
-response DTO, no frontend. It compiles and the new `:common` test suite passes.
+> **Status update 2026-08-14:** this section was written when the service layer was uncommitted
+> and unreachable. It is now committed and wired end to end — controller, converter, response
+> DTO and page all exist. The design reasoning below still holds; the "nothing calls it" framing
+> does not.
 
 Two decisions the previous session left open are settled in code. **Matching lives in the
 backend**, not the frontend where Tier 1 sits — it has to be testable against the whole corpus
@@ -425,10 +443,14 @@ HER2-positive pattern, so this patient's low-positive IHC record does not false-
 
 ### The Rank Trials endpoint — 2026-08-11
 
-`GET /api/matching/rank/{appUserExtid}?breastOnly=&limit=` ranks the corpus against the record
-already on file, best first. `GET /api/matching/trial/{trialExtid}/for/{appUserExtid}` assesses
+`GET /api/matching/rank/{patientExtid}?breastOnly=&limit=` ranks the corpus against the record
+already on file, best first. `GET /api/matching/trial/{trialExtid}/for/{patientExtid}` assesses
 one trial, for Trial Detail. Both extid-only; controller plus package-private converter in one
 file, per the existing convention.
+
+> **Updated 2026-08-14:** these paths took `{appUserExtid}` when written. `AppUser` was dropped
+> in changeset `030` and the parameter is now `{patientExtid}`, checked against the caller's
+> grants via `CurrentUserService.requireAccessId(..., AccessLevel.VIEW_TRIALS)`.
 
 **Verified live against the real record.** The top hits are genuinely the patient's profile — PI3K-pathway
 HR+/HER2− breast trials with US sites — and every signal carries its quoted criteria text
@@ -445,9 +467,11 @@ the patient never sees. Filtering first also skips the expensive per-trial work 
 the corpus that is other diseases; the pre-filter calls `diseaseTypeSignal` rather than
 re-implementing it, so it cannot drift from the reported signal.
 
-⚠️ **`SecurityConfig` is still `.anyRequest().permitAll()`.** This endpoint returns a patient's
-assessment keyed on a guessable path — one more reason that item matters before anything leaves
-localhost.
+✅ **Resolved 2026-08-14.** When written, `SecurityConfig` was `.anyRequest().permitAll()` and
+this endpoint returned a patient's assessment keyed on a guessable path. It is now
+`.anyRequest().authenticated()`, and the path is checked against the caller's grants via
+`CurrentUserService.requireAccessId(patientExtid, AccessLevel.VIEW_TRIALS)` — so a guessed extid
+returns a permission error rather than someone's medical record.
 
 ### "Trials for You" — the page she actually uses — 2026-08-11
 
@@ -767,13 +791,15 @@ open questions in `ingestion/PAYLOAD_HASH_PLAN.md`.
 
 Full layered scaffold (domain → entity → repository → db service → service → controller) for
 every core entity: Trial, TrialSource, StagingRawTrial, Sponsor, Condition, Medication,
-Location, ArmGroup, Intervention, Outcome, OverallOfficial, EligibilityRule, Keyword, AppUser,
-TrialStatus, PatientDiagnosis, plus the Epic/FHIR tables (UcHealthOAuthToken,
-StagingRawFhirResource, PatientMedication, LabResult, LabResultComponent). Standard CRUD with
-pagination on each.
+Location, ArmGroup, Intervention, Outcome, OverallOfficial, EligibilityRule, Keyword, Patient,
+TrialStatus, PatientDiagnosis, PatientVariant, PatientPriorTreatment, plus the Epic/FHIR tables
+(UcHealthOAuthToken, StagingRawFhirResource, PatientMedication, LabResult, LabResultComponent).
+Standard CRUD with pagination on each.
 
-Every entity referencing a Trial also exposes `GET /api/{entity}/by-trial/{trialExtid}`
-(or `/by-appuser/{appUserExtid}` for TrialStatus and PatientDiagnosis).
+Every entity referencing a Trial also exposes `GET /api/{entity}/by-trial/{trialExtid}`, and
+patient-scoped entities expose `GET /api/{entity}/by-patient/{patientExtid}` — five such
+endpoints, verified 2026-08-14. (These were `by-appuser` before changeset `030` dropped
+`AppUser`.)
 
 ### Frontend
 
@@ -929,15 +955,16 @@ boot without `JWT_SECRET`**, and existing tokens are invalid, so log in again.
 ships with no authentication of any kind. Override with `QDRANT_BIND` if a remote container
 ever needs it, and put real auth in front first.
 
-- ⬜ **All endpoint security is still disabled.** `SecurityConfig` line 55 is
-  `.anyRequest().permitAll()`. The original JWT rule set is preserved commented-out directly
-  below it. On restore, `/api/uchealth/callback` must stay `permitAll` — Epic's OAuth redirect
-  cannot carry a JWT. **Left deliberately**: restoring it means every API call needs a valid
-  JWT, and the frontend login flow has not been verified end-to-end. Do this when you can test
-  the login immediately after. Note `RetrievalEvaluation` hits the REST API unauthenticated and
-  will start failing for a new reason.
-- ⬜ **`UcHealthOAuthTokenController` exposes full CRUD over the token table**, including reading
-  refresh tokens back over HTTP. Needs a decision on remove-versus-protect, not a quick edit.
+- ✅ **Endpoint security is restored — verified 2026-08-14.** `SecurityConfig` now ends in
+  `.anyRequest().authenticated()`, with static assets and `/api/auth/**` explicitly permitted and
+  `/api/uchealth/callback` correctly left public (Epic's OAuth redirect cannot carry a JWT).
+  `@EnableMethodSecurity` is on, so `@PreAuthorize` is actually honoured rather than silently
+  ignored. Landed in `6037500`. Note `RetrievalEvaluation` hits the REST API unauthenticated and
+  will fail against a secured backend.
+- ✅ **`UcHealthOAuthTokenController` no longer exists — verified 2026-08-14.** The only UCHealth
+  controller is `UcHealthAuthController`. The full-CRUD-over-the-token-table exposure this item
+  described is gone. If token CRUD is ever reintroduced, it needs the remove-versus-protect
+  decision this item called for.
 
 Full checklist in `_archive/hosting/qa-setup.md`.
 
@@ -1040,11 +1067,12 @@ without a full re-embed, since backfill skips what is already indexed.
   populated column through the API. Hit this when the placeholder row's stale
   `lastChemoEndDate` (2025-11-15, predating the real diagnosis) could not be cleared; the
   row had to be deleted and recreated. Affects every `*DbService` following this template.
-- **No AppUser-seeding UI.** `User` (login) and `AppUser` (tracking) are separate tables with no
-  FK, matched by username. Creating the row is manual and it does not survive a rebuild. One
-  exists now for `jeb`, created via the API. The `passwordHash` field had to be supplied even
-  though `AppUser` never authenticates — that requirement is exactly the design flaw
-  `_archive/patient/PATIENT_MODEL_PLAN.md` removes.
+- ✅ **The `AppUser` design flaw is resolved — 2026-08-14.** `User` (login) and `AppUser`
+  (tracking) used to be separate tables with no FK, matched on a username string, and `AppUser`
+  required a `passwordHash` it never used. `AppUser` is dropped (changeset `030`); the tracking
+  entity is `Patient`, and `UserPatient` is the real FK between a login and the records they may
+  see. This is what `_archive/patient/PATIENT_MODEL_PLAN.md` proposed.
+  ⚠️ Seeding is still via `PatientSeedLoader` from gitignored CSVs — there is no UI for it.
 - **No enum endpoint.** Frontend vocabularies are hardcoded `as const` arrays in
   `types/api.ts`; adding a backend enum value will not surface in the UI on its own.
 - **`BasicApplicationTests.contextLoads()`** — status unconfirmed. It previously failed on a
@@ -1123,7 +1151,31 @@ an hour of confusion into an immediate failure.
 - **A database rebuild is free before the corpus exists and expensive after.** This one cost
   nothing because Qdrant had 0 points. After the embed it would be hours.
 
-## ⚠️ The authorization gap — found 2026-08-11, doors closed, gap deferred
+## ✅ The authorization gap — found 2026-08-11, CLOSED 2026-08-14
+
+> **This section described the gap as deferred. It has since been fixed** in `c9cb30d` ("Give
+> clinical data an owner, so a record can be shared and not just read"). The history is kept
+> below because the reasoning still explains why the model is shaped the way it is.
+
+**What exists now, verified 2026-08-14:**
+
+- **`UserPatient`** joins a login `User` to a `Patient` with an access level — the FK that this
+  section correctly identified as missing.
+- **`AccessLevel` is ranked**, not boolean: `VIEW_TRIALS(10) < VIEW_RECORD(20) < EDIT_RECORD(30)
+  < OWNER(40)`. A caller granted trial-viewing cannot read the underlying record.
+- **`CurrentUserService` reads the token and enforces the check.** `requireAccess`,
+  `requireAccessId`, `hasAccess` and `accessLevelFor` all resolve the caller from
+  `SecurityContextHolder` and compare against the requested patient. `TrialMatchingController`
+  calls `requireAccessId(patientExtid, AccessLevel.VIEW_TRIALS)` before doing any work.
+- **`AppUser` is gone.** Changeset `030-drop-app-user.yaml` dropped the table; the domain object
+  is `Patient`, and all five patient-scoped endpoints are `by-patient`, not `by-appuser`.
+
+⚠️ **The URL still names the patient** — the endpoints are `/rank/{patientExtid}`, not `/rank/me`
+as the deferred fix below proposed. That is now safe because the extid is checked against the
+caller's grants rather than trusted, but it means an unauthorized extid returns a permission
+error rather than being unaddressable.
+
+**The original finding, for context:**
 
 **The app authenticates but does not authorize.** The user asked the right question — *"users
 should only be able to see their stuff"* — and the answer is that they cannot today.
@@ -1153,13 +1205,16 @@ references it. Roles are granted and never checked, so `ROLE_USER`/`ROLE_ADMIN` 
 an account stops new logins only. A token blacklist or short expiry is the fix if that ever
 matters.
 
-**The real fix, deferred: resolve identity from the token, not the URL.**
+**The real fix as proposed then: resolve identity from the token, not the URL.**
 `/api/matching/rank/me`, with the server reading the username from `SecurityContextHolder` and
 looking up that AppUser — so a caller has nowhere to name someone else. Same for every
 `by-appuser` endpoint, plus the frontend calls.
 
-**Acceptable for a single-patient demo with registration closed and one strong password. It
-becomes a live problem the moment a second real user exists.**
+✅ **Resolved differently, and better.** Rather than making the caller unable to name anyone, the
+`UserPatient` grant model lets a caller name any patient and checks whether they may. That was
+the right call: it supports the sharing case ("a record can be shared and not just read") that
+`/rank/me` would have made impossible. The 2026-08-11 conclusion — *"it becomes a live problem
+the moment a second real user exists"* — is what the grant model exists to answer.
 
 ## Getting her record onto prod — decided 2026-08-11, not yet done
 
@@ -1251,17 +1306,18 @@ diagnosis stays placeholder. `_archive/hosting/qa-setup.md` already covers VPS p
 `./gradlew buildDeployment` exists and bundles the frontend into the jar. All config is
 env-var driven and `.env` is correctly gitignored.
 
-**Required before it is reachable on a public IP:**
+**Required before it is reachable on a public IP** — ✅ **all four resolved; the app deployed
+2026-08-11 and these are kept as the checklist that got it there:**
 
-1. **Restore endpoint security.** `SecurityConfig` line 55 is `.anyRequest().permitAll()` —
-   on a KVM that means anyone who finds the IP reads everything. Uncomment the preserved rule
-   set; keep `/api/uchealth/callback` public (Epic's redirect cannot carry a JWT).
-2. **Move the JWT secret** to `JWT_SECRET` in the server's `.env` and generate a fresh value.
-   The committed default must not be what protects a public host.
-3. **Bind Qdrant to `127.0.0.1`.** `docker-compose.yml` currently publishes 6333/6334 on all
-   interfaces — fine locally, wrong on a public box.
+1. ✅ **Restore endpoint security.** Done — `SecurityConfig` ends in
+   `.anyRequest().authenticated()`, with `/api/uchealth/callback` kept public (Epic's redirect
+   cannot carry a JWT).
+2. ✅ **Move the JWT secret** to `JWT_SECRET` in the server's `.env` with a fresh value. Done —
+   the inline literal is gone from source and startup fails if the var is unset.
+3. ✅ **Bind Qdrant to `127.0.0.1`.** Done — override with `QDRANT_BIND` if a remote container
+   ever needs it, and put real auth in front first.
 4. **Change `UCHEALTH_REDIRECT_URI`** to the server address and add that URI to Epic's app
-   registration, or the OAuth callback breaks.
+   registration, or the OAuth callback breaks. ⚠️ *Deployment-side; not verifiable from code.*
 
 **Not needed for QA, but required before it holds a real record:** encryption at rest, an
 audit log of who read what, and a backup story. Be deliberate that QA stays sample-only until
@@ -1278,17 +1334,22 @@ those exist.
 
 ## Candidate next steps
 
-Nothing here is decided. **Steps 1-3 have a natural order and should be done first**: the
-corpus must exist before retrieval can be measured, and retrieval should be measured before
-matching logic is built on top of it. Building Tier 2 against an unmeasured corpus repeats
-the mistake that produced the misleading scores on 2026-08-08.
+> **Reviewed 2026-08-14.** Items 1-3 and 7 are done — Tier 2, the Rank Trials page, and endpoint
+> security all shipped. They are kept below with ✅ markers because their reasoning explains the
+> current design. **Items 4-6 (the after-commit event hook, the join tables, and generation) are
+> the ones still open.**
+
+The ordering rationale that produced this list still stands: the corpus must exist before
+retrieval can be measured, and retrieval should be measured before matching logic is built on
+top of it. Building Tier 2 against an unmeasured corpus repeats the mistake that produced the
+misleading scores on 2026-08-08.
 
 The scope decision from `BREAST_FOCUS_PLAN.md` is also pending: narrowing the app to breast
 cancer only. The survey there found the schema and frontend are *already* breast-shaped, so
 the change is less about removing generality than about permission to hard-code clinical
-knowledge — which is what receptor-aware matching needs. Its one blocking question is whether
-matching logic lives in the backend or stays in the frontend, where Tier 1 currently sits
-(`frontend/src/lib/tier1Matching.ts`). Recommend backend: the frontend cannot be tested
+knowledge — which is what receptor-aware matching needs. ✅ **Its one blocking question is
+settled**: matching lives in the backend, in code. Tier 1 still sits in
+`frontend/src/lib/tier1Matching.ts`, but Tier 2 is server-side — the frontend cannot be tested
 against the corpus in bulk, cannot inform ranking, and cannot be reused by Tier 3.
 
 1. ✅ **Re-run the evaluation against a real corpus** — the corpus exists as of 2026-08-10 and
@@ -1325,45 +1386,48 @@ against the corpus in bulk, cannot inform ranking, and cannot be reused by Tier 
    ✅ **The disease-type gate landed 2026-08-11**, so a ranked list no longer has to carry the
    54% of the corpus that is other diseases. It demotes rather than filters, so the page still
    has to decide whether to hide non-breast trials behind a toggle or just rank them last.
-4. **The after-commit event hook** so new ingestions index themselves — `datafetcher` publishes
-3. **The after-commit event hook** so new ingestions index themselves — `datafetcher` publishes
+4. ⬜ **The after-commit event hook** so new ingestions index themselves — `datafetcher` publishes
    a Spring event (type declared in `:database`), `:rag` consumes it after commit. Avoids the
    `datafetcher` → `:rag` cycle and keeps a Qdrant outage from rolling back ingested data.
    `RAG_PLAN.md` §3 and §6 settle the design.
-5. **The join tables**, extid-only from the start, then condition/sponsor/phase filters on Trial
-   Search and sections on Trial Detail.
-6. **Generation** (`RAG_PLAN.md` §9) — the grounded "why might this fit" answer with citations.
+5. ⬜ **The join tables**, extid-only from the start, then condition/sponsor/phase filters on
+   Trial Search and sections on Trial Detail.
+6. ⬜ **Generation** (`RAG_PLAN.md` §9) — the grounded "why might this fit" answer with citations.
    Deferred until retrieval was proven; it now is. The chunk-per-criterion strategy is what
    makes line-level citation possible.
-7. **Restore endpoint security** before this goes anywhere but localhost.
+7. ✅ **Restore endpoint security** — done 2026-08-14 (`6037500`). `SecurityConfig` ends in
+   `.anyRequest().authenticated()` and the app is live on a public host.
 
 ---
 
 ## Git state
 
-**All 2026-08-10 afternoon work is committed** on `qdrant-fixes`: six commits covering the two
-chunker bug fixes, the backfill skip check plus progress ticker, the first two security items,
-the evaluation harness fix, and this document. Not yet pushed, not yet merged to `main`.
+**Verified 2026-08-14.** Current branch is **`frontend-mobile`** — **3 commits ahead of `main`,
+0 behind.** The `qdrant-fixes` state this section used to describe is long merged.
 
-**Merged to `main` on 2026-08-10** — 16 commits, a clean fast-forward, so `main` carries
-everything through the payload-hash work. `uchealth-fhir-ingestion` and `payload-hash` are
-fully contained in `main` and can be deleted whenever convenient.
+⚠️ **Being 3 ahead means `main` lacks the access model, the mobile work and these docs.** `main`'s
+tip is `0544c6a`, the deploy commit — so anything built from `main` is the app as it stood on
+2026-08-11. Merge to ship.
 
-**Current branch is `qdrant-fixes`**, one commit ahead of `main` and pushed, plus the
-uncommitted work above.
+The most recent commits, newest first. **The top three are on `frontend-mobile` only**; `main`
+stops at `0544c6a`:
 
-| Commit | Branch | What |
+| Commit | On `main`? | What |
 | --- | --- | --- |
-| `59393d6` | merged | Patient record tabs; Process Trials combined button; user-facing renames; ingestion request logging; the two `ingestion/` design docs |
-| `6043833` | merged | `payload_hash` column and the skip-unchanged branch |
-| `13b4bd9` | merged | Unchanged-count reporting through to the result modal |
-| `739937b` | merged | This document, updated for the session |
-| `77c0db0` | `qdrant-fixes` | Vector-store readiness check, startup warning, `QDRANT_SETUP.md` |
+| `5836a0b` | ❌ branch only | Write down the plans and the decisions behind them |
+| `14aadff` | ❌ branch only | Make the app usable on a phone, and stop it fetching everyone to find one |
+| `c9cb30d` | ❌ branch only | Give clinical data an owner — the authorization model |
+| `0544c6a` | ✅ **tip of `main`** | Record the deploy, and the four things that only doing it revealed |
+| `1b663cb` | Hash passwords on user create/update, and add a login allowlist |
+| `6037500` | Close the application's authentication holes before it goes public |
+| `9e9719e` | Add the "Trials for You" page |
+| `3152d32` | Expose trial ranking over REST, and batch the location lookups |
+| `89f3960` | Add Tier 2 matching: assess trials against the patient's structured record |
 
-Test counts, all re-run 2026-08-11 with the backend stopped and read from the test XML rather
-than the build result: `:database` **820**, `:datafetcher` 55, root **71**, `:common` 12,
-`:rag` 35 — **0 skipped, 0 failures** everywhere. `:database` was re-run in full because the
-batch-location work touched a shared repository and db service.
+Test counts below were read 2026-08-11 from the test XML rather than the build result:
+`:database` **820**, `:datafetcher` 55, root **71**, `:common` 12, `:rag` 35 — 0 skipped, 0
+failures. ⚠️ **Not re-run since**, and the ownership and mobile work has landed in between, so
+treat these as a floor rather than a current count.
 
 `:rag`'s one skip is `RetrievalEvaluation`, which needs a running backend; it fails loudly
 without one by design, and was run with `-Deval.skipWithoutBackend=true`. Root's 71 includes

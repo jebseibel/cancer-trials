@@ -14,7 +14,18 @@ Rewritten 2026-08-13 against the current code. Companion to `../CURRENT_STATE.md
 `../frontend/ADMIN_ONLY_INGESTION_PLAN.md` (roles — a separable, much smaller change), and
 `../hosting/DEPLOY_RUNBOOK.md`.
 
-**Status: designed, nothing built.**
+> ✅ **Built and committed 2026-08-14** (`c9cb30d`). The model in this document shipped as
+> designed: `patient`, `user_patient` grants, the ranked `AccessLevel`, `CurrentUserService`
+> resolving identity from the JWT, and `AppUser` deleted in changeset `030`.
+>
+> **The one part not built is sharing itself** — the grant/revoke endpoints (backend step 8) and
+> their UI (frontend item 8). Grants exist and are enforced; there is no way to create one through
+> the API yet, so they are seeded.
+>
+> §7's build order and §9's open decisions carry status notes below. The rest is the design as
+> implemented.
+
+**Status: built and committed 2026-08-14, except sharing (step 8).** See the note above.
 
 ---
 
@@ -271,21 +282,24 @@ which table owns which fact.
 
 Each step ends compiling with tests green.
 
+> **Status 2026-08-14: steps 0-7 are done. Step 8 is the only one outstanding.** Detail and
+> per-step traps in `BACKEND_PLAN.md` and `FRONTEND_PLAN.md`, which carry the same markers.
+
 - ~~**Step 0 — restore endpoint security.**~~ ✅ **Done 2026-08-11.** Every endpoint requires a
   JWT; `/api/uchealth/callback` correctly stays public; `JWT_SECRET` is an env var. The archived
   plan's prerequisite is satisfied.
-- **Step 1 — `patient` table + full stack** via `entity-full-stack`. New changeset, not an edit to
+- ✅ **Step 1 (done) — `patient` table + full stack** via `entity-full-stack`. New changeset, not an edit to
   `006-app-user.yaml`.
-- **Step 2 — `user_patient` link table.** Repository and db service only.
-- **Step 3 — `CurrentUserService` + `GET /api/patient/mine`.** The authorisation rule in one
+- ✅ **Step 2 (done) — `user_patient` link table.** Repository and db service only.
+- ✅ **Step 3 (done) — `CurrentUserService` + `GET /api/patient/mine`.** The authorisation rule in one
   place, **with a test for the negative case**: a login must not reach an unlinked patient, and
   must get 404 rather than 403.
-- **Step 4 — repoint `PatientDiagnosis`**, and move `date_of_birth`/`sex` to `patient`.
-- **Step 5 — repoint `PatientVariant`, `PatientPriorTreatment`, `TrialStatus`,
+- ✅ **Step 4 (done) — repoint `PatientDiagnosis`**, and move `date_of_birth`/`sex` to `patient`.
+- ✅ **Step 5 (done) — repoint `PatientVariant`, `PatientPriorTreatment`, `TrialStatus`,
   `SavedTrialMatch`.**
-- **Step 6 — delete the `AppUser` stack**, once nothing references it.
-- **Step 7 — frontend.** `useCurrentPatient` + context, then the pages, then the switcher.
-- **Step 8 — sharing.** Grant/revoke endpoints and a "who can see my record" page. **Everything
+- ✅ **Step 6 (done) — delete the `AppUser` stack**, once nothing references it.
+- ✅ **Step 7 (done) — frontend.** `useCurrentPatient` + context, then the pages, then the switcher.
+- ⬜ **Step 8 (NOT STARTED) — sharing.** Grant/revoke endpoints and a "who can see my record" page. **Everything
   above is worth doing even if this is never built.**
 - **Step 9 — seed.** A `patient` row and an `OWNER` grant in `PatientSeedLoader`, so a rebuilt
   database is immediately usable and the manual AppUser step disappears.
@@ -346,14 +360,17 @@ Also: `spring.liquibase.drop-first` is `false`, so changeset edits need a rebuil
   rather than a coordination exercise); or **admin creates every account by hand** (zero new code,
   works today, awkward only in that the owner chooses the grantee's password — and for one sister
   that may simply be the answer).
-- **Is `VIEW_TRIALS` enforced in phase 1, or recorded only?** Recommend recorded-only, per the
-  archived plan's reasoning about `access_level`. But it is the level with the most privacy value,
-  so enforcing it early has an argument.
+- ✅ ~~**Is `VIEW_TRIALS` enforced in phase 1, or recorded only?**~~ **Enforced — verified
+  2026-08-14.** The argument for enforcing early won. `TrialMatchingController`,
+  `TrialStatusController`, `SavedTrialMatchController` and `PatientController` all call
+  `requireAccess*(extid, AccessLevel.VIEW_TRIALS)`, while `PatientDiagnosisController` requires
+  `VIEW_RECORD` — so a trials-only grantee can hunt trials without reading clinical detail, which
+  is the exact distinction the level was created for.
 - **What happens to `trial_status` written by a helper when their grant is revoked?** Nothing
   under this model — status belongs to the patient, not the user. Worth confirming that is
   intended.
 - **Does the patient switcher persist across sessions?** localStorage matches how the JWT is
-  already stored.
+  already stored. ⚠️ Still open — the switcher (frontend item 7) is not built.
 - **Does `patient` need soft-delete semantics distinct from `active`?** Removing a patient a
   helper no longer works with is arguably a `user_patient` revocation, not a patient deletion.
 - **Is multi-patient in scope for the UI, or only the schema?** The schema becomes

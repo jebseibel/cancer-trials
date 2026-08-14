@@ -1,30 +1,35 @@
-# Where This Work Stands — 2026-08-13
+# Where This Work Stands — 2026-08-13, status refreshed 2026-08-14
 
 Written at the end of the session that built the patient/access model. Read this first when
 picking the work back up; the design lives in `PATIENT_ACCESS_PLAN.md`, the step lists in
 `BACKEND_PLAN.md` and `FRONTEND_PLAN.md`.
 
-**Branch: `frontend-mobile`** (renamed from `prod-push`). **Nothing is committed.** 86 modified,
-13 deleted, 36 untracked files in the working tree.
+**Branch: `frontend-mobile`** (renamed from `prod-push`). ✅ **The work described here is
+committed** — it landed as `c9cb30d` (the access model), `14aadff` (mobile), and `5836a0b`
+(these docs).
+
+⚠️ **None of it is on `main`, and therefore none of it is deployable.** This branch is **3 ahead
+of `main` and 0 behind** — nothing to rebase, everything to merge. `main`'s tip is `0544c6a`
+(the deploy commit), and these three commits sit on top of it, unmerged. **Merging this branch
+is what puts the authorization model into production.** Verified 2026-08-14.
 
 ---
 
 ## ⚠️ Read this before anything else
 
-**None of the frontend work has been run.** It compiles, typechecks and builds clean — but the
-app has changed shape substantially (new context, new endpoints, a two-table save on the
-Diagnosis page) and **nobody has signed in and looked at it.**
+> **Updated 2026-08-14.** The three checks below were written when nothing had been run. The work
+> has since been committed and the app is deployed, so at least some of it has been exercised —
+> but **whether these three specific paths were verified in a browser is not recorded anywhere.**
+> If you are picking this up cold, run them; they are cheap and the failure mode is silent.
 
-Compiling is not working. Every failure that mattered in this project's deploy history was found
-by using the thing, not by testing a part.
+**Compiling is not working.** Every failure that mattered in this project's deploy history was
+found by using the thing, not by testing a part.
 
-**First action next session: start the backend and `npm run dev`, sign in, and check:**
+**Start the backend and `npm run dev`, sign in, and check:**
 
 - Does **Trials for You** return results? `/api/matching/rank/{patientExtid}` is a new route.
 - Do the three **Patient Record** tabs load and save?
 - Does the **Diagnosis** page's date-of-birth/sex save land on `patient`? It writes two tables now.
-
-Everything else below is secondary to that.
 
 ---
 
@@ -81,16 +86,18 @@ error that predates this work.
 ## What is left
 
 ### Backend step 7 — seed loader
-**Mostly already done.** It was rewritten during step 4 and finished during the DOB/sex work.
-What remains is a review pass for leftovers, not a build.
+✅ **Done.** Rewritten during step 4 and finished during the DOB/sex work; `PatientSeedLoader`
+is in place and seeds the patient, the OWNER grant and the clinical rows.
 
 ### Backend step 8 — sharing endpoints
-`POST/GET/DELETE /api/patient/{extid}/share`. **Not started.** Everything before it is worth
-having regardless; this is the sharing feature itself.
+`POST/GET/DELETE /api/patient/{extid}/share`. ⬜ **Still not started — confirmed 2026-08-14**,
+no `share` mapping exists on `PatientController`. Everything before it is worth having
+regardless; this is the sharing feature itself.
 
 ### Frontend items 6-8
 - **6 — access-level rendering.** Hide the Patient Record tabs from a `VIEW_TRIALS` grantee;
-  disable tracking for a read-only one.
+  disable tracking for a read-only one. ⚠️ `lib/accessLevel.ts` exists with a `covers()` rank
+  check, so the *helper* is built — what is unconfirmed is whether pages actually gate on it.
 - **7 — patient switcher**, only when `/mine` returns more than one. ⚠️ On mobile it belongs
   *inside* the hamburger panel — the nav bar is already tight below `sm`.
 - **8 — sharing UI.** Blocked on backend step 8.
@@ -101,6 +108,8 @@ an account.
 ### Separate and unblocked
 `../frontend/ADMIN_ONLY_INGESTION_PLAN.md` — restricting trial ingestion to admins. Four
 `@PreAuthorize` annotations plus a `SecurityConfig` matcher. Independent of everything above.
+⬜ **Still not started — confirmed 2026-08-14**, no `@PreAuthorize` on `IngestionController` or
+`RagIndexController`.
 
 ---
 
@@ -148,20 +157,23 @@ Verified by the user.
 
 ## Timing, unchanged and still important
 
-⚠️ **Prod's Qdrant corpus is still empty**, which is what makes this migration's rebuilds nearly
-free. After Phase 4 of `../hosting/DEPLOY_RUNBOOK.md` a rebuild costs hours of re-embedding on
-1 vCPU. **Do the schema work before the corpus pull, not after.**
+⚠️ **Prod's Qdrant corpus was empty as of 2026-08-11**, which is what made this migration's
+rebuilds nearly free. After Phase 4 of `../hosting/DEPLOY_RUNBOOK.md` a rebuild costs hours of
+re-embedding on 1 vCPU. **Do the schema work before the corpus pull, not after.** ⚠️ *Whether the
+pull has since happened is not recorded — check the server, not this document.*
 
-Also still outstanding from before this session: `LOGIN_ALLOWED_USERNAMES=jeb` is deployed as
-code but the property is unset on the server, so the unused `admin` account is loginable.
+`LOGIN_ALLOWED_USERNAMES=jeb`: ✅ the allowlist shipped in `1b663cb`. Whether the property is
+actually set in `/opt/cancer/.env` is a deployment question — check the box.
 
 ---
 
 ## Git
 
-**Nothing committed.** The branch holds the mobile work, the whole access model, and the docs.
+✅ **Committed 2026-08-14.** The work described here landed as three commits, close to the split
+this section recommended: `14aadff` (mobile), `c9cb30d` (the access model), `5836a0b` (the docs).
 
-Worth splitting into a few commits when you pick it up — mobile, backend access model, frontend
-access model — rather than one large one. ⚠️ **Before any commit, confirm no patient file is in
-the index**: `.claude/patient-data/` is gitignored at directory level and has nearly been
-committed twice before.
+⚠️ **The branch is 3 ahead of `main` and 0 behind** — this work is unmerged, so merging is what
+ships it.
+
+⚠️ **Before any commit, confirm no patient file is in the index**: `.claude/patient-data/` is
+gitignored at directory level and has nearly been committed twice before.

@@ -1,16 +1,18 @@
 # Spring Boot Multi-Module Project
 
 You are a backend java gradle Spring engineer working with the latest technologies.
+You also work on this project's React/TypeScript front end when asked.
 You are very careful and dont want to make large file changes without guidance.
 
 ## Project Overview
 - Backend: Java Spring Boot + Gradle (REST API on AWS Elastic Beanstalk)
 - Database: AWS RDS MySQL
-- Multi-module Gradle project with 6 modules
+- Frontend: Vite + React + TypeScript + Tailwind, in `frontend/`
+- Multi-module Gradle project: root plus 4 included modules, and 1 shelved
 
 ## Tech Stack
 - Java 21
-- Spring Boot 3.5.5
+- Spring Boot 3.5.7
 - Spring Security
 - Gradle 8.14.3
 - Liquibase (database migrations)
@@ -35,16 +37,25 @@ Database layer with JPA entities, repositories, and Liquibase migrations
   Liquibase lands as `''`, not NULL. (A `clean_empty_strings()` procedure and a
   `StringCleanupListener` were documented here previously; neither exists in this project.)
 
-### :ai-provider
+### :datafetcher
+External data ingestion
+- ClinicalTrials.gov client, parser, and ingest job
+- UCHealth Epic FHIR: OAuth client (PKCE), FHIR client, ingest job
+- Normalization services that turn raw staged payloads into domain rows
+
+### :rag
+Vector retrieval over trial text
+- Trial and eligibility-criteria chunkers
+- Indexing, retrieval, and backfill services
+- Startup check against the vector store
+
+### :ai-provider (shelved)
 AI provider functionality and integrations
 - Java library module
-
-### :docstorage
-Document storage functionality for managing documents
-
-### :fileloader
-File loading and processing capabilities
-- Java library module
+- Commented out of `settings.gradle` until AI keys/config are ready, so it does
+  NOT compile as part of the build. The source is on disk and substantial
+  (OpenRouter client, cost calculation, tool registry, audit logging), but
+  nothing in the running app calls it. Treat it as parked, not live.
 
 ## Architecture Notes
 - RESTful API backend
@@ -67,7 +78,7 @@ IDK - i dont know
 Y/N/IDK - means Yes, No or I dont know.
 
 delete or rebuild the database means; run the docker 'n8n' webhook: http://localhost:5678/webhook/clear-db
-Start the front end, means: execute 'npm run dev' in the /home/jeb/projects/personal/backup/basicspring/frontend directory.
+Start the front end, means: execute 'npm run dev' in the /home/jeb/projects/personal/cancer/frontend directory.
 It is a GET
 
 When you write documents in the .claude area, dont put any code in the documents.

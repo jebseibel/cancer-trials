@@ -6,7 +6,12 @@ this document is the build order, the file-by-file blast radius, and the traps.
 Written 2026-08-13 from a survey of the actual code. The frontend half is a separate document
 written against this plan's finished API contract.
 
-**Status: planned, nothing built.**
+**Status as of 2026-08-14: ✅ steps 1-7 are BUILT and committed** (`c9cb30d`). ⬜ **Step 8 —
+grant and revoke endpoints — is the only one not started**, confirmed against
+`PatientController`, which has `/mine` but no `share` mapping.
+
+The build order, blast radius and traps below are kept as the record of how it was done. Read
+per-step status markers rather than the prose, which is written in the future tense throughout.
 
 ---
 
@@ -67,7 +72,11 @@ the honest scale of this change.
 
 ---
 
-## A bug to fix while passing through
+## A bug to fix while passing through — ✅ FIXED
+
+> **Verified 2026-08-14.** `TrialStatusRepository.findByPatientId` is now a `default` method
+> delegating to `findByPatientIdAndActive(patientId, ActiveEnum.ACTIVE)`, and carries a comment
+> recording the `PatientDiagnosisRepository` precedent. Fixed in step 5 as planned.
 
 ⚠️ **`TrialStatusRepository.findByAppUserId` has no active filter.**
 
@@ -90,7 +99,7 @@ changes behaviour, and bundling it with a rename means one test run attributes b
 Every step ends compiling with `:database` and root tests green. **Do not start a step before the
 one above it is verified.**
 
-### Step 1 — `patient` table and full stack
+### ✅ Step 1 (done) — `patient` table and full stack
 
 Use the `entity-full-stack` skill. Inputs, so it runs uninterrupted:
 
@@ -113,7 +122,7 @@ Do **not** edit `006-app-user.yaml`; a fresh number reads more clearly in the ch
 ⚠️ **No `username`, no `password_hash`.** Their absence is the whole point — a patient does not
 log in.
 
-### Step 2 — `user_patient` link table
+### ✅ Step 2 (done) — `user_patient` link table
 
 Repository and db service only. **No controller** — grants are managed through a purpose-built
 endpoint in step 8, not generic CRUD.
@@ -136,7 +145,7 @@ Unique on `(user_id, patient_id)` among active rows. Finders needed:
 authorisation logic, and a typo in a string comparison fails open. Follow the existing
 `ActiveEnum` pattern. The DB column stays `varchar(24)`, consistent with the rest of the schema.
 
-### Step 3 — `CurrentUserService` and `GET /api/patient/mine`
+### ✅ Step 3 (done) — `CurrentUserService` and `GET /api/patient/mine`
 
 **The single most important step. Everything else is plumbing.**
 
@@ -169,7 +178,7 @@ be tested directly rather than assumed.
 `GET /api/patient/mine` returns the patients this login may see, each with the caller's own
 access level — the frontend needs the level to decide what to render.
 
-### Step 4 — repoint `PatientDiagnosis`, and move `date_of_birth` / `sex`
+### ✅ Step 4 (done) — repoint `PatientDiagnosis`, and move `date_of_birth` / `sex`
 
 `appUserId` → `patientId` through domain, entity, mapper, repository finders, db service, service,
 controller converter, both request DTOs, the response DTO, and changeset `023`.
@@ -184,7 +193,7 @@ do not interpret the resulting frontend failure as a defect in this step.
 
 New path: `GET /api/patient/{patientExtid}/diagnosis`, authorised through `CurrentUserService`.
 
-### Step 5 — repoint the other four
+### ✅ Step 5 (done) — repoint the other four
 
 `PatientVariant`, `PatientPriorTreatment`, `TrialStatus`, `SavedTrialMatch`. Same shape as step 4,
 no field moves.
@@ -200,7 +209,7 @@ become `patientId`, as do `TrialMatchingController`'s two paths:
 Both gain a `requireAccess(..., VIEW_TRIALS)` check — the lowest level, since ranking is exactly
 what `VIEW_TRIALS` exists to permit.
 
-### Step 6 — delete the `AppUser` stack
+### ✅ Step 6 (done) — delete the `AppUser` stack
 
 Only once nothing references it. Eleven main files plus three test classes:
 
@@ -221,7 +230,7 @@ its checksum, and `drop-first` is `false`.
 `DomainBuilderDatabase` loses its AppUser builders and gains Patient ones — **append to that file,
 never overwrite it**; it is shared by every `:database` test.
 
-### Step 7 — `PatientSeedLoader`
+### ✅ Step 7 (done) — `PatientSeedLoader`
 
 Currently calls `resolveOrCreateAppUser(username)` per CSV row, keyed on the username column.
 
@@ -237,7 +246,7 @@ missing file is not an error; a malformed row never blocks startup.
 ⚠️ **The CSVs have a `username` column that now means "the owning login", not "the patient".**
 Worth a comment in the loader, because the same string is doing a different job.
 
-### Step 8 — grant and revoke endpoints
+### ⬜ Step 8 (NOT STARTED) — grant and revoke endpoints
 
 `POST /api/patient/{patientExtid}/share` — grant, OWNER only.
 `DELETE /api/patient/{patientExtid}/share/{shareExtid}` — revoke by writing `revoked_at`.

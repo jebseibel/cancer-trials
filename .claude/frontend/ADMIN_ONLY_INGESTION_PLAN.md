@@ -8,7 +8,13 @@ than from the design docs.
 Companion to `MOBILE_PLAN.md`, `../CURRENT_STATE.md` (the authorization gap), and
 `../hosting/DEPLOY_RUNBOOK.md`.
 
-**Status: planned, nothing built.**
+**Status as of 2026-08-14: ⬜ the backend guard is still NOT built** — confirmed: no
+`@PreAuthorize` on `IngestionController` or `RagIndexController`, and no ingestion/rag matcher in
+`SecurityConfig`. **The endpoints remain callable by any authenticated user.**
+
+✅ **One prerequisite landed since this was written**: the frontend now stores the role.
+`services/api.ts` has `saveRole`/`getRole`/`removeRole` plus an `isAdmin()` helper, added by the
+access-model work. The table below is corrected accordingly.
 
 ---
 
@@ -42,8 +48,8 @@ Better than expected — most of the machinery exists and is simply not applied 
 | Roles reach Spring Security | ✅ `CustomUserDetailsService` grants `ROLE_ + user.getRole()` |
 | A working `hasRole('ADMIN')` example | ✅ `/api/auth/register`, guarded two ways |
 | Login returns the role to the browser | ✅ `ResponseAuth` already carries `role` |
-| **Ingestion / backfill role guard** | ❌ **Missing — the gap this plan closes** |
-| Frontend stores the role | ❌ Only token + username are kept |
+| **Ingestion / backfill role guard** | ❌ **Missing — the gap this plan closes.** Re-confirmed 2026-08-14 |
+| Frontend stores the role | ✅ **Now done** — `authHelpers.saveRole`/`getRole`/`removeRole` and `isAdmin()` in `services/api.ts`, added by the access-model work |
 
 ⚠️ **`@EnableMethodSecurity` being present is load-bearing and worth not breaking.** It was
 found missing once already: without it `@PreAuthorize` is silently ignored, the method runs
@@ -75,7 +81,12 @@ rule — matcher order decides which wins.
 runs on, and it does not modify anything. Guard the writes, not the reads. Getting this wrong
 silently breaks the search page for the patient.
 
-### 2. Persist the role on login, so the frontend can ask
+### ✅ 2 (DONE). Persist the role on login, so the frontend can ask
+
+> **Already built — verified 2026-08-14.** `authHelpers` in `services/api.ts` has `saveRole`,
+> `getRole`, `removeRole` and an `isAdmin()` convenience check; the role is cleared at logout
+> with the token and username. This landed with the access-model work (its frontend item 3), so
+> **skip this step.** The caveat below still applies to how the value may be used.
 
 `ResponseAuth` already returns `role`; `authHelpers` currently stores only the token and
 username. Add a `role` alongside them, following the existing helper pattern rather than

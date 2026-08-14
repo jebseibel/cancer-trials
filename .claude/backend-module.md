@@ -1,11 +1,16 @@
 # Backend Description
 
 ## Overview
-The BasicSpring backend is a RESTful API built with Spring Boot 3.5.7 and Gradle. It provides comprehensive CRUD operations for managing customers, purchases, and users with JWT-based authentication and a structured layered architecture.
+
+The Breast Cancer Trial Finder backend is a RESTful API built with Spring Boot 3.5.7 and Gradle.
+It provides CRUD operations across the trial and patient schemas, ingestion from
+ClinicalTrials.gov and Epic FHIR, vector retrieval over eligibility criteria, and trial matching —
+with JWT authentication and a grant-based authorization model.
 
 ## Architecture
 
-### Layered Architecture
+### Layered architecture
+
 The backend follows a 4-layer pattern:
 
 1. **Controller Layer** (`web.controller`): REST endpoints with DTO conversion
@@ -13,23 +18,27 @@ The backend follows a 4-layer pattern:
 3. **Database Service Layer** (`database.db.service`): Data persistence operations
 4. **Entity Layer** (`database.db.entity`): JPA entities and repositories
 
-### Package Structure
+### Package structure
+
 ```
-com.seibel.jobhunting
+com.seibel.cancer
 ├── common/
-│   ├── domain/           # Business domain objects (Customer, Purchase, User)
-│   ├── enums/            # Enums (ActiveEnum, CompResult)
+│   ├── domain/           # Domain objects (Trial, Patient, PatientDiagnosis, ...)
+│   │   └── matching/     # TrialAssessment, EligibilitySignal, SignalOutcome
+│   ├── enums/            # ActiveEnum, AccessLevel, ReceptorStatus, VariantStatus,
+│   │                     # TreatmentStatus, TrackingSystem, CompResult
 │   ├── exceptions/       # Business exceptions
 │   └── util/             # Utilities (CodeGenerator)
-├── config/               # Spring configuration
+├── config/               # SecurityConfig, WebConfig
 ├── database/
-│   ├── db/
-│   │   ├── entity/       # JPA entities (CustomerDb, PurchaseDb, UserDb, BaseDb)
-│   │   ├── mapper/       # Entity ↔ Domain mappers
-│   │   ├── repository/   # Spring Data repositories
-│   │   └── service/      # Database service layer
+│   └── db/
+│       ├── entity/       # JPA entities (TrialDb, PatientDb, UserDb, ... BaseDb)
+│       ├── mapper/       # Entity ↔ Domain mappers
+│       ├── repository/   # Spring Data repositories
+│       └── service/      # Database service layer
 ├── security/             # JWT and authentication
 ├── service/              # Business service layer
+│   └── matching/         # TrialMatchingService, CriteriaSignalEvaluator
 └── web/
     ├── controller/       # REST controllers
     ├── request/          # Request DTOs
@@ -37,217 +46,214 @@ com.seibel.jobhunting
     └── GlobalExceptionHandler
 ```
 
-## Key Components
+Two sibling modules sit below root and are called directly from it: `:datafetcher` (CT.gov and
+Epic FHIR ingestion, normalization) and `:rag` (chunking, indexing, retrieval).
 
-### Core Entities
-1. **Customer**: Code, name, contact information, email, phone
-2. **Purchase**: Customer reference, items, status (renamed from Order)
-3. **User**: Username, email, role
+## Key components
+
+### Core entities
+
+Grouped by area:
+
+1. **Trial**: `Trial` plus `ArmGroup`, `Condition`, `EligibilityRule`, `Intervention`, `Keyword`,
+   `Location`, `Outcome`, `OverallOfficial`, `Sponsor`, `TrialSource`, `TrialStatus`
+2. **Patient**: `Patient`, `PatientDiagnosis`, `PatientVariant`, `PatientPriorTreatment`,
+   `PatientMedication`, `LabResult`, `LabResultComponent`, `Medication`
+3. **Access**: `User` (login) and `UserPatient` (which patients a user may see, at what level)
+4. **Matching / staging**: `SavedTrialMatch`, `SavedTrialMatchCriterion`, `StagingRawTrial`,
+   `StagingRawFhirResource`, `UcHealthOAuthToken`
+
+`Customer` and `Purchase` are inherited scaffolding from the copied-from project, not part of
+this domain.
 
 ### Authentication
 - **JwtUtil**: Generates and validates JWT tokens
-  - Token expiration: 24 hours (configurable via jwt.expiration property)
+  - Token expiration: 24 hours (configurable via `jwt.expiration`)
   - HS256 signature algorithm
   - Claims include username and issuedAt timestamp
-  - Configurable secret key via jwt.secret property
-- **CustomUserDetailsService**: Loads user details from UserDb entity
-- **JwtAuthenticationFilter**: Extracts token from request headers and validates
-- **SecurityConfig**: Configures security filter chain
-  - Permits auth endpoints (/api/auth/**)
-  - Requires JWT for all other /api endpoints
-  - Enables CORS
-  - Stateless session management
+  - Secret read from `JWT_SECRET`. ⚠️ **No default, deliberately** — a default would silently
+    re-enable a known literal whenever the env var is unset, so the app fails to start instead
+- **CustomUserDetailsService**: Loads user details from `UserDb`, filtering out soft-deleted
+  accounts so a deleted user cannot log in
+- **JwtAuthenticationFilter**: Extracts and validates the bearer token
+- **LoginRateLimitFilter**: 8 consecutive failures per IP+username → 429 with `Retry-After`,
+  registered ahead of authentication so a locked-out caller costs no bcrypt work
+- **SecurityConfig**: Configures the filter chain
+  - Permits `/api/auth/**`, static assets, and `/api/uchealth/callback` (Epic's OAuth redirect
+    cannot carry a JWT)
+  - `.anyRequest().authenticated()` for everything else
+  - `@EnableMethodSecurity` is on, so `@PreAuthorize` is honoured rather than silently ignored
+  - CORS enabled; stateless session management
 
-### Database Layer
-- **Repositories**: Spring Data `JpaRepository` for each entity
-  - Standard methods: save, findById, delete, etc.
-  - Custom methods: findByExtid, findByActive, findAllActive, existsByExtid
+### Authorization
+- **`UserPatient`** grants a `User` access to a `Patient` at a ranked level:
+  `VIEW_TRIALS(10) < VIEW_RECORD(20) < EDIT_RECORD(30) < OWNER(40)`
+- **`CurrentUserService`** resolves the caller from `SecurityContextHolder` and enforces it —
+  `requireAccess`, `requireAccessId`, `hasAccess`, `accessLevelFor`
+- Patient-scoped endpoints take the target extid from the URL and check it against the caller's
+  grants, so naming someone else's record returns a permission error rather than their data
+
+### Database layer
+- **Repositories**: Spring Data `JpaRepository` per entity
+  - Standard: save, findById, delete
+  - Custom: findByExtid, findByActive, findAllActive, existsByExtid
   - Paginated queries with findByActive(ActiveEnum, Pageable)
 - **Entity Mappers**: Convert between Domain and Db objects
-- **Database Services**: Handle low-level persistence operations
-  - Create, update, delete, findByExtid, findAll, findByActive methods
-  - Soft delete implementation (marks as INACTIVE, sets deletedAt)
+- **Database Services**: Low-level persistence
+  - Create, update, delete, findByExtid, findAll, findByActive
+  - Soft delete (marks INACTIVE, sets `deletedAt`)
   - Pagination support
 
-### Service Layer
+⚠️ **`update()` cannot clear a field.** Every assignment is guarded by `if (item.getX() != null)`,
+so null means "leave alone" and there is no way to unset a populated column through the API.
+This affects every `*DbService` following the template.
+
+### Service layer
 - **BaseService**: Abstract base with validation helpers
-  - requireNonNull(), requireNonBlank() methods
-  - Uses Lombok @Slf4j for logging
-- **Entity Services** (CustomerService, PurchaseService, UserService):
-  - CRUD operations delegating to database service
-  - Input validation
-  - Pagination support with configurable max page size (100)
-  - Allowed sort fields validation
-  - Business logic coordination with exception handling
-  - Transactional operations (@Transactional annotations)
+  - `requireNonNull()`, `requireNonBlank()`
+  - Lombok `@Slf4j` for logging
+- **Entity Services**: CRUD delegating to the db service, input validation, pagination with a
+  configurable max page size (100), allowed sort-field validation, `@Transactional` operations
+- **`service/matching/`**: `TrialMatchingService` ranks the corpus against a patient record;
+  `CriteriaSignalEvaluator` produces per-signal outcomes with the criteria text that caused them
+- **`PatientSeedLoader`**: A `CommandLineRunner` that recreates patient rows on startup from
+  gitignored CSVs. Seeds if absent, never syncs — an existing row is left alone, so UI edits
+  survive a restart
 
-### Web Layer
+### Web layer
 - **Controllers**: RESTful endpoints with Swagger documentation
-  - GET / - List with pagination (default 20 items) and optional active filter
-  - GET /{extid} - Get single entity
-  - POST / - Create entity
-  - PUT /{extid} - Update entity
-  - DELETE /{extid} - Soft delete entity
-- **Converter Classes**: Inline package-private classes in controller files
-  - toDomain() - Convert request DTO to domain object
-  - toResponse() - Convert domain object to response DTO
-- **Request DTOs**: Create and Update variants
-  - Create: All fields required with validation
-  - Update: All fields optional for partial updates
-- **Response DTOs**: Include extid and all business fields
+  - `GET /` — list with pagination (default 20) and optional active filter
+  - `GET /{extid}` — get single entity
+  - `POST /` — create
+  - `PUT /{extid}` — update
+  - `DELETE /{extid}` — soft delete
+- **Converter Classes**: Package-private classes inline in controller files
+  - `toDomain()` — request DTO → domain object
+  - `toResponse()` — domain object → response DTO
+- **Request DTOs**: Create (fields required) and Update (fields optional) variants
+- **Response DTOs**: Include extid and all business fields — never the numeric id
 
-### Exception Handling
-- **GlobalExceptionHandler**: REST controller advice with typed exception handlers
-  - ResourceNotFoundException → HTTP 404
-  - ValidationException → HTTP 400
-  - MethodArgumentNotValidException → HTTP 400 with field errors
-  - ConstraintViolationException → HTTP 400 with field errors
-  - ResourceAlreadyExistsException → HTTP 409
-  - ServiceException → HTTP 500
-  - Generic Exception → HTTP 500
-- **Custom Exceptions**:
-  - BaseServiceException: Base class for all service exceptions
-  - ServiceException: General business logic errors
-  - ValidationException: Input validation failures
-  - ResourceNotFoundException: Entity not found
-  - ResourceAlreadyExistsException: Duplicate resource
+### Exception handling
+- **GlobalExceptionHandler**: REST controller advice with typed handlers
+  - ResourceNotFoundException → 404
+  - ValidationException → 400
+  - MethodArgumentNotValidException → 400 with field errors
+  - ConstraintViolationException → 400 with field errors
+  - ResourceAlreadyExistsException → 409
+  - ServiceException → 500
+  - Generic Exception → 500
+- **Custom Exceptions**: BaseServiceException, ServiceException, ValidationException,
+  ResourceNotFoundException, ResourceAlreadyExistsException
 
 ### Utilities
 - **CodeGenerator**: Generates unique codes for entities
-- **ActiveEnum**: Tracks entity active/inactive status
-  - ACTIVE (1), INACTIVE (0)
-  - Helper methods: isActive(), isInactive()
+- **ActiveEnum**: ACTIVE (1) / INACTIVE (0), with `isActive()` / `isInactive()`
 
-## Database Configuration
+## Database configuration
 
 ### Liquibase
-- Changelog: `db/changelog/db.changelog-master.yaml`
+- Changelog: `db/changelog/db.changelog-master.yaml`, `includeAll` over `changes/`
 - Automatic schema initialization on startup
-- Drop-first enabled in non-production environments
+- ⚠️ **`drop-first` is `false`**, so a stored UCHealth OAuth token survives a restart.
+  Consequence: **edits to an already-applied changeset do not take effect on startup** — rebuild
+  the DB via the n8n `clear-db` webhook. New changesets still apply normally
 - MySQL driver: `com.mysql:mysql-connector-j`
 
-### Data Source
+### Data source
 - Connection pool: HikariCP with 30s connection timeout
-- URL: Configured via RDS_HOSTNAME, RDS_PORT, RDS_DB_NAME environment variables
-- Credentials: RDS_USERNAME, RDS_PASSWORD environment variables
+- URL from `RDS_HOSTNAME`, `RDS_PORT`, `RDS_DB_NAME`
+- Credentials from `RDS_USERNAME`, `RDS_PASSWORD`
 - Initialization failure timeout: 0 (fail fast)
 
-### JPA Configuration
-- DDL-auto: none (Liquibase handles schema)
-- Show-sql: false (no SQL logging by default)
+### JPA configuration
+- DDL-auto: none (Liquibase owns the schema)
+- Show-sql: false
 - Allow bean definition overriding: true
 
-## Security Features
+⚠️ **`BaseDb` uses `GenerationType.IDENTITY`**, which disables Hibernate JDBC batching entirely.
+This is the blocker on batching the ~25 child INSERTs per trial during normalization.
+
+## API endpoints
 
 ### Authentication
-- JWT token-based (stateless, no session-based authentication)
-- Token stored in HTTP Authorization header (Bearer scheme)
-- Username/password credentials for login
-- Token extraction and validation from request headers
+- `POST /api/auth/login` — login; rate-limited
+- `POST /api/auth/register` — ADMIN-only
 
-### Password Handling
-- Uses Spring Security password encoding
-- Configured for secure password comparison
+### Entity CRUD
 
-### CORS
-- Enabled globally in SecurityConfig
-- Allows cross-origin requests from frontend
+The five-endpoint shape above, at: `/api/armgroup`, `/api/condition`, `/api/eligibilityrule`,
+`/api/intervention`, `/api/keyword`, `/api/labresult`, `/api/labresultcomponent`,
+`/api/location`, `/api/medication`, `/api/outcome`, `/api/overallofficial`, `/api/patient`,
+`/api/patientdiagnosis`, `/api/patientmedication`, `/api/patientpriortreatment`,
+`/api/patientvariant`, `/api/sponsor`, `/api/stagingrawfhirresource`, `/api/stagingrawtrial`,
+`/api/trial`, `/api/trialmatch`, `/api/trialmatchcriterion`, `/api/trialsource`,
+`/api/trialstatus`, `/api/user`.
 
-### Authorization
-- Stateless session management
-- Public endpoints: /api/auth/login, /api/auth/register, static assets
-- Protected endpoints: All /api/** require valid JWT token
-- Token validation on every protected request
+Plus `/api/customer` and `/api/purchase`, which are inherited scaffolding.
 
-## API Endpoints
+Entities referencing a trial also expose `GET /api/{entity}/by-trial/{trialExtid}`;
+patient-scoped entities expose `GET /api/{entity}/by-patient/{patientExtid}`.
 
-### Authentication
-- `POST /api/auth/login` - Login with username/password
-- `POST /api/auth/register` - Register new user
+### Matching
+- `GET /api/matching/rank/{patientExtid}?breastOnly=&limit=` — rank the corpus, best first
+- `GET /api/matching/trial/{trialExtid}/for/{patientExtid}` — assess a single trial
 
-### Customer Management
-- `GET /api/customer` - List customers (paginated, default 20)
-- `GET /api/customer/{extid}` - Get customer details
-- `POST /api/customer` - Create customer
-- `PUT /api/customer/{extid}` - Update customer
-- `DELETE /api/customer/{extid}` - Soft delete customer
+### Ingestion and retrieval
+- `POST /api/ingestion/clinicaltrials` — pull and stage trials
+- `POST /api/uchealth/observation`, `POST /api/uchealth/medicationrequest` — Epic FHIR pulls
+- `POST /api/rag/backfill` — embed and index staged trials
+- `GET /api/rag/search` — semantic search over criteria
+- `POST /api/rag/reindex/{trialExtid}` — re-index one trial
 
-### Purchase Management
-- `GET /api/purchase` - List purchases (paginated, default 20, sortable by: customer, status, createdAt, updatedAt)
-- `GET /api/purchase/{extid}` - Get purchase details
-- `POST /api/purchase` - Create purchase
-- `PUT /api/purchase/{extid}` - Update purchase
-- `DELETE /api/purchase/{extid}` - Soft delete purchase
+## Build and deployment
 
-### User Management
-- `GET /api/user` - List users (paginated, default 20)
-- `GET /api/user/{extid}` - Get user details
-- `POST /api/user` - Create user
-- `PUT /api/user/{extid}` - Update user
-- `DELETE /api/user/{extid}` - Soft delete user
-
-## Build & Deployment
-
-### Build System
-- Gradle 8.14.3
-- Java 21 toolchain
+### Build system
+- Gradle 8.14.3, Java 21 toolchain
 - Embedded frontend build tasks
 
-### Frontend Integration
-- Frontend built with Vite and copied to `src/main/resources/static`
-- Build tasks: npmInstall, npmBuild, copyFrontend, cleanStatic
-- Deployment task: buildDeployment (builds JAR with frontend included)
-- Development task: killFrontend (terminates dev servers on ports 5173-5175)
+### Frontend integration
+- Built with Vite, copied to `src/main/resources/static`
+- Tasks: `npmInstall`, `npmBuild`, `cleanStatic`, `copyFrontend`
+- Deployment: `buildDeployment` (jar with frontend included)
+- Development: `killFrontend` (kills dev servers on 5173-5175)
 
 ### Configuration
-- Application name: basic
-- Server port: 8080 (configurable via PORT env var)
+- Application name: `basic` (a naming leftover; the project is `cancer`)
+- Server port: 8080, configurable via `PORT`. ⚠️ **Production runs on 8081** — another app owns
+  8080 on that box
 - Version: 0.0.2-SNAPSHOT
 - Spring Boot DevTools enabled for development
+
+⚠️ **Do not run Gradle while the backend is running.** DevTools watches build output and
+hot-restarts on change, so any `./gradlew` invocation rewrites those outputs and the app dies
+against a half-written classpath. The failures look like real configuration faults
+(`Not a managed type`, `ClassNotFoundException`) and arrive on a `restartedMain` thread.
 
 ## Dependencies
 
 ### Spring Boot
-- spring-boot-starter-web: REST API support
-- spring-boot-starter-data-jpa: ORM/persistence with JPA repositories
-- spring-boot-starter-security: Authentication/authorization
-- spring-boot-starter-validation: Input validation
-- spring-boot-starter-thymeleaf: Template engine
-- spring-boot-devtools: Hot reload for development
-- springdoc-openapi-starter-webmvc-ui: Swagger UI (v2.6.0)
+- spring-boot-starter-web, -data-jpa, -security, -validation, -thymeleaf
+- spring-boot-devtools (development only)
+- springdoc-openapi-starter-webmvc-ui (Swagger UI, v2.6.0)
 
-### JWT & Security
-- jjwt-api (0.12.6): JWT token API
-- jjwt-impl (0.12.6): JWT implementation
-- jjwt-jackson (0.12.6): Jackson integration for JWT
+### JWT & security
+- jjwt-api / jjwt-impl / jjwt-jackson (0.12.6)
 
 ### Database
-- mysql-connector-j: MySQL JDBC driver (version with mysql.cj.jdbc.Driver)
-- liquibase-core (4.29.2): Schema versioning and migrations
+- mysql-connector-j
+- liquibase-core (4.29.2)
 
 ### Utilities
-- modelmapper (3.2.0): Object mapping
-- lombok (1.18.34): Boilerplate reduction (@Data, @Slf4j, etc.)
-- spring-dotenv (4.0.0): .env file support
-- apache commons-csv (1.11.0): CSV processing
-- threeten-bp (1.6.8): Date/time utilities
-- snakeyaml (2.2): YAML parsing
+- modelmapper (3.2.0), lombok (1.18.34), spring-dotenv (4.0.0),
+  commons-csv (1.11.0), threeten-bp (1.6.8), snakeyaml (2.2)
 
 ### Testing
-- spring-boot-starter-test: Integration tests
-- junit-platform-launcher: JUnit 5
+- spring-boot-starter-test, junit-platform-launcher
 
-## Development Features
-- Spring Boot DevTools for hot reload
-- Comprehensive logging throughout application (configurable levels)
-- Swagger/OpenAPI documentation for all endpoints
-- Support for environment variables and .env files
-- Request validation with detailed error responses
-
-## Deployment Considerations
-- Runs on Ubuntu 24.04 by default
-- Configured for AWS RDS MySQL
+## Deployment considerations
+- Runs on Ubuntu 24.04
+- Configured for MySQL, AWS RDS compatible
 - Frontend served as static assets from Spring Boot
-- JWT-based stateless authentication (suitable for cloud deployment)
-- Database migrations handled by Liquibase on startup
-- Configurable via environment variables for cloud deployments
+- JWT-based stateless authentication
+- Liquibase migrations on startup
+- Full deploy procedure in `hosting/DEPLOY_RUNBOOK.md`

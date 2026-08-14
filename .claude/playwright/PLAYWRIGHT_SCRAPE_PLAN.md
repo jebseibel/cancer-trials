@@ -5,8 +5,13 @@ A second path to the patient record, alongside the Epic FHIR pipeline. Companion
 `../PROJECT_PLAN.md` §7 (which already anticipated a Playwright source writing into
 staging).
 
-**Status: planned, nothing built.** The `playwright/` directory at the repo root is
-created and empty.
+**Status as of 2026-08-14: ✅ step 1 is built; steps 2-6 are designed and not started.**
+The `playwright/` directory at the repo root is a working standalone Gradle build —
+`MyChartScraperApp`, plus `SessionManager`, `LoginService` and `ConfigLoader` under
+`scraper/common/`. It is deliberately **not** in root `settings.gradle`.
+
+⚠️ `playwright/.auth/` is currently empty, so the next run will do a fresh login and
+**MFA will fire** — the code goes to the patient's phone, so allow the 10-minute wait.
 
 ---
 

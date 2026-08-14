@@ -63,7 +63,7 @@ One row per patient. Molecular and germline findings, at the depth a patient can
 answer from what they have been told.
 
 ```
-app_user_id            bigint          not null    -- FK -> app_user.id
+patient_id             bigint          not null    -- FK -> patient.id (was app_user_id until changeset 030)
 patient_diagnosis_id   bigint                      -- FK -> patient_diagnosis.id, nullable
 
 -- Somatic (tumor) findings
@@ -135,7 +135,7 @@ into it. This table records *exposure and outcome*, which is what gates eligibil
 are complementary; neither replaces the other.
 
 ```
-app_user_id            bigint          not null    -- FK -> app_user.id
+patient_id             bigint          not null    -- FK -> patient.id (was app_user_id until changeset 030)
 patient_diagnosis_id   bigint                      -- FK -> patient_diagnosis.id, nullable
 
 -- Priority 1 classes: the gates that appear most in this corpus
@@ -225,16 +225,20 @@ Diagnosis / Biomarkers / Molecular / Treatment History:
 - **`patient_variant`** is the "what her tumor and germline carry" row.
 - **`patient_prior_treatment`** is the "what she has been through" row.
 
-**One row of each per patient, keyed on `app_user_id`**, with a nullable
+**One row of each per patient, keyed on `patient_id`**, with a nullable
 `patient_diagnosis_id` so a row survives the diagnosis being deleted and recreated — which
 already happened once, on 2026-08-08.
 
-**Note the planned key change.** `_archive/patient/PATIENT_MODEL_PLAN.md` proposes replacing
-`app_user_id` with `patient_id` across `patient_diagnosis` and `trial_status`, on the grounds
-that a clinical fact belongs to the patient rather than to whoever is holding the laptop. That
-plan is unbuilt, so these tables follow the current convention — but they will need the same
-FK move if it ever ships. Building them now adds two tables to that migration, which is a real
-cost and a small one; the alternative is blocking a needed feature on an unscheduled refactor.
+✅ **The planned key change shipped — 2026-08-14.** This section predicted it and it played out
+exactly as described: `_archive/patient/PATIENT_MODEL_PLAN.md` proposed replacing `app_user_id`
+with `patient_id` on the grounds that a clinical fact belongs to the patient rather than to
+whoever is holding the laptop. That is now the schema. `app_user` was dropped in changeset `030`,
+and both tables here carry `patient_id` alongside the nullable `patient_diagnosis_id`.
+
+**The cost estimate was right.** Building these two tables ahead of the migration added them to
+it, and that was "a real cost and a small one" — the migration moved five tables in one step
+(`patient_diagnosis`, `patient_variant`, `patient_prior_treatment`, `trial_status`,
+`trial_match`) rather than being blocked on an unscheduled refactor.
 
 **Two overlaps to resolve when these are built:**
 

@@ -6,7 +6,19 @@ time can search rather than being told to go and process trials first.
 Written 2026-08-10. Companion to `PAYLOAD_HASH_PLAN.md` (which is what would make a re-pull
 cheap) and `../CURRENT_STATE.md`.
 
-**Status: analysed, nothing built. No option chosen yet.**
+**Status as of 2026-08-14: ✅ option 2 was chosen and is the live procedure.** Phase 4 of
+`../hosting/DEPLOY_RUNBOOK.md` is exactly this option — `curl` against
+`POST /api/ingestion/clinicaltrials` then `POST /api/rag/backfill`, run inside `tmux` so the
+session surviving matters rather than the HTTP request, with an Nginx `proxy_read_timeout`
+override on `^/api/(ingestion|rag/backfill)`. No application code was needed, as predicted.
+
+The recommended sequencing at the end of this document was followed: option 2 first, then
+payload hashing (✅ built, see `PAYLOAD_HASH_PLAN.md`). **Option 1 — ship the data as a restore —
+remains unbuilt and is still the recommendation for production**, now that a corpus worth
+capturing exists.
+
+⚠️ **Whether Phase 4 has actually been run on the server is not recorded in any document.** As of
+2026-08-11 prod had 0 Qdrant points. Check the box, not this file.
 
 ## What the user should experience
 
@@ -15,9 +27,12 @@ about ingestion, backfill, or corpus loading should be a prerequisite for that. 
 Trials page stays — refreshing the corpus is a real thing to want — but it should be
 maintenance, not setup.
 
-Patient data already works this way: `PatientSeedLoader` recreates AppUser, PatientDiagnosis,
-PatientVariant and PatientPriorTreatment on startup from gitignored CSVs, and it is verified
-through a real rebuild. The trial corpus is the remaining gap.
+Patient data already works this way: `PatientSeedLoader` recreates the patient, its OWNER grant,
+PatientDiagnosis, PatientVariant and PatientPriorTreatment on startup from gitignored CSVs, and
+it is verified through a real rebuild. The trial corpus is the remaining gap.
+
+> *Written when the entity was `AppUser`; that table was dropped in changeset `030` and replaced
+> by `patient` plus `user_patient` grants. The seeding behaviour is unchanged.*
 
 ## The trap: do not seed trials the way patient rows are seeded
 
@@ -100,9 +115,10 @@ the app to do it.
 **A stale collection is worse than an empty one.** Chunks reference trial extids; after a
 rebuild those ids no longer exist. The collection must be deleted and re-created, never reused.
 
-**Qdrant is currently published on all interfaces.** `docker-compose.yml` exposes 6333/6334
-without binding to localhost — fine on a development machine, wrong on a public host. This is
-already on the QA checklist and becomes load-bearing the moment seeding happens on a server.
+~~**Qdrant is currently published on all interfaces.**~~ ✅ **Fixed — verified 2026-08-14.**
+`docker-compose.yml` now binds both ports to `${QDRANT_BIND:-127.0.0.1}`, so the default is
+localhost-only and a remote container needs an explicit override. Qdrant ships with no
+authentication of any kind, so put real auth in front before ever setting `QDRANT_BIND=0.0.0.0`.
 
 ## The corpus goes stale, whichever option is chosen
 
@@ -122,7 +138,15 @@ and makes options 2 and 3 far less painful.
 
 Recommended order:
 
-1. **Option 2 now** — zero code, unblocks a deployment immediately.
-2. **Payload hashing** — during a rebuild that is happening anyway, since it needs one.
-3. **Option 1 for production** — once there is a corpus worth capturing and a cheap way to
-   keep it current.
+1. ✅ **Option 2 now** — zero code, unblocks a deployment immediately. **Done** — it is Phase 4
+   of the deploy runbook.
+2. ✅ **Payload hashing** — during a rebuild that is happening anyway, since it needs one.
+   **Done**, shipped in `6043833`.
+3. ⬜ **Option 1 for production** — once there is a corpus worth capturing and a cheap way to
+   keep it current. **Still outstanding**, and both preconditions are now met.
+
+⚠️ **The unanswered question option 1 runs into is the chunk key.** A Qdrant snapshot is only
+valid against the exact MySQL rows it was built from, because chunk payloads key on `trialExtid`
+and extids regenerate on every rebuild. Keying chunks on `nctId` instead — globally stable, so a
+snapshot survives a rebuild independently — is the structural fix, and it is a chunking change,
+so adopting it later costs a full `force=true` re-index. That cost grows with the corpus.
