@@ -4,7 +4,12 @@ Make a repeat ingestion cost time proportional to **what changed**, not to corpu
 Written 2026-08-10 from a read of `ClinicalTrialsGovIngestJob`, not from the design docs.
 Companion to `../CURRENT_STATE.md` and `DEPLOYMENT_SEEDING.md`.
 
-**Status: planned, nothing built.**
+**Status: ✅ BUILT — verified 2026-08-14.** `payload_hash varchar(64)` is on changeset
+`010-staging-raw-trial.yaml`, `StagingRawTrialDb.payloadHash` exists, and
+`ClinicalTrialsGovIngestJob` computes `sha256Hex(rawJson)` and takes the skip branch on
+`payloadHash.equals(existing.getPayloadHash())`. Shipped in `6043833`.
+
+The plan below is kept as the design record; it is written in the future tense throughout.
 
 ## The problem, measured
 
@@ -170,6 +175,14 @@ question with its own answer, and embedding is far more expensive per trial than
 The same hash could plausibly gate it — a trial whose payload hash is unchanged since its last
 successful index does not need re-embedding — but that is a second change against different
 code, and the retrieval consequences of skipping have not been thought through here.
+
+> ✅ **Solved separately, and not with this hash.** `TrialIndexService.isIndexed(trialExtid)`
+> probes Qdrant per trial and the backfill skips on a hit — measured at 14.9s → 0.4s for 50
+> already-indexed trials. **The probe asks the vector store rather than a stored flag**,
+> deliberately: a cached `indexed_at` column can lie after a cleared collection or a DB rebuild,
+> which is exactly when it matters. `?force=true` bypasses the skip, and it is not optional —
+> after a chunking or embedding-model change every stored vector is stale despite the payload
+> being unchanged. See `../CURRENT_STATE.md`, "Backfill skips what is already indexed".
 
 **The fetch does not get cheaper.** Every study payload is still downloaded to discover that
 most are unchanged. `ClinicalTrialsGovClient` also accumulates every study in a

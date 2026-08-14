@@ -2,6 +2,18 @@
 
 *Notes from prior research conversation*
 
+> **Reviewed 2026-08-14 — still accurate.** This is external research about Epic and UCHealth,
+> not about this codebase, so it does not drift with the code.
+>
+> **It has since been acted on.** The app is registered with Epic, the PKCE flow described here
+> is built (`UcHealthOAuthClient`, `UcHealthAuthController`), and it works against Epic's
+> sandbox. What the research did *not* predict is where the real friction turned out to be:
+> Epic granted `patient/*.read fhirUser launch/patient openid` but **silently dropped
+> `offline_access`**, so tokens die in ~1 hour with no refresh path.
+>
+> See `UCHEALTH_INGESTION_PLAN.md` for the build, and `../CURRENT_STATE.md` for the grants
+> still outstanding on Epic's side.
+
 ## Short Answer
 
 **Yes to the portal, qualified yes to the APIs.**

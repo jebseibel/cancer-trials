@@ -44,14 +44,37 @@ stored secret. Confirm this against Epic's actual registration form in step 1; i
 forces a confidential client, the token-exchange and refresh calls need a
 `client_secret` added and the PKCE store becomes optional.
 
-**Note for when endpoint security is re-enabled:** `/api/uchealth/callback` must stay
-`permitAll` — Epic's redirect arrives from the patient's browser and cannot carry a JWT.
-A reminder to that effect is in the commented-out rule block in `SecurityConfig`.
+✅ **Endpoint security has since been re-enabled, and the callback is correctly public.**
+`SecurityConfig` now ends in `.anyRequest().authenticated()` with an explicit
+`.requestMatchers("/api/uchealth/callback").permitAll()` rule — Epic's redirect arrives
+from the patient's browser and cannot carry a JWT. Verified 2026-08-14.
 
-Not yet started: Epic developer registration (step 1, requires you), the FHIR client, the
-ingest job, and the parser (steps 4–7). The scaffolded entities still have no
-mapper/repository/dbservice tests — that pass was skipped deliberately, per this
-project's usual two-pass convention (`database-restapi-template` then
+> ### Status update — 2026-08-14
+>
+> **Steps 1-7 are all built.** The paragraph below said steps 4-7 were not started; they
+> since landed:
+>
+> | Step | Class | |
+> | --- | --- | --- |
+> | 4 | `UcHealthFhirClient` | ✅ |
+> | 5 | `UcHealthIngestJob` | ✅ |
+> | 6 | `EpicObservationParser` + `FhirNormalizationService` | ✅ |
+> | 7 | `POST /api/ingestion/uchealth/observation` and `/uchealth/medicationrequest` | ✅ |
+>
+> ⚠️ **Step 7 landed as endpoints on the existing `IngestionController`, not as a separate
+> `UcHealthIngestionController`.** Both CT.gov and Epic pulls are triggered from one
+> controller.
+>
+> All five changesets are applied: `018` oauth token, `019` staging raw FHIR resource,
+> `020` patient medication, `021` lab result, `022` lab result component.
+>
+> **What is genuinely blocked is Epic's side, not this code** — see "Open questions" and
+> `../CURRENT_STATE.md`: no `offline_access` grant so the token dies in ~1 hour with no
+> refresh, `MedicationRequest` rejected pending a sub-resource grant, `DiagnosticReport`
+> returning 403, and panel handling untested against real data.
+
+The scaffolded entities' mapper/repository/dbservice tests were skipped deliberately, per
+this project's usual two-pass convention (`database-restapi-template` then
 `database-restapi-testing`).
 
 ## Why this exists
@@ -264,7 +287,7 @@ before seeing real sandbox FHIR payloads), but the table shape should be:
   actually log in via UCHealth's page), unlike CT.gov's fully server-side flow — needs a
   real browser round-trip, not just curl/Swagger.
 
-### 4. `UcHealthFhirClient` (`datafetcher/uchealth/`)
+### 4. `UcHealthFhirClient` (`datafetcher/uchealth/`) — **built**
 - Authenticated GET against FHIR R4 resource endpoints for the target data only:
   `/Patient/{id}` (resolve the authorized patient), `/Observation?patient={id}&category=laboratory`
   (test results — confirm the right `category` search param against sandbox; Epic
@@ -274,7 +297,7 @@ before seeing real sandbox FHIR payloads), but the table shape should be:
 - FHIR search results are paginated via `Bundle.link[relation=next]` — different
   pagination shape than CT.gov's `pageToken`, handle accordingly.
 
-### 5. `UcHealthIngestJob` (`datafetcher/uchealth/`)
+### 5. `UcHealthIngestJob` (`datafetcher/uchealth/`) — **built**
 - Ensures a valid (non-expired, refreshed-if-needed) token exists.
 - Fetches each resource type for the authorized patient, writes
   `staging_raw_fhir_resource` rows — same "raw payload preserved as-is" principle as
@@ -283,12 +306,12 @@ before seeing real sandbox FHIR payloads), but the table shape should be:
   build this pipeline with that dedup logic from day one instead of discovering the gap
   again.
 
-### 6. `UcHealthFhirParser` (`datafetcher/normalization/`)
+### 6. `UcHealthFhirParser` (`datafetcher/normalization/`) — **built as `EpicObservationParser` + `FhirNormalizationService`**
 - Parses each `staging_raw_fhir_resource` row's JSON per its `resource_type`
   (`Observation`/`DiagnosticReport`/`MedicationRequest`) into
   whatever normalized table shape gets decided in the schema step above.
 
-### 7. `UcHealthIngestionController` (root module)
+### 7. `UcHealthIngestionController` (root module) — **built as endpoints on `IngestionController`**
 - `POST /api/ingestion/uchealth` — triggers fetch → stage → normalize synchronously
   (same shape as `POST /api/ingestion/clinicaltrials`), using the already-stored token
   (no patient interaction needed for this call — only the initial `/authorize` /

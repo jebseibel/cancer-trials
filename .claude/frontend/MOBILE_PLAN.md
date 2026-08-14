@@ -3,12 +3,14 @@
 Written 2026-08-13, from a read of every file in `frontend/src/` rather than from the design
 docs. Companion to `../CURRENT_STATE.md` and `../hosting/DEPLOY_RUNBOOK.md`.
 
-**Status: all items built 2026-08-13 on branch `frontend-mobile` (renamed from `prod-push`),
-uncommitted. Item 8 needed no change; item 9 turned out to be a dead-file delete.**
+**Status: ✅ all items built and committed** as `14aadff` ("Make the app usable on a phone, and
+stop it fetching everyone to find one"), verified 2026-08-14. Item 8 needed no change; item 9
+turned out to be a dead-file delete (`App.css`, confirmed removed in that commit).
 
-⚠️ **Built but not yet seen on a phone.** Typecheck and production build are clean and the
-desktop view is unchanged by construction (every change is either below `sm` or a padding move
-that nets out), but nothing here has been confirmed on a real device. See "How to verify".
+⚠️ **Whether this was ever confirmed on a real phone is not recorded.** Typecheck and production
+build were clean and the desktop view is unchanged by construction (every change is either below
+`sm` or a padding move that nets out), but no note anywhere says a device was used. `MOBILE_TESTING.md`
+is the procedure; run it if you need certainty.
 
 ## Why this matters now, and not before
 

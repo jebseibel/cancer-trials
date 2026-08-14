@@ -1,8 +1,19 @@
 # Narrowing to Breast Cancer — Change Plan
 
 Written 2026-08-09, from a survey of the actual code rather than from the design docs.
-Companion to `PROJECT_PLAN.md` (which still describes the general-purpose app) and
+Companion to `PROJECT_PLAN.md` (the original general-purpose plan, now marked historical) and
 `CURRENT_STATE.md`.
+
+> **Reviewed 2026-08-14. The decision this plan asks for was effectively taken, in practice
+> rather than by declaration.** The app is named Breast Cancer Trial Finder and deployed at
+> breastcancertrialfinder.com; the Process Trials form pre-fills `breast cancer`; and the
+> matching layer hard-codes breast clinical knowledge — a `diseaseTypeSignal` gate plus
+> receptor-polarity, CDK4/6 treatment-line and PI3K-pathway signals. That is exactly the
+> "permission to hard-code clinical knowledge" this document argued narrowing was really about.
+>
+> Both blocking open questions are now answered (see the end). What was never done as a
+> deliberate pass is the *cleanup* — the plan's step list has not been worked through
+> item by item, so treat it as a checklist of what remains rather than as pending approval.
 
 ## The finding that should shape this decision
 
@@ -171,10 +182,15 @@ misleading scores.
 
 ## Open questions
 
-- **Backend or frontend for receptor matching?** The one blocking decision. See step 2.
-- **Does the diagnosis stay one row per user, or does narrowing make multi-patient more
-  attractive?** A breast-focused tool is more plausibly shareable with other breast patients
-  than a general tool was with anyone. `_archive/patient/PATIENT_MODEL_PLAN.md` is unbuilt.
+- ✅ ~~**Backend or frontend for receptor matching?**~~ **Settled: backend.**
+  `CriteriaSignalEvaluator.receptorSignal` is server-side, and the reasoning held — the frontend
+  could not be measured against the whole corpus in bulk, could not inform ranking, and could not
+  be reused by Tier 3. Tier 1 remains in `frontend/src/lib/tier1Matching.ts`.
+- ✅ ~~**Does the diagnosis stay one row per user, or does narrowing make multi-patient more
+  attractive?**~~ **Multi-patient won, and it shipped 2026-08-14.**
+  `_archive/patient/PATIENT_MODEL_PLAN.md` is no longer unbuilt — `patient` plus `user_patient`
+  grants replaced `app_user`, so the schema is multi-patient-capable and a record can be shared.
+  See `access/PATIENT_ACCESS_PLAN.md`.
 - **Should the ingestion condition become a fixed constant rather than a default?** Keeping it
   overridable costs nothing and preserves an escape hatch. Recommend keeping it.
 - **Does `EligibilityRule` (scaffolded, never populated) get built for Tier 3, or dropped?**

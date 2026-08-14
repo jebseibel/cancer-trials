@@ -50,7 +50,8 @@ all sharing a `search_run_id`.
 
 ```
 trial_id               bigint          not null    -- FK -> trial.id
-app_user_id            bigint          not null    -- FK -> app_user.id, whose search this was
+patient_id             bigint          not null    -- FK -> patient.id, whose record this matched
+                                                   -- (was app_user_id until changeset 030)
 patient_diagnosis_id   bigint                      -- FK -> patient_diagnosis.id, the row used
 search_run_id          varchar(36)     not null    -- UUID grouping every match from one run
 query_text             text            not null    -- the exact query string sent to retrieval
@@ -124,5 +125,5 @@ that fix will be measured, since a stored run can be compared against a later on
   (interested, contacted, ruled out). A match is machine-generated evidence. They stay
   separate, but a future UI likely wants to show "this trial matched at 0.72 on <criterion>"
   alongside the status.
-- **Indexing.** At minimum `trial_match.search_run_id` (fetching a run), `trial_match.app_user_id`,
+- **Indexing.** At minimum `trial_match.search_run_id` (fetching a run), `trial_match.patient_id`,
   `trial_match.trial_id`, and `trial_match_criterion.trial_match_id`.

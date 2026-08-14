@@ -1,4 +1,26 @@
-# Clinical Trials Finder — Project Plan
+# Clinical Trials Finder — Project Plan (HISTORICAL)
+
+> ⚠️ **This is the original founding plan, written before the project was built. It is kept as a
+> design record, not as a description of the app.** Reviewed 2026-08-14.
+>
+> **The architecture calls in it held up** — staging-then-normalize, `TrialSourceParser` as the
+> seam for new sources, `BaseDb` with extid and soft deletes, and a single deployable jar are all
+> how the app actually works.
+>
+> **What the plan says that is no longer true:**
+>
+> | Plan says | Actually |
+> | --- | --- |
+> | `com.seibel.clinicaltrials`, `ClinicaltrialsApplication` | `com.seibel.cancer`, `CancerApplication` |
+> | Single module with layered packages | Five modules: root, `:common`, `:database`, `:datafetcher`, `:rag` |
+> | "not deployed publicly" | Live at breastcancertrialfinder.com since 2026-08-11 |
+> | Matching deferred to Phase 3, "not designed yet" | Tier 2 matching is built, corpus-measured, and shipped |
+> | 5 frontend pages | 11 pages, including the patient record tabs and "Trials for You" |
+> | No registration, login only | Registration exists but is ADMIN-only; login is rate-limited |
+> | §11's three open items | All decided — on-demand ingestion, scrapers in `playwright/` |
+>
+> For the current state, read `CURRENT_STATE.md`. For current architecture, read
+> `project-description.md` or the root `CLAUDE.md`.
 
 ## 1. Purpose
 
@@ -13,6 +35,10 @@ eligibility parsing) is explicitly deferred to a later phase.
 This app is single-user, runs entirely on your machine, and is not deployed publicly.
 
 ## 2. Reference project
+
+> ⚠️ **Superseded.** This project no longer defers to cpss for conventions — it has its own,
+> documented in the root `CLAUDE.md` and `.claude/backend-module.md`. Follow those; this section
+> records where the patterns originally came from.
 
 This project mirrors the architecture and conventions of `~/projects/personal/cpss`
 (a working Spring Boot + React app), rather than inventing new patterns. Where this
@@ -181,6 +207,15 @@ Core screens for phase 1:
 
 ## 10. Phased roadmap
 
+> **Status 2026-08-14:** Phase 1 is complete — all eight steps shipped, including the real
+> end-to-end run against the patient's actual condition. Phase 2 (additional sources) is partly
+> done: the `playwright/` MyChart scraper logs in and reuses sessions, but steps 2-6 are designed
+> and not built, and no second `TrialSourceParser` exists. Phase 3 is **done, not deferred** —
+> Tier 2 matching is built and measured against the full corpus, and the structured patient
+> profile it needed exists across `PatientDiagnosis`, `PatientVariant` and
+> `PatientPriorTreatment`. What remains open is generation (grounded "why might this fit"
+> answers), the join tables, and the after-commit indexing hook.
+
 **Phase 1 — Foundation & ClinicalTrials.gov ingestion (this plan's scope)**
 1. Project scaffold: Gradle, Spring Boot, MySQL/Docker, Liquibase master changelog
 2. Core schema as Liquibase changesets (see `_archive/clinical-trials/clinical-trials-tables.md` for the table design)
@@ -208,8 +243,12 @@ Core screens for phase 1:
 
 ## 11. Open items to decide when we start building
 
-- Exact search terms/conditions to configure for the initial CT.gov ingestion pull
-- Whether ingestion runs on-demand (a button/endpoint) or on a schedule (`@Scheduled`)
-  for phase 1 — recommend on-demand first, since trial data doesn't change fast
-- Where Playwright scraper scripts will live (separate repo vs. `scrapers/` folder
-  here) — can decide in phase 2
+✅ **All three are decided.** Kept for the record:
+
+- ~~Exact search terms/conditions for the initial CT.gov pull~~ — configured via
+  `cancer.ingestion.clinicaltrials.*`; the Process Trials form pre-fills `breast cancer` after an
+  empty box once pulled 2,500 arbitrary general-cancer trials.
+- ~~On-demand vs. scheduled ingestion~~ — **on-demand**, via `POST /api/ingestion/clinicaltrials`
+  and the Process Trials page. The recommendation in this plan was followed.
+- ~~Where Playwright scrapers live~~ — in `playwright/`, a standalone Gradle build that is
+  deliberately **not** in root `settings.gradle`.

@@ -2,7 +2,18 @@
 
 > **DEPLOYED 2026-08-11.** https://breastcancertrialfinder.com is live, HTTPS, with her record
 > seeded. What follows is the corrected procedure — every correction below came from doing it,
-> not from planning it. The corpus (Phase 4) is the one step not yet run.
+> not from planning it. The corpus (Phase 4) had not been run as of that date.
+>
+> ⚠️ **Reviewed 2026-08-14: the authorization model is NOT on `main`, and therefore not
+> deployable yet.** `main`'s tip is `0544c6a`, this deploy's own commit. The access model
+> (`c9cb30d`), the mobile work (`14aadff`) and the current docs (`5836a0b`) live only on
+> `frontend-mobile` and have not been merged. **A deploy from `main` today ships the app exactly
+> as it was on 2026-08-11** — no `user_patient` grants, no access levels.
+>
+> `1b663cb` (password hashing on create/update, plus the login allowlist) **is** on `main` and
+> therefore deployable; the `.env` block in Phase 3 has gained `LOGIN_ALLOWED_USERNAMES` for it.
+>
+> Whether Phase 4 has since been run is not recorded anywhere — check the server, not this file.
 
 First deploy of this app to a public host, holding **one real person's medical record**.
 
@@ -192,7 +203,17 @@ JWT_SECRET=...                    # fresh 512-bit; the app will NOT boot without
 QDRANT_BIND=127.0.0.1
 CORS_ALLOWED_ORIGINS=https://breastcancertrialfinder.com,https://www.breastcancertrialfinder.com
 PORT=8081
+LOGIN_ALLOWED_USERNAMES=jeb      # added 2026-08-14; see the warning below
 ```
+
+⚠️ **`LOGIN_ALLOWED_USERNAMES` was added to the app after this runbook's first deploy** and is
+easy to miss. It defaults to **empty, which means no allowlist is applied** — every account in
+the database can log in, including the unused `admin`. Setting it to a comma-separated list is
+what closes that. The code shipped in `1b663cb`; **whether the property is set on the server is a
+separate question, and as of 2026-08-11 it was not.**
+
+Optional, both with working defaults: `LOGIN_MAX_ATTEMPTS` (8) and `LOGIN_LOCKOUT_MINUTES` (15)
+tune the login rate limiter.
 
 ⚠️ **`JWT_SECRET` has no default, deliberately.** A default would silently re-enable the literal
 that is public in git history. Unset means the app fails to start, which is the failure you want.
@@ -413,10 +434,13 @@ Expect ranking around 4-5s on the dev machine; slower on a small VPS.
 
 Written down so they are decisions, not discoveries.
 
-- **No authorization model.** Any authenticated user can read any patient's record by passing
-  their extid — endpoints take the target from the URL and never compare it to the caller.
-  Acceptable while there is exactly one account; a live problem the moment there are two. See
-  `../CURRENT_STATE.md`.
+- ~~**No authorization model.**~~ ✅ **Closed 2026-08-14** (`c9cb30d`), and no longer an accepted
+  gap. `user_patient` grants plus a ranked `AccessLevel` (`VIEW_TRIALS < VIEW_RECORD <
+  EDIT_RECORD < OWNER`) are enforced by `CurrentUserService` — endpoints still take the target
+  extid from the URL, but now check it against the caller's grants and return **404, never 403**,
+  so a probe cannot confirm a record exists. ⚠️ **It is on `frontend-mobile`, not `main`** — so
+  it is neither deployed nor deployable until that branch is merged. Until then, this gap is
+  still live in production exactly as originally written.
 - **No encryption at rest, no access log.** Accepted knowingly by the user for a single-patient
   tool on his own host.
 - **Existing JWTs survive account deletion** — tokens are stateless and cannot be recalled.

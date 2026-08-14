@@ -3,10 +3,18 @@
 The frontend half of `PATIENT_ACCESS_PLAN.md`, written against the API contract `BACKEND_PLAN.md`
 produces. Read both first.
 
-Written 2026-08-13 from a survey of `frontend/src`. **This work cannot start until backend steps
-1-5 are done** — it consumes endpoints that do not exist yet.
+Written 2026-08-13 from a survey of `frontend/src`. The backend dependency it named — steps 1-5 —
+is satisfied; those endpoints exist.
 
-**Status: planned, nothing built.**
+**Status as of 2026-08-14: ✅ items 1-5 are BUILT and committed** (`c9cb30d`).
+`lib/PatientContext.tsx` replaced `useCurrentAppUser`, the API client is repointed to
+`/by-patient/`, and the pages are migrated.
+
+⬜ **Items 6-8 are not started.** `lib/accessLevel.ts` exists with a `covers()` rank helper, so
+item 6 has its building block, but nothing confirms pages gate on it. Item 8 remains blocked on
+backend step 8, which is also not started.
+
+The prose below is written in the future tense throughout — read the per-item status markers.
 
 ---
 
@@ -63,7 +71,7 @@ attempting a save and failing.
 
 ## The work
 
-### 1. Replace the hook — `useCurrentPatient`
+### ✅ 1 (done). Replace the hook — `useCurrentPatient`
 
 Delete `useCurrentAppUser`. New `lib/useCurrentPatient.ts` backed by `GET /api/patient/mine`.
 
@@ -79,7 +87,7 @@ until it exists.
 stored. On load, validate it against `/mine` and fall back to the first entry if it is stale or
 revoked — a remembered extid the caller no longer has access to must not produce a wall of 404s.
 
-### 2. Rework `services/api.ts`
+### ✅ 2 (done). Rework `services/api.ts`
 
 - **Delete `appUserApi`** entirely.
 - **Add `patientApi`** — `mine()`, and the per-patient sub-resources.
@@ -90,7 +98,7 @@ revoked — a remembered extid the caller no longer has access to must not produ
 **Rename the parameter from `appUserExtid` to `patientExtid` throughout.** Same string, different
 concept — leaving the old name is how the old model survives its own deletion.
 
-### 3. Store the role at login
+### ✅ 3 (done). Store the role at login
 
 `ResponseAuth` already returns `role`; `authHelpers` keeps only token and username. Add
 `saveRole`/`getRole`/`removeRole` alongside, and clear it on logout with the others.
@@ -102,7 +110,7 @@ must never be the only thing standing between a user and a capability.**
 Needed by `ADMIN_ONLY_INGESTION_PLAN.md` for hiding Process Trials, and it is the same one-line
 storage change either way.
 
-### 4. Fix the eight pages
+### ✅ 4 (done). Fix the eight pages
 
 Mechanical once the hook lands. Each `useCurrentAppUser()` becomes `useCurrentPatient()` and each
 `appUser.extid` becomes `patient.extid`.
@@ -116,7 +124,7 @@ Two that need more than a rename:
   move to `patient` in backend step 4**, so `tier1Matching.ts` needs both objects. **Pass them
   separately rather than merging** — merging hides which table owns which fact.
 
-### 5. Replace the "no app-user profile" dead end
+### ✅ 5 (done). Replace the "no app-user profile" dead end
 
 Three pages currently render:
 
@@ -132,7 +140,7 @@ Replace with the two real cases:
   and it is currently impossible in the UI.
 - **A patient exists but this tab is empty** → the existing empty form, unchanged.
 
-### 6. Access-level rendering
+### ⬜ 6 (NOT STARTED). Access-level rendering
 
 Per `PATIENT_ACCESS_PLAN.md` §3:
 
@@ -150,7 +158,7 @@ mobile pass, and the reason this is one filter rather than two.
 ⚠️ **Hiding a nav item is not access control.** The route must also refuse, and the backend must
 refuse regardless. Three layers, and only the third is load-bearing.
 
-### 7. Patient switcher — only when it earns its place
+### ⬜ 7 (NOT STARTED). Patient switcher — only when it earns its place
 
 In `Layout`, **rendered only when `/mine` returns more than one patient.** With one patient it
 never appears, so the single-patient experience is unchanged.
@@ -159,7 +167,7 @@ never appears, so the single-patient experience is unchanged.
 beside the hamburger. A switcher does not fit there too. On mobile it belongs **inside the
 hamburger panel**, above the links, not in the bar.
 
-### 8. Sharing UI — last
+### ⬜ 8 (NOT STARTED). Sharing UI — last
 
 A "Who can see my record" page, OWNER only: the list of active grants with names and levels, a
 form to grant, and a revoke control.

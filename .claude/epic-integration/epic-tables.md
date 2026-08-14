@@ -39,6 +39,15 @@ from the start.
 These two exist in full (domain → entity → mapper → repository → dbservice → service →
 DTOs → controller), changesets `018` and `019`. Listed here for completeness.
 
+> ✅ **All five tables in this document are now built — verified 2026-08-14.** The three under
+> "Normalized tables" below shipped as changesets `020` (patient_medication), `021` (lab_result)
+> and `022` (lab_result_component); their columns match this spec exactly. They are, however,
+> still **empty** — the pipeline works but Epic's grants do not. See `UCHEALTH_INGESTION_PLAN.md`.
+>
+> ⚠️ One correction to the note above: `UcHealthOAuthTokenController` **no longer exists.** It
+> exposed full CRUD over the token table, including reading refresh tokens back over HTTP, and
+> was removed. The only UCHealth controller is `UcHealthAuthController`.
+
 ### `uchealth_oauth_token`
 One row — this is a single-patient app. Written by the OAuth callback, read by every
 FHIR call.
@@ -210,6 +219,17 @@ re-normalizing rebuilds both.
 **Why no FK to a patient table:** this app stores exactly one patient's record (the
 plan explicitly rules out multi-patient support). Adding a `patient_id` FK would be
 dead weight. If that ever changes, it's an additive column, not a redesign.
+
+> ⚠️ **That "if that ever changes" has happened — 2026-08-14.** A real `patient` table exists
+> (changeset `028`) with `user_patient` grants deciding who may read it, and five other clinical
+> tables were repointed to `patient_id`: `patient_diagnosis`, `patient_variant`,
+> `patient_prior_treatment`, `trial_status`, `trial_match`.
+>
+> **The three tables in this document were not repointed.** `lab_result`, `lab_result_component`
+> and `patient_medication` still have no `patient_id`. That is consistent — they are also still
+> empty and blocked on Epic grants — but it means **the moment Epic data flows for a second
+> patient, these rows have no owner** and are unreachable through the grant model that guards
+> everything else. As predicted, the fix is an additive column rather than a redesign.
 
 ---
 

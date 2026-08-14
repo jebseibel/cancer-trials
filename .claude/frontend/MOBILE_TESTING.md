@@ -94,8 +94,9 @@ padding move that nets out, so a visible difference at desktop width means somet
 
 **Prod is for confirming, not discovering.** Three reasons it is the wrong place to iterate:
 
-- **Its corpus is empty**, so "Trials for You" renders its empty state. The card layout — the
-  most substantial part of the mobile work — is not visible there at all.
+- **Its corpus was empty as of 2026-08-11**, so "Trials for You" renders its empty state and the
+  card layout — the most substantial part of the mobile work — is not visible there at all.
+  ⚠️ *Unverified since; if the corpus has been pulled, this reason no longer applies.*
 - **Each iteration is a `buildDeployment`, an scp, and a service restart.** Minutes per attempt
   to learn whether a CSS class was right.
 - **It holds a real medical record.** Wrong risk profile for checking whether a button wraps.
