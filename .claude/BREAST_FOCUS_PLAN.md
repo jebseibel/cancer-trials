@@ -14,6 +14,20 @@ Companion to `PROJECT_PLAN.md` (the original general-purpose plan, now marked hi
 > Both blocking open questions are now answered (see the end). What was never done as a
 > deliberate pass is the *cleanup* — the plan's step list has not been worked through
 > item by item, so treat it as a checklist of what remains rather than as pending approval.
+>
+> ⚠️ **Step 1 is still not done, verified 2026-08-21.** `application.yml:70` still reads
+> `condition: ${INGEST_CONDITION:cancer}`. Only the Process Trials form pre-fills "breast
+> cancer", so **any pull that does not go through that form still fetches the general cancer
+> corpus** — which is how 2,500 arbitrary trials were loaded once already. The current corpus is
+> 2,473 trials and mixed, not pure breast.
+>
+> ⚠️ **The estimates below are against the old 4,634-trial corpus** and no longer size anything
+> correctly. Current: 2,473 trials, 71,712 chunks.
+>
+> ⚠️ **The premise has also moved.** This plan argued that narrowing was really about permission
+> to hard-code clinical knowledge. That permission has been taken repeatedly since: the breast
+> gate is now one tier of a **seven**-signal ranking that also hard-codes receptor polarity,
+> CDK4/6 treatment lines, PI3K pathway status, curative intent and disease stage.
 
 ## The finding that should shape this decision
 

@@ -5,8 +5,8 @@ You also work on this project's React/TypeScript front end when asked.
 You are very careful and dont want to make large file changes without guidance.
 
 ## Project Overview
-- Backend: Java Spring Boot + Gradle (REST API on AWS Elastic Beanstalk)
-- Database: AWS RDS MySQL
+- Backend: Java Spring Boot + Gradle (REST API, deployed on a Hostinger KVM behind Nginx)
+- Database: MySQL. The `RDS_*` env-var names are a leftover from an earlier AWS deployment and are deliberate - do not rename them.
 - Frontend: Vite + React + TypeScript + Tailwind, in `frontend/`
 - Multi-module Gradle project: root plus 4 included modules, and 1 shelved
 

@@ -408,8 +408,9 @@ in bulk, inform ranking, and be reusable by Tier 3, none of which the browser ca
 instead of the old `signals_matched / 6`, which was unreachable by construction and counted
 keyword co-occurrence rather than whether the patient qualifies.
 
-Four signals: receptor polarity, treatment line against CDK4/6 history, PI3K pathway, and US
-location. Each returns the criteria phrase that produced it, so a flag is never an unexplained
+Four signals at the time: receptor polarity, treatment line against CDK4/6 history, PI3K
+pathway, and US location. ⚠️ **There are now seven** — `diseaseTypeSignal` landed later the same
+day, and `treatmentGoalSignal` and `diseaseStageSignal` on 2026-08-21. Each returns the criteria phrase that produced it, so a flag is never an unexplained
 verdict.
 
 ✅ **The exclusion-context check now exists — 2026-08-11.** It was described in the class's own
@@ -539,6 +540,9 @@ through to the response.
 
 **Ranking is lexicographic over honest counts**, since there is deliberately no score to sort
 on: breast trials first, then fewest concerns, then most passes, then most applicable signals.
+⚠️ **Changed 2026-08-21**: **treatment goal** now sorts second, above concern count — see
+"Treatment goal and disease stage" above for why that placement is the feature rather than a
+detail.
 That last tier matters — a trial the tool could say something about outranks one it was silent
 on, because silence is not a pass.
 
@@ -606,6 +610,12 @@ of a flag**.
 
 "Only breast cancer trials" is a checkbox, on by default, mapping to `breastOnly`. It is the one
 control that hides anything, so it is visible and reversible rather than silent.
+
+⚠️ **Reversed 2026-08-21.** The checkbox was removed and `breastOnly` is hardcoded true on this
+page — unchecking it filled the list with trials for other cancers, which the disease-type signal
+already demotes to the bottom, so the control cost attention and bought nothing. The parameter
+survives on the API. Trial Search now carries three hiding controls of its own (curative intent,
+United States, not-early-stage), all off by default for the reason argued here.
 
 Typecheck and production build clean. Lint has only the pre-existing `Login.tsx` error.
 
@@ -884,9 +894,24 @@ endpoints, verified 2026-08-14. (These were `by-appuser` before changeset `030` 
 
 ### Frontend
 
-Seven routes: Login, Dashboard, Trial Search, Trial Detail, Saved Trials, **Diagnosis** (the
-`PatientRecord` shell, with Diagnosis / Variants / Prior Treatment as tabs), and Process
-Trials. Structure and gotchas in `_archive/frontend/frontend-module.md`.
+Eight routes: Login, Dashboard, **Trials for You** (`RankedTrials`, first in the nav), Trial
+Search, Trial Detail, Saved Trials, **Diagnosis** (the `PatientRecord` shell, with Diagnosis /
+Variants / Prior Treatment as tabs), and Process Trials. Structure and gotchas in
+`_archive/frontend/frontend-module.md`.
+
+**Changed 2026-08-21:**
+
+- **Trial Search gained semantic search.** It previously had none — it fetched 200 trials and
+  filtered substrings in the browser. "By meaning" mode queries the vector store with
+  `criteriaOnly` on, and shows the matched text rather than a score.
+- **Locations sit beside the trial number**, fetched in one batched query per page rather than
+  one per trial — the same N+1 shape that made ranking take 43 seconds before it was batched.
+- **Three filter checkboxes**: aiming beyond disease control, in the United States, not
+  early-stage only. All off by default, since each hides trials.
+- **Trial Detail shows the full seven-signal assessment**, not only the Tier 1 age/sex/recruiting
+  checks. `SignalRow` is shared with the ranked list so the two cannot describe the same
+  assessment differently.
+- **Process Trials has a fourth button**, "Recheck Treatment Goals".
 
 **Variants and Prior Treatment became tabs on 2026-08-10**, having been separate pages when
 added on 2026-08-09. The reason they were separate still governs the tab design: three tables
@@ -987,7 +1012,9 @@ cosine similarity — do not compare these scores against a future semantic run.
 ### Diagnosis matching — Tier 1 of 3
 
 `PatientDiagnosis` (21 fields) plus deterministic age/sex/recruiting checks surfaced on Trial
-Detail and Trial Search. Tier 2 (retrieval-driven) and Tier 3 (rule tree) are not built.
+Detail and Trial Search. ⚠️ **Superseded: Tier 2 is built** (seven signals, corpus-measured, on
+the ranked list and — since 2026-08-21 — on Trial Detail). Tier 3, a rule tree parsing each
+criterion into a testable predicate, is still not built.
 
 ---
 
@@ -1066,6 +1093,11 @@ Full checklist in `_archive/hosting/qa-setup.md`.
 
 ### Schema
 
+✅ **Changesets `031` and `032` added 2026-08-21** — `trial.treatment_goal` and
+`trial.disease_stage`, both new files rather than edits to `005-trial.yaml`. Editing that applied
+changeset broke its checksum and failed startup, which would have forced a rebuild and destroyed
+the corpus to add a column.
+
 - **The join tables were never scaffolded**: `trial_condition`, `trial_sponsor`, `trial_phase`,
   `trial_std_age`, `trial_keyword`, and `intervention_arm_group`. Deliberate, but it means
   **Trial Search cannot filter by condition, sponsor, or phase**, Trial Detail cannot show them,
@@ -1132,6 +1164,13 @@ without a full re-embed, since backfill skips what is already indexed.
 
 ### Other
 
+- ⚠️ **`*DbService.findByExtid` throws, it does not return null** — and callers guard for null.
+  `TrialRetrievalService.groupAndHydrate` had `if (trial == null) { log.warn(); continue; }`
+  which **could never fire**, so one orphan chunk turned a whole search into a 500. Fixed there
+  2026-08-21 by catching instead. **`TrialIndexService.reindexTrial` line 53 has the identical
+  dead guard and is unfixed**, so `POST /api/rag/reindex/{extid}` with an unknown extid still
+  500s. Worth grepping for the pattern elsewhere: any null check on a `findByExtid` result is
+  dead code hiding a 500.
 - **One single-item failure from the 2026-08-08 250-trial pull remains**: `NCT06685796` failed
   to normalize (`Create operation failed for TrialDb`, generic message — needs the staging row
   inspected). **The second one is solved**: `NCT07219277`'s "Embeddings must have the same
