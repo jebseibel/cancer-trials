@@ -59,8 +59,13 @@ import java.util.regex.Pattern;
 @Component
 public class LoginRateLimitFilter extends OncePerRequestFilter {
 
-    /** Consecutive failures for one IP+username pair before it is locked out. */
-    @Value("${security.login.max-attempts:8}")
+    /**
+     * Consecutive failures for one IP+username pair before it is locked out.
+     *
+     * <p>The fallback here only applies when the property is absent entirely; {@code
+     * application.yml} sets it, and the two must agree. See the note there for why 5.
+     */
+    @Value("${security.login.max-attempts:5}")
     private int maxAttempts;
 
     /** How long a lockout lasts. */

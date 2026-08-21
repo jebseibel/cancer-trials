@@ -221,7 +221,16 @@ security:
     #
     # Counts CONSECUTIVE FAILURES per IP; a successful login clears the counter, so mistyping
     # a password twice and then getting it right never locks anyone out.
-    max-attempts: ${LOGIN_MAX_ATTEMPTS:8}
+    #
+    # 5 rather than 8: this serves one household, so a real person needing more than five
+    # consecutive tries is rarer than the attacker the limit exists to slow down. It stays
+    # forgiving because the counter resets on success - mistyping twice and getting it right
+    # never counts toward a lockout.
+    #
+    # The lockout window, not the threshold, is what actually defeats brute force: 5 attempts
+    # per 15 minutes is 20 guesses an hour. Raise LOGIN_LOCKOUT_MINUTES to harden further
+    # without punishing someone fumbling a password on a phone.
+    max-attempts: ${LOGIN_MAX_ATTEMPTS:5}
     lockout-minutes: ${LOGIN_LOCKOUT_MINUTES:15}
 
 logging:
