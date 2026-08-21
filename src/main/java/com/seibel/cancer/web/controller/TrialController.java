@@ -143,6 +143,7 @@ class TrialConverter {
                 .officialTitle(item.getOfficialTitle())
                 .overallStatus(item.getOverallStatus())
                 .studyType(item.getStudyType())
+                .treatmentGoal(item.getTreatmentGoal())
                 .briefSummary(item.getBriefSummary())
                 .detailedDescription(item.getDetailedDescription())
                 .startDate(item.getStartDate())

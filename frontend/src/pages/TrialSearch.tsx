@@ -70,6 +70,9 @@ function ModeButton({
 function KeywordSearch() {
     const [term, setTerm] = useState('');
     const [status, setStatus] = useState('');
+    // The 38-in-2,473 question, askable directly. Off by default: it is the one control here
+    // that hides trials, so it is an explicit choice rather than a silent default.
+    const [curativeOnly, setCurativeOnly] = useState(false);
     const { patient } = useCurrentPatient();
 
     const { data, isLoading, isError } = useQuery({
@@ -90,9 +93,13 @@ function KeywordSearch() {
                 trial.nctId?.toLowerCase().includes(lowerTerm) ||
                 trial.briefSummary?.toLowerCase().includes(lowerTerm);
             const matchesStatus = !status || trial.overallStatus === status;
-            return matchesTerm && matchesStatus;
+            const matchesGoal =
+                !curativeOnly ||
+                trial.treatmentGoal === 'ABLATIVE' ||
+                trial.treatmentGoal === 'CURE_LANGUAGE';
+            return matchesTerm && matchesStatus && matchesGoal;
         });
-    }, [data, term, status]);
+    }, [data, term, status, curativeOnly]);
 
     return (
         <>
@@ -119,6 +126,15 @@ function KeywordSearch() {
                         </option>
                     ))}
                 </select>
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer min-h-[2.25rem]">
+                    <input
+                        type="checkbox"
+                        checked={curativeOnly}
+                        onChange={(e) => setCurativeOnly(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                    />
+                    Aiming beyond disease control
+                </label>
             </div>
 
             {isLoading && <p className="text-gray-500">Loading trials...</p>}
@@ -144,7 +160,10 @@ function KeywordSearch() {
                                 {trial.briefSummary && (
                                     <p className="text-sm text-gray-600 mt-1 line-clamp-2">{trial.briefSummary}</p>
                                 )}
-                                {patient && <Tier1Badge patient={patient} trial={trial} />}
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {patient && <Tier1Badge patient={patient} trial={trial} />}
+                                    <TreatmentGoalBadge goal={trial.treatmentGoal} />
+                                </div>
                             </div>
                             {trial.overallStatus && (
                                 <span className="flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -361,6 +380,35 @@ function sourceLabel(source: string): string {
         default:
             return source.replaceAll('_', ' ').toLowerCase();
     }
+}
+
+/**
+ * What the trial appears to be aiming at, when it says anything at all.
+ *
+ * <p>Nothing renders for NOT_STATED, which is most trials. A badge saying "does not aim at
+ * cure" on the overwhelming majority would read as a criticism of trials that are testing
+ * disease control legitimately, and would drown the ~1.5% this exists to make visible.
+ */
+function TreatmentGoalBadge({ goal }: { goal?: string }) {
+    if (goal !== 'ABLATIVE' && goal !== 'CURE_LANGUAGE') {
+        return null;
+    }
+    const isAblative = goal === 'ABLATIVE';
+    return (
+        <span
+            className={`mt-2 inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium ${
+                isAblative ? 'bg-blue-50 text-blue-800' : 'bg-blue-50/60 text-blue-700'
+            }`}
+            title={
+                isAblative
+                    ? 'Treats the individual sites of spread rather than only slowing the disease'
+                    : 'Describes cure or long-term remission — read the trial to see whether that is its aim'
+            }
+        >
+            <Sparkles className="h-3 w-3" />
+            {isAblative ? 'Treats the spread directly' : 'Mentions long-term remission'}
+        </span>
+    );
 }
 
 /**

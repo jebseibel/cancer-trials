@@ -32,6 +32,10 @@ export interface Trial {
     officialTitle?: string;
     overallStatus?: string;
     studyType?: string;
+    // What the trial appears to be trying to achieve, derived from its own description:
+    // ABLATIVE (treats the sites of spread directly), CURE_LANGUAGE (talks about cure or
+    // long-term remission), or NOT_STATED. Absent on trials loaded before this existed.
+    treatmentGoal?: 'ABLATIVE' | 'CURE_LANGUAGE' | 'NOT_STATED';
     briefSummary?: string;
     detailedDescription?: string;
     startDate?: string;
