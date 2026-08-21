@@ -185,11 +185,17 @@ function AssessmentCard({ assessment }: { assessment: TrialAssessment }) {
 
 export default function RankedTrials() {
     const { patient } = useCurrentPatient();
-    const [breastOnly, setBreastOnly] = useState(true);
 
     const rank = useMutation({
         mutationFn: async () => {
-            const response = await matchingApi.rank(patient!.extid, { breastOnly, limit: 50 });
+            // Always breast-only. This was a checkbox, and unchecking it filled the list with
+            // trials for other cancers - which the disease-type signal already demotes to the
+            // bottom anyway, so the control cost a reader attention and bought nothing.
+            //
+            // It also filters before assessment rather than after, so it is what keeps this
+            // call at a few seconds instead of paying per-trial work on the ~54% of the corpus
+            // that is other diseases.
+            const response = await matchingApi.rank(patient!.extid, { breastOnly: true, limit: 50 });
             return response.data;
         },
     });
@@ -204,8 +210,8 @@ export default function RankedTrials() {
                     Trials for You
                 </h1>
                 <p className="mt-1 text-sm text-gray-600">
-                    This looks through every trial we have using the details on your Patient
-                    Record, and lists the ones worth a closer look first.
+                    This looks through the breast cancer trials we have using the details on
+                    your Patient Record, and lists the ones worth a closer look first.
                 </p>
             </div>
 
@@ -229,15 +235,6 @@ export default function RankedTrials() {
                 >
                     {rank.isPending ? 'Looking through the trials…' : 'Find trials for me'}
                 </button>
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                        type="checkbox"
-                        checked={breastOnly}
-                        onChange={(e) => setBreastOnly(e.target.checked)}
-                        className="rounded border-gray-300"
-                    />
-                    Only breast cancer trials
-                </label>
             </div>
 
             {/* This takes tens of seconds. Saying so is the difference between "working" and
