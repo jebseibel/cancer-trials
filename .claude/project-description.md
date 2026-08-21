@@ -28,7 +28,7 @@ Gradle multi-module build, root project name `cancer`:
 - **`:datafetcher`** — ClinicalTrials.gov ingestion and UCHealth Epic FHIR ingestion
 - **`:rag`** — chunking, embedding, indexing and retrieval over trial eligibility text
 - **`:ai-provider`** — present on disk but commented out of `settings.gradle`; not part of the
-  build
+  build, **and not what the AI feature uses**. The live path is `service/ai/` in the root module
 - **Frontend** — React/TypeScript with Vite, served as static assets from Spring Boot
 - **`playwright/`** — a standalone Gradle build for MyChart scraping; not a module of this project
 
@@ -136,6 +136,10 @@ naming both stages is common and genuinely ambiguous.
   are derived from each trial's own prose, since ClinicalTrials.gov publishes neither. Measured
   across 2,473 trials: 38 are metastasis-directed or curative-intent studies for stage IV disease,
   and 823 (33%) are early-stage and therefore a mismatch for a metastatic patient
+- **An AI trial check** — reads one trial's criteria against the patient record and reports what
+  rules her out and what it could not judge. It cannot report eligibility: the response type has
+  no such field. ⚠️ The only feature that sends clinical text off the machine, de-identified by
+  an explicit allowlist
 - **Semantic search with a criteria-only mode** — restricts matching to eligibility criteria,
   because trial-design prose otherwise crowds out the text that decides who can join
 

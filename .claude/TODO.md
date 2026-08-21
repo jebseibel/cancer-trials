@@ -75,6 +75,30 @@ the cause in one line.** Read it first next time.
 
 ---
 
+## 1b. ✅ The AI trial check — **BUILT 2026-08-21**
+
+Reads one trial's criteria against the patient record, on Trial Detail. Fills the gap the
+patterns cannot reach — a carve-out inside an exclusion, an unusual phrasing.
+
+**It cannot report eligibility**, enforced by the response type having no such field rather than
+by the prompt. Readings are stored (`ai_trial_assessment`, changeset `033`) with a snapshot of
+the record they read and a hash of the prompt used.
+
+⚠️ **The only feature that sends clinical text off the machine.** De-identified by an explicit
+allowlist. See `CURRENT_STATE.md`, "What leaves the machine, and what does not".
+
+### Still open on this
+
+- ⬜ **Never verified against a real model.** Written and tested against a mock; the first live
+  run has not happened. **Check the quoted criteria appear in the trial's own text** — a quote
+  that is not there is fabrication and changes how far this can be trusted.
+- ⬜ **No cost ceiling.** Every press is a paid call with nothing capping the rate. Fine for one
+  reader; it would not be if the app were shared.
+- ⬜ **The stored readings have no UI beyond the latest one.** History accumulates and only the
+  most recent is shown.
+
+---
+
 ## 2b. ⬜ `reindexTrial` has the identical dead guard
 
 `TrialIndexService.reindexTrial` (line 53) does the same `findByExtid` then `if (trial == null)`.
@@ -158,6 +182,8 @@ a Qdrant outage from rolling back ingested data.
   "CDK", so *"received a CDK4/6 inhibitor"* misses.
 - **Keywords are never ingested.** Full CRUD stack exists; the parser never reads
   `conditionsModule.keywords`. The table is almost certainly empty.
+- **The frontend has no test runner.** `diagnosisSummary.ts`, `tier1Matching.ts` and
+  `accessLevel.ts` all carry real logic and none is unit-tested; adding vitest would cover them.
 - **Two Liquibase number collisions** — `011` and `014` are each used twice. Renumber when
   convenient, never as a side effect of unrelated work.
 - **Nothing detects an orphaned vector store.** A database rebuild regenerates every trial extid

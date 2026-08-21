@@ -37,6 +37,8 @@ com.seibel.cancer
 │       ├── repository/   # Spring Data repositories
 │       └── service/      # Database service layer
 ├── security/             # JWT and authentication
+├── service/ai/           # AiService (Spring AI, Anthropic), TrialDiagnosisMatchService,
+│                         # TrialMatchAssessment - the AI trial check
 ├── service/              # Business service layer
 │   └── matching/         # TrialMatchingService, CriteriaSignalEvaluator,
 │                         # TrialClassificationBackfillService
@@ -161,7 +163,7 @@ This affects every `*DbService` following the template.
 ## Database configuration
 
 ### Liquibase
-- Changelog: `db/changelog/db.changelog-master.yaml`, `includeAll` over `changes/`
+- Changelog: `db/changelog/db.changelog-master.yaml`, `includeAll` over `changes/`, running `001`-`033`
 - Automatic schema initialization on startup
 - ⚠️ **`drop-first` is `false`**, so a stored UCHealth OAuth token survives a restart.
   Consequence: **edits to an already-applied changeset do not take effect on startup** — rebuild
@@ -206,6 +208,11 @@ patient-scoped entities expose `GET /api/{entity}/by-patient/{patientExtid}`.
 ### Matching
 - `GET /api/matching/rank/{patientExtid}?breastOnly=&limit=` — rank the corpus, best first
 - `GET /api/matching/trial/{trialExtid}/for/{patientExtid}` — assess a single trial
+- `GET /api/matching/ai/status` — whether the AI trial check is configured
+- `GET /api/matching/ai/trial/{trialExtid}/for/{patientExtid}` — latest stored reading, 204 if none
+- `POST /api/matching/ai/trial/{trialExtid}/for/{patientExtid}` — read this trial's criteria
+  against the record. ⚠️ **The only endpoint that sends clinical text off the machine**; the
+  payload is de-identified by an explicit allowlist in `TrialDiagnosisMatchService`
 - `POST /api/matching/backfill-treatment-goals` — re-derive `treatment_goal` and `disease_stage`
   for every trial. **ADMIN-only.** Needed because ingestion skips trials whose ClinicalTrials.gov
   payload is unchanged, so a re-pull cannot pick up a change to the code that reads that payload

@@ -26,8 +26,9 @@ otherwise.** Prod contents were last observed 2026-08-11. Local figures were re-
 | Curative-intent + stage IV | **38 trials (1.54%)** — see `matching/CURATIVE_STEP1_MEASUREMENT.md` |
 | Early-stage trials | **823 (33.3%)** — a third of the corpus cannot apply to a metastatic patient |
 | Patient / PatientDiagnosis / PatientVariant / PatientPriorTreatment | 1 row each — **auto-seeded** |
-| Tests | `:common` **43**, root **128**, `:database` **862**, `:datafetcher` **55**, `:rag` **44** (1 skip: `RetrievalEvaluation`, needs a live backend by design) |
-| Branch | `curative-work`, branched from `main` at `82e299b`. `main` is pushed and in sync with `origin/main`. |
+| Tests | `:common` **43**, root **140**, `:database` **862**, `:datafetcher` **55**, `:rag` **44** — **1,144 total**, 1 skip (`RetrievalEvaluation`, needs a live backend by design) |
+| AI | Anthropic via Spring AI, `service/ai/`. Needs `ANTHROPIC_API_KEY`; without it the feature is hidden and everything else is unaffected |
+| Branch | `curative-work`, **15 commits ahead of `main`** and unmerged. `main` is in sync with `origin/main` at `82e299b`. |
 
 ⚠️ **The corpus shrank on purpose.** It was 4,634 trials, then a database rebuild regenerated
 every extid while Qdrant kept its 136,345 points — leaving **4,634 orphans out of 4,884 indexed
@@ -325,6 +326,93 @@ now that the database holds a real medical record rather than sample data.
 ---
 
 ## What's built
+
+### The AI trial check — 2026-08-21
+
+**The first thing in this project that sends clinical text off the machine**, and the first that
+costs money per use. Both are deliberate and both are bounded.
+
+`POST /api/matching/ai/trial/{trialExtid}/for/{patientExtid}` reads one trial's criteria against
+the patient record and reports what it finds. On Trial Detail as "Read This Trial Against Your
+Record".
+
+**Why it exists alongside seven deterministic signals.** Those answer seven specific questions
+with patterns and are right about them in a way a model is not. What they cannot do is read a
+criterion nobody anticipated — a carve-out inside an exclusion, an unusual phrasing, a
+requirement that only makes sense in context. **39 trials name CDK4/6 in an exclusion and 6 of
+them contain a permission rather than a bar**; no keyword rule reaches those. That gap is the
+whole justification.
+
+**It cannot report eligibility, and the response type is why.** `TrialMatchAssessment` has no
+such field, so no prompt change can produce one and no rendering slip can show one. The model may
+assert that a criterion *rules her out* — a checkable claim carrying a quoted criterion — and the
+absence of such a finding renders as "nothing here rules you out", never as a match. A test
+fails if a field named anything like `eligible`, `qualifies`, `score` or `match` ever appears on
+that class.
+
+**Open questions are listed first** on the page, ahead of concerns and matches. They are the
+reason to run it: they turn an appointment from "should I ask about trials" into four specific
+things to ask.
+
+### What leaves the machine, and what does not
+
+Recorded here because it is a decision rather than an implementation detail, and because the
+default everywhere else in this project is the opposite.
+
+The payload is built by **an explicit allowlist in `TrialDiagnosisMatchService`, never a
+serialized object** — so adding a column to a patient table does not silently start transmitting
+it. Excluded on purpose:
+
+- **Free-text `notes`, from all three patient tables.** It cannot be guaranteed identifier-free;
+  it already holds the Ki-67 discrepancy and the abemaciclib date conflict, and a clinician's
+  name could land there tomorrow.
+- **Exact dates** — coarsened to a year, which is a HIPAA identifier boundary and is all any
+  criterion needs.
+- **`testLab`** — names an institution, which narrows a population.
+- **Name and date of birth** — those live on `Patient`, which this service never reads.
+
+⚠️ **This is not anonymity.** A de novo stage IV patient with these receptor percentages, this
+PIK3CA status and this radiation history is close to unique. It is not PHI under Safe Harbor, and
+that is a different claim from "cannot be re-identified". The provider's retention and training
+policy is the real control, and swapping to a local Ollama model would end the question entirely
+— `AiService` imports no Anthropic types precisely so that stays a config change.
+
+### Readings are stored — 2026-08-21
+
+`ai_trial_assessment`, changeset `033`. Opening a trial shows what she was told last time with
+its date; the button becomes "Check again", so a fresh reading is a deliberate press.
+
+**Rows accumulate rather than replace.** Overwriting would destroy the only record of an answer
+she may already have acted on, and comparing two readings is how a changed answer is told from
+changed circumstances.
+
+Each row carries **a snapshot of the diagnosis it read** — the same reasoning as
+`SavedTrialMatch`, since `patient_diagnosis` is one row updated in place — and **the model name
+plus a hash of the system prompt**. Two runs months apart may differ because the prompt changed
+rather than because anything clinical did.
+
+**A storage failure logs and returns the answer anyway.** The reading already cost money and the
+reader is waiting for it.
+
+⚠️ **`:ai-provider` is still shelved and was not used.** It carries eleven `ChatClient` beans
+across four providers, no tests, and prompts for energy-certificate workflows. The live path is
+`service/ai/` — Spring AI's Anthropic starter, one client, ~170 lines ported in shape from the
+jobhunting app, including its rule that an unconfigured provider disables the feature rather than
+stopping the backend booting.
+
+### The record summarises itself — 2026-08-21
+
+One derived line above the Patient Record tabs: *"Stage IV invasive ductal carcinoma · spread to
+bone, lymph nodes · ER+ / PR− / HER2− · PIK3CA, ESR1 (uncertain) · postmenopausal · ECOG 1"*.
+
+Above the tabs rather than inside Diagnosis, because tabs mount only while selected and the line
+draws on two tables. Derived, never stored, so it cannot drift from the fields below it.
+
+**An unrecorded field contributes nothing rather than "unknown"** — that word reads as *tested and
+indeterminate*, which is a different claim. Genes follow the five-state rule: `DETECTED` named,
+`VUS` named and labelled uncertain, `NOT_TESTED` and `NOT_DETECTED` absent because neither is a
+finding.
+
 
 ### Treatment goal and disease stage — 2026-08-21
 

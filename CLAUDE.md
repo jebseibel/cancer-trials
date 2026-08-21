@@ -26,7 +26,7 @@ Database:
 
 ## Architecture
 
-Gradle multi-module project (root project name: `cancer`). `settings.gradle` includes four modules alongside the root: `:common`, `:database`, `:datafetcher`, `:rag`. A fifth module, `:ai-provider`, exists on disk with source in it but is commented out of `settings.gradle` ("shelved until AI keys/config are ready") — it does not build as part of the project. A top-level `playwright/` directory holds scraping work and is not a Gradle module.
+Gradle multi-module project (root project name: `cancer`). `settings.gradle` includes four modules alongside the root: `:common`, `:database`, `:datafetcher`, `:rag`. A fifth module, `:ai-provider`, exists on disk with source in it but is commented out of `settings.gradle` ("shelved until AI keys/config are ready") — it does not build as part of the project, and **it is not what the app's AI feature uses**. That module carries eleven `ChatClient` beans across four providers, no tests, and prompt templates for energy-certificate workflows from the project it was lifted from. The live AI path is `service/ai/` in the root module: Spring AI's Anthropic starter, one `ChatClient`, one env var (`ANTHROPIC_API_KEY`). A top-level `playwright/` directory holds scraping work and is not a Gradle module.
 
 Base Java package: `com.seibel.cancer` (main and test source sets). Main class is `CancerApplication`.
 
@@ -44,11 +44,11 @@ The app is a clinical-trial finder/matcher. The domain splits into three broad g
 
 - **Trial side** — `Trial` and its satellites: `ArmGroup`, `Condition`, `EligibilityRule`, `Intervention`, `Keyword`, `Location`, `Outcome`, `OverallOfficial`, `Sponsor`, `TrialSource`, `TrialStatus`.
 - **Patient side** — `Patient`, `PatientDiagnosis`, `PatientVariant`, `PatientMedication`, `PatientPriorTreatment`, `LabResult`, `LabResultComponent`, `Medication`, and `UserPatient` (which links a `User` to the patient records they own).
-- **Matching + ingestion** — `SavedTrialMatch` and `SavedTrialMatchCriterion` for persisted results; `matching/` domain types (`TrialAssessment`, `EligibilitySignal`, `SignalOutcome`) for evaluation output; `StagingRawTrial` and `StagingRawFhirResource` as landing tables for raw ingested payloads; `UcHealthOAuthToken` for Epic auth.
+- **Matching + ingestion** — `SavedTrialMatch` and `SavedTrialMatchCriterion` for persisted results; `AiTrialAssessment` for stored AI readings of a trial against a record (changeset `033`) — ⚠️ **clinical prose about a real patient, not a cache**; `matching/` domain types (`TrialAssessment`, `EligibilitySignal`, `SignalOutcome`) for evaluation output; `StagingRawTrial` and `StagingRawFhirResource` as landing tables for raw ingested payloads; `UcHealthOAuthToken` for Epic auth.
 
 ## Liquibase
 
-Changelog entrypoint is `database/src/main/resources/db/changelog/db.changelog-master.yaml`, which does `includeAll` on `db/changelog/changes/`. Individual changesets are numbered, currently running `001` through `032` plus `100-load-init-data.yaml`.
+Changelog entrypoint is `database/src/main/resources/db/changelog/db.changelog-master.yaml`, which does `includeAll` on `db/changelog/changes/`. Individual changesets are numbered, currently running `001` through `033` plus `100-load-init-data.yaml`.
 
 Known issue: two number collisions exist — `011-trial-source.yaml` / `011-trial-status.yaml`, and `014-eligibility-rule.yaml` / `014-outcome.yaml`. `includeAll` resolves them by alphabetical filename so they do load deterministically, but the duplicate prefixes are unintentional and should be renumbered when convenient. Don't renumber them as a side effect of unrelated work.
 
