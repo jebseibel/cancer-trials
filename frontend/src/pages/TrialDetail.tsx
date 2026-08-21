@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, MapPin, Target, UserCircle, Layers, Check, X, HelpCircle, Stethoscope } from 'lucide-react';
+import { ArrowLeft, MapPin, Target, UserCircle, Layers, Check, X, HelpCircle, Stethoscope, ListChecks } from 'lucide-react';
 import {
     trialApi,
     locationApi,
@@ -10,9 +10,11 @@ import {
     outcomeApi,
     overallOfficialApi,
     trialStatusApi,
+    matchingApi,
 } from '../services/api';
 import { useCurrentPatient } from '../lib/PatientContext';
 import { runTier1Checks } from '../lib/tier1Matching';
+import SignalRow from '../components/SignalRow';
 import type { CheckOutcome } from '../lib/tier1Matching';
 import { TRIAL_STATUS_VALUES } from '../types/api';
 
@@ -27,6 +29,17 @@ export default function TrialDetail() {
         queryKey: ['trial', extid],
         queryFn: async () => (await trialApi.getByExtid(extid!)).data,
         enabled: !!extid,
+    });
+
+    // The Tier 2 assessment for this one trial. Its own endpoint rather than a slice of the
+    // ranked list, so opening a trial directly - from a link, or a saved trial - still explains
+    // itself. Silent on failure: the assessment is additional context, and a trial's own record
+    // must still render if matching is unavailable.
+    const { data: assessment } = useQuery({
+        queryKey: ['assessment', extid, patient?.extid],
+        queryFn: async () => (await matchingApi.assessTrial(extid!, patient!.extid)).data,
+        enabled: !!extid && !!patient?.extid,
+        retry: false,
     });
 
     const { data: locations } = useQuery({
@@ -230,6 +243,48 @@ export default function TrialDetail() {
                         Everything else in the eligibility criteria below is unassessed. A trial
                         that fails a check here may still be worth asking about — confirm with the
                         study team.
+                    </p>
+                </div>
+            )}
+
+            {/* Tier 2 - the assessment that drives the ranked list. Shown here so a trial
+                opened directly explains itself the same way it does in that list. */}
+            {assessment && assessment.signals.length > 0 && (
+                <div className="bg-white shadow rounded-lg p-6 mb-6">
+                    <h2 className="text-lg font-medium text-gray-900 mb-1 flex items-center gap-2">
+                        <ListChecks className="h-5 w-5 text-blue-600" />
+                        What We Checked Against Your Record
+                    </h2>
+                    <p className="text-sm text-gray-500 mb-4">
+                        Compares this trial's own text against your diagnosis, variants and prior
+                        treatment. Anything flagged is something to ask about — none of it decides
+                        whether you qualify.
+                    </p>
+
+                    {/* Counts, never a percentage. A number that looks like a probability
+                        invites reliance this tool must not earn. */}
+                    <p className="text-sm text-gray-600 mb-4">
+                        {[
+                            assessment.concernCount > 0 && `${assessment.concernCount} to check`,
+                            assessment.unknownCount > 0 && `${assessment.unknownCount} to ask about`,
+                            assessment.passCount > 0 && `${assessment.passCount} matched`,
+                        ]
+                            .filter(Boolean)
+                            .join(' · ') || 'Nothing to flag on this trial.'}
+                    </p>
+
+                    {/* Every signal, unlike the ranked list which collapses passes. There is one
+                        trial here and the reader is already looking at it closely. */}
+                    <ul className="space-y-2">
+                        {assessment.signals.map((s) => (
+                            <SignalRow key={s.name} signal={s} />
+                        ))}
+                    </ul>
+
+                    <p className="mt-4 text-xs text-gray-500 border-t pt-3">
+                        These checks read the trial's own wording, which is often ambiguous. Use
+                        “why?” to see the exact text behind any flag, and confirm anything that
+                        matters with the study team.
                     </p>
                 </div>
             )}

@@ -1,54 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { ListChecks, AlertTriangle, HelpCircle, Check, ChevronDown, ChevronRight, MapPin } from 'lucide-react';
+import { ListChecks, Check, ChevronDown, ChevronRight, MapPin } from 'lucide-react';
 import { matchingApi } from '../services/api';
 import { useCurrentPatient } from '../lib/PatientContext';
-import type { EligibilitySignal, TrialAssessment } from '../types/api';
+import type { TrialAssessment } from '../types/api';
+import SignalRow from '../components/SignalRow';
 
 // Run on demand, never on page load. Ranking assesses thousands of trials in one request and
 // takes tens of seconds, so it has to be something the reader chooses to start and can see
 // the progress of - not a spinner that appears unbidden and looks like a hang.
-
-const CONCERN_STYLE = 'border-amber-300 bg-amber-50 text-amber-900';
-const UNKNOWN_STYLE = 'border-sky-300 bg-sky-50 text-sky-900';
-
-function SignalRow({ signal }: { signal: EligibilitySignal }) {
-    const [showEvidence, setShowEvidence] = useState(false);
-    const isConcern = signal.outcome === 'CONCERN';
-
-    return (
-        <li className={`rounded border px-3 py-2 text-sm ${isConcern ? CONCERN_STYLE : UNKNOWN_STYLE}`}>
-            <div className="flex items-start gap-2">
-                {isConcern ? (
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                ) : (
-                    <HelpCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                )}
-                <div className="min-w-0 flex-1">
-                    <span className="font-medium">{signal.name}:</span> {signal.detail}
-                    {/* The quoted criteria text sits behind a toggle rather than being hidden.
-                        A reader has to be able to check the reasoning, but the wall of trial
-                        text should not be the first thing they see. */}
-                    {signal.evidence && (
-                        <button
-                            type="button"
-                            onClick={() => setShowEvidence((v) => !v)}
-                            className="ml-2 inline-flex min-h-6 items-center gap-1 px-1 py-0.5 align-baseline text-xs underline opacity-80 hover:opacity-100"
-                        >
-                            {showEvidence ? 'hide' : 'why?'}
-                        </button>
-                    )}
-                    {showEvidence && signal.evidence && (
-                        <blockquote className="mt-2 border-l-2 border-current/30 pl-2 text-xs italic opacity-90">
-                            “{signal.evidence}”
-                        </blockquote>
-                    )}
-                </div>
-            </div>
-        </li>
-    );
-}
 
 // Where the trial runs, shown on the card itself. For most people travel is the constraint that
 // decides whether a trial is possible at all, so the cities have to be visible at a glance
