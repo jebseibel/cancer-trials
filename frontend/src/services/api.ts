@@ -127,6 +127,9 @@ export const matchingApi = {
     // free-text notes, dates coarsened to a year.
     aiCheck: (trialExtid: string, patientExtid: string) =>
         apiClient.post<AiTrialCheck>(`/matching/ai/trial/${trialExtid}/for/${patientExtid}`),
+    // The stored reading, if there is one. 204 when this trial has never been checked.
+    latestAiCheck: (trialExtid: string, patientExtid: string) =>
+        apiClient.get<AiTrialCheck | ''>(`/matching/ai/trial/${trialExtid}/for/${patientExtid}`),
     aiStatus: () => apiClient.get<AiStatus>('/matching/ai/status'),
     backfillTreatmentGoals: () =>
         apiClient.post<TreatmentGoalBackfillResult>('/matching/backfill-treatment-goals'),

@@ -10,6 +10,7 @@ import com.seibel.cancer.common.enums.AccessLevel;
 import com.seibel.cancer.service.CurrentUserService;
 import com.seibel.cancer.service.TrialService;
 import com.seibel.cancer.service.matching.CriteriaSignalEvaluator;
+import com.seibel.cancer.database.db.service.AiTrialAssessmentDbService;
 import com.seibel.cancer.service.ai.AiService;
 import com.seibel.cancer.service.ai.TrialDiagnosisMatchService;
 import com.seibel.cancer.service.ai.TrialMatchAssessment;
@@ -22,6 +23,7 @@ import com.seibel.cancer.web.response.ResponseTrialAssessment;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -57,6 +59,7 @@ public class TrialMatchingController {
     private final TrialMatchingService matchingService;
     private final TrialDiagnosisMatchService aiMatchService;
     private final AiService aiService;
+    private final AiTrialAssessmentDbService assessmentDbService;
     private final TrialClassificationBackfillService trialClassificationBackfillService;
     private final TrialService trialService;
     private final CurrentUserService currentUserService;
@@ -161,6 +164,31 @@ public class TrialMatchingController {
      * is a de-identified subset built by an explicit allowlist - no name, no date of birth, no
      * free-text notes, dates coarsened to a year. See {@link TrialDiagnosisMatchService}.
      */
+    /**
+     * The most recent stored reading, or 204 when there is none.
+     *
+     * <p>The page shows what she was told last time rather than silently re-running: this call
+     * costs money and returns a slightly different answer each time, so a fresh reading is a
+     * deliberate press rather than something that happens by arriving on a page.
+     */
+    @GetMapping("/ai/trial/{trialExtid}/for/{patientExtid}")
+    @Operation(summary = "The latest stored AI reading of this trial, if any")
+    public ResponseEntity<ResponseAiTrialCheck> latestAiCheck(
+            @PathVariable String trialExtid,
+            @PathVariable String patientExtid
+    ) {
+        Long patientId = currentUserService.requireAccessId(patientExtid, AccessLevel.VIEW_RECORD);
+        Trial trial = trialService.findByExtid(trialExtid);
+        if (trial == null) {
+            throw new ResourceNotFoundException("Trial", trialExtid);
+        }
+
+        var stored = assessmentDbService.findLatest(trial.getId(), patientId);
+        return stored == null
+                ? ResponseEntity.noContent().build()
+                : ResponseEntity.ok(converter.toResponse(stored));
+    }
+
     @PostMapping("/ai/trial/{trialExtid}/for/{patientExtid}")
     @Operation(summary = "Ask a model to read this trial's criteria against a patient's record")
     public ResponseAiTrialCheck aiCheck(
@@ -175,7 +203,7 @@ public class TrialMatchingController {
 
         var record = matchingService.loadPatientRecord(patientId);
         TrialMatchAssessment assessment = aiMatchService.assess(
-                trial, record.diagnosis(), record.variant(), record.treatment());
+                trial, patientId, record.diagnosis(), record.variant(), record.treatment());
 
         return ResponseAiTrialCheck.builder()
                 .rulesPatientOut(assessment.getRulesPatientOut())
@@ -248,6 +276,38 @@ class TrialMatchingConverter {
                     default -> 2;
                 })
                 .orElse(2);
+    }
+
+    /**
+     * A stored reading, back into the response shape.
+     *
+     * <p>The list fields are JSON in the column - prose for a human, never queried on - so they
+     * are parsed back here rather than being three child tables and three joins.
+     */
+    ResponseAiTrialCheck toResponse(com.seibel.cancer.common.domain.AiTrialAssessment stored) {
+        return ResponseAiTrialCheck.builder()
+                .rulesPatientOut(stored.getRulesPatientOut())
+                .exclusionCriterion(stored.getExclusionCriterion())
+                .summary(stored.getSummary())
+                .criteriaSheAppearsToMeet(parseList(stored.getCriteriaMet()))
+                .openQuestions(parseList(stored.getOpenQuestions()))
+                .concerns(parseList(stored.getConcerns()))
+                .model(stored.getModel())
+                .assessedAt(stored.getAssessedAt())
+                .build();
+    }
+
+    /** A malformed stored list renders as absent rather than failing the whole page. */
+    private List<String> parseList(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readValue(json, new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     /** True when the disease-type signal passed. A basket trial is UNKNOWN, so it is not. */

@@ -38,4 +38,7 @@ public class ResponseAiTrialCheck {
 
     /** Which model produced this, so an answer stays traceable to what generated it. */
     private String model;
+
+    /** When this reading was made. Null on a fresh one - it is being made now. */
+    private java.time.LocalDateTime assessedAt;
 }

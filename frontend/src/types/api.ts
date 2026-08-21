@@ -508,6 +508,8 @@ export interface AiTrialCheck {
     openQuestions?: string[] | null;
     concerns?: string[] | null;
     model?: string | null;
+    // When this reading was made. Absent on a fresh one - it is being made now.
+    assessedAt?: string | null;
 }
 
 export interface AiStatus {

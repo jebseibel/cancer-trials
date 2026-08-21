@@ -52,9 +52,29 @@ export default function TrialDetail() {
         staleTime: Infinity,
     });
 
+    // What she was told last time, shown on open. A fresh reading costs money and returns a
+    // slightly different answer, so re-running is a deliberate press rather than something that
+    // happens by arriving on the page.
+    const { data: storedAiCheck } = useQuery({
+        queryKey: ['ai-check', extid, patient?.extid],
+        queryFn: async () => {
+            const response = await matchingApi.latestAiCheck(extid!, patient!.extid);
+            // 204 - never checked.
+            return response.data === '' ? null : response.data;
+        },
+        enabled: !!extid && !!patient?.extid,
+        retry: false,
+    });
+
     const aiCheck = useMutation({
         mutationFn: async () => (await matchingApi.aiCheck(extid!, patient!.extid)).data,
+        onSuccess: (fresh) => {
+            queryClient.setQueryData(['ai-check', extid, patient?.extid], fresh);
+        },
     });
+
+    // The fresh reading wins while it is on screen; otherwise whatever was stored.
+    const shownAiCheck = aiCheck.data ?? storedAiCheck ?? null;
 
     const { data: locations } = useQuery({
         queryKey: ['locations', extid],
@@ -329,8 +349,19 @@ export default function TrialDetail() {
                         ) : (
                             <Sparkles className="h-4 w-4" />
                         )}
-                        {aiCheck.isPending ? 'Reading the criteria...' : 'Check this trial'}
+                        {aiCheck.isPending
+                            ? 'Reading the criteria...'
+                            : shownAiCheck
+                              ? 'Check again'
+                              : 'Check this trial'}
                     </button>
+
+                    {shownAiCheck?.assessedAt && !aiCheck.data && (
+                        <p className="mt-2 text-xs text-gray-500">
+                            Last checked {new Date(shownAiCheck.assessedAt).toLocaleString()}.
+                            Your record may have changed since.
+                        </p>
+                    )}
 
                     {aiCheck.isError && (
                         <p className="mt-3 text-sm text-red-600">
@@ -340,7 +371,7 @@ export default function TrialDetail() {
                         </p>
                     )}
 
-                    {aiCheck.data && <AiCheckResult check={aiCheck.data} />}
+                    {shownAiCheck && <AiCheckResult check={shownAiCheck} />}
                 </div>
             )}
 

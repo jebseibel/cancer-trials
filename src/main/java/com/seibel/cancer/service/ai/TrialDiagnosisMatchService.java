@@ -1,9 +1,13 @@
 package com.seibel.cancer.service.ai;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.seibel.cancer.common.domain.AiTrialAssessment;
 import com.seibel.cancer.common.domain.PatientDiagnosis;
 import com.seibel.cancer.common.domain.PatientPriorTreatment;
 import com.seibel.cancer.common.domain.PatientVariant;
 import com.seibel.cancer.common.domain.Trial;
+import com.seibel.cancer.database.db.service.AiTrialAssessmentDbService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
@@ -12,7 +16,13 @@ import org.springframework.util.StreamUtils;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.HexFormat;
+import java.util.List;
 
 /**
  * Reads one trial's criteria against one patient's record, using a model.
@@ -59,6 +69,8 @@ public class TrialDiagnosisMatchService {
     private static final String SYSTEM_PROMPT_PATH = "prompts/trial-match-system.txt";
 
     private final AiService aiService;
+    private final AiTrialAssessmentDbService assessmentDbService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** Loaded once. A prompt change needs a restart, which is the right cadence for it. */
     private volatile String systemPrompt;
@@ -67,6 +79,7 @@ public class TrialDiagnosisMatchService {
      * Assesses one trial against one patient's record.
      *
      * @param trial     the trial, whose criteria and description are read
+     * @param patientId whose record this was read against, for the stored row
      * @param diagnosis the patient's diagnosis; may be null, in which case there is nothing to
      *                  compare against and the caller is told so
      * @param variant   the genomic panel row, or null
@@ -74,6 +87,7 @@ public class TrialDiagnosisMatchService {
      * @throws AiGenerationException when AI is unconfigured or the call fails
      */
     public TrialMatchAssessment assess(Trial trial,
+                                       Long patientId,
                                        PatientDiagnosis diagnosis,
                                        PatientVariant variant,
                                        PatientPriorTreatment treatment) {
@@ -93,8 +107,78 @@ public class TrialDiagnosisMatchService {
 
         String userPrompt = buildPrompt(trial, diagnosis, variant, treatment);
         log.info("AI trial check: nctId={}", trial.getNctId());
-        return aiService.generateStructured(loadSystemPrompt(), userPrompt,
-                TrialMatchAssessment.class);
+        TrialMatchAssessment assessment = aiService.generateStructured(
+                loadSystemPrompt(), userPrompt, TrialMatchAssessment.class);
+
+        persist(trial, diagnosis, patientId, assessment);
+        return assessment;
+    }
+
+    /**
+     * Records what was said, and what it was said about.
+     *
+     * <p>A failure here must not lose the answer. The reading already cost money and the reader
+     * is waiting for it, so a storage problem is logged and the assessment is still returned —
+     * losing the row is bad, throwing away a paid-for answer the reader can see no reason for is
+     * worse.
+     */
+    private void persist(Trial trial, PatientDiagnosis diagnosis, Long patientId,
+                         TrialMatchAssessment assessment) {
+        if (patientId == null || trial.getId() == null) {
+            return;
+        }
+        try {
+            assessmentDbService.create(AiTrialAssessment.builder()
+                    .trialId(trial.getId())
+                    .patientId(patientId)
+                    .rulesPatientOut(assessment.getRulesPatientOut())
+                    .exclusionCriterion(assessment.getExclusionCriterion())
+                    .summary(assessment.getSummary())
+                    .openQuestions(toJson(assessment.getOpenQuestions()))
+                    .concerns(toJson(assessment.getConcerns()))
+                    .criteriaMet(toJson(assessment.getCriteriaSheAppearsToMeet()))
+                    .model(aiService.getModelName())
+                    .promptHash(promptHash())
+                    // Snapshot: patient_diagnosis is one row updated in place, so without this
+                    // a stored reading has no record of what it was reading.
+                    .snapshotStage(diagnosis.getStage())
+                    .snapshotErStatus(diagnosis.getErStatus())
+                    .snapshotPrStatus(diagnosis.getPrStatus())
+                    .snapshotHer2Status(diagnosis.getHer2Status())
+                    .assessedAt(LocalDateTime.now())
+                    .build());
+        } catch (Exception e) {
+            log.error("Could not store the AI assessment for nctId={} - returning it anyway",
+                    trial.getNctId(), e);
+        }
+    }
+
+    private String toJson(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(values);
+        } catch (JsonProcessingException e) {
+            log.warn("Could not serialise a list for storage: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * A hash of the instructions this reading used.
+     *
+     * <p>Two runs months apart may differ because the prompt changed rather than because
+     * anything clinical did, and without this there is no way to tell those apart.
+     */
+    private String promptHash() {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(loadSystemPrompt().getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest).substring(0, 16);
+        } catch (NoSuchAlgorithmException e) {
+            return null;
+        }
     }
 
     /**
