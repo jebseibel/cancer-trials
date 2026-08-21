@@ -1,9 +1,13 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Stethoscope, Dna, Pill } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import Diagnosis from './Diagnosis';
 import Variants from './Variants';
 import PriorTreatment from './PriorTreatment';
+import { patientDiagnosisApi, patientVariantApi } from '../services/api';
+import { useCurrentPatient } from '../lib/PatientContext';
+import { buildDiagnosisSummary } from '../lib/diagnosisSummary';
 
 // Three tables, three endpoints, three Save buttons - one per tab, unchanged from when these
 // were separate pages. Tabs group them without merging the writes, so there is still no
@@ -18,6 +22,23 @@ const TABS: { key: TabKey; label: string; icon: LucideIcon }[] = [
 
 export default function PatientRecord() {
     const [tab, setTab] = useState<TabKey>('diagnosis');
+    const { patient } = useCurrentPatient();
+
+    // Read here rather than inside a tab: the tabs mount only while selected, and the summary
+    // draws on two of the three tables. Shared query keys with the tabs, so saving in a tab
+    // refreshes the line above it rather than leaving it stale.
+    const { data: diagnoses } = useQuery({
+        queryKey: ['patientDiagnosis', patient?.extid],
+        queryFn: async () => (await patientDiagnosisApi.getByPatientExtid(patient!.extid)).data,
+        enabled: !!patient?.extid,
+    });
+    const { data: variants } = useQuery({
+        queryKey: ['patientVariant', patient?.extid],
+        queryFn: async () => (await patientVariantApi.getByPatientExtid(patient!.extid)).data,
+        enabled: !!patient?.extid,
+    });
+
+    const summary = buildDiagnosisSummary(diagnoses?.[0], variants?.[0]);
 
     return (
         <div>
@@ -25,6 +46,15 @@ export default function PatientRecord() {
                 <Stethoscope className="h-6 w-6 text-green-600" />
                 <h1 className="text-2xl font-bold text-gray-900">Patient Diagnosis</h1>
             </div>
+
+            {/* The clinical picture in one line, above the tabs so it is there whichever one is
+                being edited. Nothing here is stored - it is the same record read in the order a
+                clinician thinks about it, so it cannot drift from the forms below. */}
+            {summary && (
+                <div className="mb-6 rounded-lg border border-gray-200 bg-white px-4 py-3">
+                    <p className="text-sm leading-relaxed text-gray-900">{summary}</p>
+                </div>
+            )}
 
             <div className="border-b border-gray-200 mb-6">
                 {/* Icons are dropped below `sm`. Three tabs plus icons overflow a 360px screen,
