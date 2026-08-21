@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Search, FlaskConical, Sparkles, AlertTriangle } from 'lucide-react';
+import { Search, FlaskConical, Sparkles, AlertTriangle, MapPin } from 'lucide-react';
 import { trialApi, ragSearchApi } from '../services/api';
 import { useCurrentPatient } from '../lib/PatientContext';
 import { runTier1Checks, summariseTier1 } from '../lib/tier1Matching';
@@ -73,6 +73,9 @@ function KeywordSearch() {
     // The 38-in-2,473 question, askable directly. Off by default: it is the one control here
     // that hides trials, so it is an explicit choice rather than a silent default.
     const [curativeOnly, setCurativeOnly] = useState(false);
+    // Travel is often what decides whether a trial is possible at all, and she will travel
+    // anywhere in the USA but not abroad. Off by default, like the other hiding control.
+    const [usOnly, setUsOnly] = useState(false);
     const { patient } = useCurrentPatient();
 
     const { data, isLoading, isError } = useQuery({
@@ -97,9 +100,12 @@ function KeywordSearch() {
                 !curativeOnly ||
                 trial.treatmentGoal === 'ABLATIVE' ||
                 trial.treatmentGoal === 'CURE_LANGUAGE';
-            return matchesTerm && matchesStatus && matchesGoal;
+            // Undefined means locations were never looked up, which is not the same as having
+            // none - so an unknown trial stays in the list rather than being hidden by silence.
+            const matchesLocation = !usOnly || trial.hasUnitedStatesSite !== false;
+            return matchesTerm && matchesStatus && matchesGoal && matchesLocation;
         });
-    }, [data, term, status, curativeOnly]);
+    }, [data, term, status, curativeOnly, usOnly]);
 
     return (
         <>
@@ -135,6 +141,15 @@ function KeywordSearch() {
                     />
                     Aiming beyond disease control
                 </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer min-h-[2.25rem]">
+                    <input
+                        type="checkbox"
+                        checked={usOnly}
+                        onChange={(e) => setUsOnly(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                    />
+                    In the United States
+                </label>
             </div>
 
             {isLoading && <p className="text-gray-500">Loading trials...</p>}
@@ -155,6 +170,7 @@ function KeywordSearch() {
                                 <div className="flex items-center gap-2 mb-1">
                                     <FlaskConical className="h-4 w-4 text-green-600 flex-shrink-0" />
                                     <span className="text-xs font-mono text-gray-500">{trial.nctId ?? 'No NCT ID'}</span>
+                                    <TrialSites trial={trial} />
                                 </div>
                                 <h2 className="text-lg font-medium text-gray-900 truncate">{trial.briefTitle}</h2>
                                 {trial.briefSummary && (
@@ -380,6 +396,38 @@ function sourceLabel(source: string): string {
         default:
             return source.replaceAll('_', ' ').toLowerCase();
     }
+}
+
+/**
+ * Where the trial runs, beside the trial number.
+ *
+ * <p>A perfect biological match three states away may be out of reach and a mediocre one nearby
+ * may not be, so the cities belong where someone scanning a list will see them.
+ *
+ * <p>A trial with no US site says so in amber rather than showing foreign cities as though they
+ * were local. "No locations recorded" is distinct from having none, and both are said plainly
+ * rather than left blank.
+ */
+function TrialSites({ trial }: { trial: Trial }) {
+    const labels = trial.siteLabels ?? [];
+    if (labels.length === 0) {
+        return <span className="text-xs text-gray-400">No locations recorded</span>;
+    }
+
+    const shown = labels.slice(0, 3).join(' · ');
+    const more = (trial.siteCount ?? labels.length) - Math.min(labels.length, 3);
+    const outsideUs = trial.hasUnitedStatesSite === false;
+
+    return (
+        <span className={`flex items-center gap-1 text-xs ${outsideUs ? 'text-amber-700' : 'text-gray-500'}`}>
+            <MapPin className="h-3 w-3 shrink-0" />
+            {outsideUs && <span className="font-medium">Outside the US:</span>}
+            <span className="truncate">
+                {shown}
+                {more > 0 && ` and ${more} more`}
+            </span>
+        </span>
+    );
 }
 
 /**

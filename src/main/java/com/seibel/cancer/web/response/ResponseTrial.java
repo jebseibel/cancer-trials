@@ -24,6 +24,21 @@ public class ResponseTrial {
      * it could disagree with the classifier and nothing would reconcile them.
      */
     private String treatmentGoal;
+
+    /**
+     * Where the trial runs, as "City, State" for US sites or country names otherwise.
+     *
+     * <p>Populated on the list endpoint, where a reader is scanning and travel is often what
+     * decides whether a trial is possible at all. Empty on the single-trial endpoint, which has
+     * a full locations section of its own.
+     */
+    private java.util.List<String> siteLabels;
+
+    /** Total recorded sites, so a truncated label list can say how many more there are. */
+    private Integer siteCount;
+
+    /** Whether any site is in the United States. Null when locations were not looked up. */
+    private Boolean hasUnitedStatesSite;
     private String briefSummary;
     private String detailedDescription;
     private LocalDate startDate;
