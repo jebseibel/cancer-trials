@@ -28,6 +28,7 @@ import type {
     PatientPriorTreatment,
     PatientPriorTreatmentRequest,
     TrialAssessment,
+    TrialSearchMatch,
 } from '../types/api';
 
 // API Configuration
@@ -86,6 +87,26 @@ export const trialApi = {
     create: (trial: TrialRequest) => apiClient.post<Trial>('/trial', trial),
     update: (extid: string, trial: Partial<TrialRequest>) => apiClient.put<Trial>(`/trial/${extid}`, trial),
     delete: (extid: string) => apiClient.delete(`/trial/${extid}`),
+};
+
+// Semantic search over trial text, as opposed to trialApi.getAll's substring filtering.
+//
+// criteriaOnly restricts matching to eligibility criteria, dropping summaries, descriptions,
+// interventions and outcomes. Measured 2026-08-21: on a whole-profile query 15 of the top 25
+// hits were trial-design prose ("first-in-human, open-label, phase I/Ib...") repeated across
+// unrelated trials, crowding out the criteria that decide whether someone qualifies.
+//
+// Off by default on purpose - prose is the right answer to "what is this trial testing", so
+// the restriction is the caller's explicit choice, never a silent one.
+export const ragSearchApi = {
+    search: (params: {
+        query: string;
+        maxTrials?: number;
+        recruitingOnly?: boolean;
+        excludeExclusionCriteria?: boolean;
+        criteriaOnly?: boolean;
+        similarityThreshold?: number;
+    }) => apiClient.get<TrialSearchMatch[]>('/rag/search', { params }),
 };
 
 // Ranks the whole corpus against the patient record already on file, so nobody has to know

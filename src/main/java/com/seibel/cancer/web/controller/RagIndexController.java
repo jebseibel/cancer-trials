@@ -66,12 +66,16 @@ public class RagIndexController {
             @RequestParam(defaultValue = "5") int maxTrials,
             @RequestParam(defaultValue = "false") boolean recruitingOnly,
             @RequestParam(defaultValue = "false") boolean excludeExclusionCriteria,
+            // Restricts to eligibility-criteria chunks. Off by default: prose answers "what is
+            // this trial testing", and defaulting to true would silently break that.
+            @RequestParam(defaultValue = "false") boolean criteriaOnly,
             // No default: omitting it falls back to cancer.rag.retrieval.default-similarity-threshold
             // rather than hardcoding 0.0 here.
             @RequestParam(required = false) Double similarityThreshold) {
 
         return retrievalService
-                .search(query, maxTrials, recruitingOnly, excludeExclusionCriteria, similarityThreshold)
+                .search(query, maxTrials, recruitingOnly, excludeExclusionCriteria, criteriaOnly,
+                        similarityThreshold)
                 .stream()
                 .map(m -> ResponseTrialSearchMatch.builder()
                         .trialExtid(m.trial().getExtid())
