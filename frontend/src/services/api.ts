@@ -29,6 +29,7 @@ import type {
     PatientPriorTreatmentRequest,
     TrialAssessment,
     TrialSearchMatch,
+    TreatmentGoalBackfillResult,
 } from '../types/api';
 
 // API Configuration
@@ -116,6 +117,11 @@ export const matchingApi = {
         apiClient.get<TrialAssessment[]>(`/matching/rank/${patientExtid}`, { params }),
     assessTrial: (trialExtid: string, patientExtid: string) =>
         apiClient.get<TrialAssessment>(`/matching/trial/${trialExtid}/for/${patientExtid}`),
+    // Re-derives the treatment-goal column for every trial. Needed because ingestion skips
+    // trials whose ClinicalTrials.gov payload has not changed, so a re-pull cannot pick up a
+    // change to the code that reads that payload. ADMIN-only.
+    backfillTreatmentGoals: () =>
+        apiClient.post<TreatmentGoalBackfillResult>('/matching/backfill-treatment-goals'),
 };
 
 export const trialSourceApi = {

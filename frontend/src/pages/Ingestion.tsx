@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Database, Download, Loader2, PlayCircle, AlertTriangle } from 'lucide-react';
-import { ingestionApi, ragApi } from '../services/api';
+import { Database, Download, Loader2, PlayCircle, AlertTriangle, Target } from 'lucide-react';
+import { ingestionApi, ragApi, matchingApi } from '../services/api';
 import { OVERALL_STATUS_OPTIONS } from '../types/api';
 import JobResultModal from '../components/JobResultModal';
 import type { JobResultContent } from '../components/JobResultModal';
@@ -67,6 +67,25 @@ export default function Ingestion() {
                     { label: 'Sections of text prepared', value: data.chunksWritten },
                     { label: 'Already searchable', value: data.trialsAlreadyIndexed },
                     { label: 'Trials skipped (nothing to read)', value: data.trialsSkipped },
+                ],
+                errors: data.errors,
+            });
+        },
+    });
+
+    // Re-derives what each trial appears to be trying to achieve. Separate from the two steps
+    // above because it reads nothing new - it re-reads text already in the database with the
+    // current patterns. Needed because pulling skips trials whose ClinicalTrials.gov payload is
+    // unchanged, so a re-pull cannot pick up a change to the code that reads that payload.
+    const treatmentGoalMutation = useMutation({
+        mutationFn: async () => (await matchingApi.backfillTreatmentGoals()).data,
+        onSuccess: (data) => {
+            setModalContent({
+                title: 'Treatment Goals Updated',
+                lines: [
+                    { label: 'Trials examined', value: data.trialsRead },
+                    { label: 'Trials updated', value: data.updated },
+                    { label: 'Already correct', value: data.unchanged },
                 ],
                 errors: data.errors,
             });
@@ -269,6 +288,36 @@ export default function Ingestion() {
                 </p>
             </form>
 
+            {/* Maintenance rather than part of pulling trials, so it sits on its own. It reads
+                no new data - it re-reads text already in the database with the current
+                patterns. */}
+            <div className="bg-white shadow rounded-lg p-6 mb-6">
+                <h2 className="text-lg font-medium text-gray-900 mb-1">Recheck Treatment Goals</h2>
+                <p className="text-sm text-gray-500 mb-4">
+                    Works out what each trial appears to be trying to achieve &mdash; treating the
+                    individual sites of spread, aiming at long-term remission, or neither
+                    &mdash; from the trial's own description. Run this once after loading trials,
+                    and again if the wording it looks for is changed.
+                </p>
+                <button
+                    type="button"
+                    onClick={() => treatmentGoalMutation.mutate()}
+                    disabled={busy || treatmentGoalMutation.isPending}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {treatmentGoalMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                        <Target className="h-4 w-4" />
+                    )}
+                    {treatmentGoalMutation.isPending ? 'Rechecking...' : 'Recheck Treatment Goals'}
+                </button>
+                <p className="mt-3 text-xs text-gray-500">
+                    Safe to re-run, and quick &mdash; it does not download anything or rebuild
+                    search. Trials already carrying the right answer are left alone.
+                </p>
+            </div>
+
             {/* Inline banner rather than alert() - viro uses alert() for this, but a banner is
                 less disruptive and keeps the failure visible while you fix it. */}
             {ingestMutation.isError && (
@@ -281,6 +330,13 @@ export default function Ingestion() {
                     Could not prepare trials for search. The trials are still safely in the
                     database &mdash; they just will not turn up in search yet. Check that the
                     server is running, then try <strong>Prepare for Search</strong> again.
+                </div>
+            )}
+
+            {treatmentGoalMutation.isError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-6">
+                    Could not recheck treatment goals. This needs an administrator account. The
+                    trials themselves are unaffected &mdash; only the labelling did not update.
                 </div>
             )}
 

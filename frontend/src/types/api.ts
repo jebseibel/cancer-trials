@@ -472,3 +472,13 @@ export interface TrialSearchChunkMatch {
     // of a fit. Shown as a caution, never counted as evidence of eligibility.
     isExclusion: boolean;
 }
+
+// One treatment-goal backfill run. `unchanged` is separate from `updated` on purpose: most runs
+// follow a pattern change that moves a handful of trials, so an edit that did nothing would
+// otherwise look like an edit that worked.
+export interface TreatmentGoalBackfillResult {
+    trialsRead: number;
+    updated: number;
+    unchanged: number;
+    errors: string[];
+}
