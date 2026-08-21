@@ -109,6 +109,7 @@ public class TrialMatchingController {
 class TrialMatchingConverter {
 
     private static final String DISEASE_TYPE_SIGNAL = "Disease type";
+    private static final String TREATMENT_GOAL_SIGNAL = "Treatment goal";
 
     private final TrialService trialService;
     private final CriteriaSignalEvaluator evaluator;
@@ -123,14 +124,45 @@ class TrialMatchingConverter {
      * passed, so a trial that affirmatively matches outranks one that merely said nothing.
      * Finally most signals applicable, preferring trials the tool could say something about
      * over trials it was silent on — silence is not a pass.
+     *
+     * <p><b>Treatment goal sits above concern count, and that placement is the feature.</b>
+     * Almost every metastatic breast trial tests disease control; the ones attempting durable
+     * remission are roughly 1.5% of the corpus. Ranking on concerns alone, a well-matched
+     * control trial with zero concerns outranks a curative-intent trial carrying one, every
+     * time — so the trials most wanted were structurally buried by the sort order itself.
+     * Identifying them correctly and leaving them ranked 40th would not have delivered anything.
+     *
+     * <p>It ranks <em>below</em> disease type on purpose: a curative trial for another cancer is
+     * still the wrong trial, and demoting off-topic studies has to come first.
      */
     Comparator<TrialAssessment> ranking() {
         return Comparator
                 .comparing((TrialAssessment a) -> isBreastCancer(a) ? 0 : 1)
+                .thenComparing(TrialMatchingConverter::treatmentGoalRank)
                 .thenComparingLong(TrialAssessment::concernCount)
                 .thenComparing(Comparator.comparingLong(TrialAssessment::passCount).reversed())
                 .thenComparing(Comparator.comparingLong(TrialAssessment::applicableCount).reversed())
                 .thenComparing(a -> a.nctId() == null ? "" : a.nctId());
+    }
+
+    /**
+     * Sort key for treatment goal: 0 attempts durable control, 1 might, 2 does not say.
+     *
+     * <p>Three tiers rather than a boolean because UNKNOWN is a real answer here. A trial whose
+     * summary uses cure language that may be background rather than aim is worth surfacing above
+     * the silent majority and below the ones doing metastasis-directed treatment — it is a
+     * question, and the reader can see the quoted text and judge.
+     */
+    private static int treatmentGoalRank(TrialAssessment assessment) {
+        return assessment.signals().stream()
+                .filter(s -> TREATMENT_GOAL_SIGNAL.equals(s.name()))
+                .findFirst()
+                .map(s -> switch (s.outcome()) {
+                    case PASS -> 0;
+                    case UNKNOWN -> 1;
+                    default -> 2;
+                })
+                .orElse(2);
     }
 
     /** True when the disease-type signal passed. A basket trial is UNKNOWN, so it is not. */

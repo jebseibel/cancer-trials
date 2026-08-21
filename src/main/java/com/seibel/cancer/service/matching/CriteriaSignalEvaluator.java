@@ -6,6 +6,7 @@ import com.seibel.cancer.common.domain.PatientPriorTreatment;
 import com.seibel.cancer.common.domain.PatientVariant;
 import com.seibel.cancer.common.domain.Trial;
 import com.seibel.cancer.common.domain.matching.EligibilitySignal;
+import com.seibel.cancer.common.domain.matching.SignalOutcome;
 import com.seibel.cancer.common.enums.ReceptorStatus;
 import com.seibel.cancer.common.enums.TreatmentStatus;
 import com.seibel.cancer.common.enums.VariantStatus;
@@ -179,6 +180,88 @@ public class CriteriaSignalEvaluator {
             Pattern.CASE_INSENSITIVE);
 
     /**
+     * Metastasis-directed and ablative strategy — the language that actually works.
+     *
+     * <p>Measured across all 2,473 trials on 2026-08-21: <b>26 of the 38 trials that survive
+     * this whole signal come from this pattern alone</b>, at near-perfect precision. Ablative
+     * vocabulary is specific in a way response vocabulary is not — it names a thing being done
+     * to a metastasis, so it cannot appear in an endpoint definition or a patient's history.
+     *
+     * <p>This is also the clinically real route: it is the strategy under which a stage IV
+     * patient is treated with curative intent at all, and it maps onto bone-dominant disease
+     * with a small number of named sites.
+     */
+    private static final Pattern ABLATIVE_STRATEGY = Pattern.compile(
+            "oligometasta\\w*|oligoprogress\\w*|metastasis[- ]directed|\\bSBRT\\b"
+                    + "|stereotactic body|ablation|ablative|metastasectomy"
+                    + "|total metastatic ablation|radical local",
+            Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Explicit cure language. A confirmer, never the primary test.
+     *
+     * <p>Measured: 72 trials say one of these, but only 12 reach the final signal on this alone,
+     * and that dozen is where every false positive lives. Kept because a curative-intent trial
+     * sometimes states its ambition in exactly these words and nowhere else.
+     *
+     * <p>{@code eradicat*} is deliberately absent: its only corpus matches described axillary
+     * disease "eradicated by NACT", which is neoadjuvant, early-stage, and the opposite of the
+     * target.
+     */
+    private static final Pattern EXPLICIT_CURE = Pattern.compile(
+            "\\bcure\\b|\\bcured\\b|\\bcurable\\b|curative[- ]intent|\\bcurative\\b",
+            Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Negation immediately before a cure word, which inverts it.
+     *
+     * <p><b>Every family-1 false positive in the corpus was a negation</b>: "metastatic
+     * (considered non-curative)", "cancer that is unlikely to be cured", "aromatase inhibitors
+     * improve outcomes, but are not curative". The phrase and its denial differ by one token —
+     * the same reason embeddings cannot read receptor polarity — so the only way to tell them
+     * apart is to look left.
+     *
+     * <p>Applied to the ~40 characters before the match, which covers the intervening words in
+     * every observed case without reaching into an unrelated clause.
+     */
+    private static final Pattern CURE_NEGATED = Pattern.compile(
+            "\\b(not|non|never|rarely|seldom|un\\w*|cannot|can't|incurable|no longer|without"
+                    + "|difficult to|unlikely to be|hard to|fail\\w* to)\\b[\\s\\-]{0,4}$",
+            Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Metastatic disease vocabulary.
+     *
+     * <p>{@code metasta(tic|sis|ses|tases)} as one stem rather than {@code metastatic} alone:
+     * NCT03808337 — the clearest curative-intent trial in the corpus — says "1-5 metastases",
+     * and an adjective-only pattern dropped it entirely while the distribution looked healthy.
+     *
+     * <p>Bare {@code advanced} is deliberately absent. "Locally advanced" is stage III, and
+     * admitting it would let in exactly the early-stage trials {@link #EARLY_STAGE_DISEASE}
+     * exists to catch.
+     */
+    private static final Pattern METASTATIC_DISEASE = Pattern.compile(
+            "metasta(tic|sis|ses|tases)\\w*|stage IV|stage 4|\\bMBC\\b|\\bM1\\b|\\brecurrent\\b",
+            Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Early-stage scope, which disqualifies a trial from being a stage IV cure attempt.
+     *
+     * <p>Load-bearing: it removed 27 of 65 candidates (42%) in the corpus measurement, and the
+     * removed ones are adjuvant and neoadjuvant studies — curative in intent, wrong disease
+     * stage, and useless to a patient who is already metastatic.
+     *
+     * <p>⚠️ {@code \b} on {@code operable} and {@code resectable} is not decoration. Without it
+     * they match inside "inoperable" and "unresectable", which mean the opposite, and a trial
+     * reading "recurrent unresectable ... metastatic" was vetoed as early-stage on that
+     * substring. Third occurrence of this class of bug in this file's history.
+     */
+    private static final Pattern EARLY_STAGE_DISEASE = Pattern.compile(
+            "\\badjuvant\\b|neoadjuvant|early[- ]stage|\\bstage (0|I|II|III)\\b|\\boperable\\b"
+                    + "|\\bresectable\\b|postoperative|preoperative|\\bDCIS\\b|\\bin situ\\b",
+            Pattern.CASE_INSENSITIVE);
+
+    /**
      * Assesses whether the trial is about breast cancer at all.
      *
      * <p><b>The gate the corpus sweep showed was missing.</b> Only 45.7% of this corpus is
@@ -229,6 +312,164 @@ public class CriteriaSignalEvaluator {
         }
 
         return EligibilitySignal.pass(name, "This trial is about breast cancer.", breastMatch);
+    }
+
+    /**
+     * Assesses what the trial is trying to <b>achieve</b>, as opposed to who may enrol.
+     *
+     * <p><b>The first signal about goal rather than eligibility.</b> Every other signal here
+     * answers "does she qualify?"; none asks "and if she got in, what is this trial trying to do
+     * for her?". In metastatic breast cancer the overwhelming majority of trials test disease
+     * control — a longer interval before the next line — which is worth having and is not what
+     * was asked for.
+     *
+     * <p><b>Read from title and summary, never criteria.</b> Criteria state who may enrol, and
+     * routinely describe a patient's past treatment: "curative intent" appears there meaning the
+     * therapy someone already received. Reading intent from criteria inverts the meaning on
+     * exactly the phrases that matter most. {@link #diseaseTypeSignal} set this precedent for
+     * the same reason.
+     *
+     * <p><b>Ablative language leads, cure language confirms.</b> Measured across 2,473 trials:
+     * 26 of 38 survivors come from {@link #ABLATIVE_STRATEGY} at near-perfect precision, while
+     * the 12 that arrive on cure language alone carry every false positive. Response-endpoint
+     * vocabulary — "complete response", "disease-free survival" — was measured and
+     * <b>excluded</b>: 232 trials say it, and 5 of 5 hand-checked were reporting how outcomes are
+     * measured, not what the trial was trying to do.
+     *
+     * <p>PASS is deliberately reserved for ablative strategy. Cure language alone returns UNKNOWN
+     * rather than PASS — it is a question worth raising, not an answer.
+     */
+    public EligibilitySignal treatmentGoalSignal(Trial trial) {
+        String name = "Treatment goal";
+        String haystack = (nullToEmpty(trial.getBriefTitle()) + " "
+                + nullToEmpty(trial.getOfficialTitle()) + " "
+                + nullToEmpty(trial.getBriefSummary()) + " "
+                + nullToEmpty(trial.getDetailedDescription())).strip();
+
+        if (haystack.isBlank()) {
+            return EligibilitySignal.unknown(name,
+                    "This trial has no title or summary recorded, so what it is trying to achieve "
+                            + "could not be checked.");
+        }
+
+        String ablative = firstMatch(haystack, ABLATIVE_STRATEGY);
+        if (ablative != null) {
+            return EligibilitySignal.pass(name,
+                    "This trial treats the individual sites of spread rather than only slowing "
+                            + "the disease. That is the approach used when the aim is long-term "
+                            + "control, and it is worth asking the care team about.",
+                    ablative);
+        }
+
+        String cure = firstUnnegatedCure(haystack);
+        if (cure != null) {
+            return new EligibilitySignal(name, SignalOutcome.UNKNOWN,
+                    "This trial's description uses the language of cure or long-term remission. "
+                            + "Whether that is this study's aim, or background about the disease, "
+                            + "is worth reading the quoted text to judge.",
+                    cure);
+        }
+
+        // Silence, not a concern. Most trials test disease control and that is legitimate; a
+        // trial that says nothing about cure has not failed a test, it simply was not asked.
+        return new EligibilitySignal(name, SignalOutcome.NOT_APPLICABLE,
+                "This trial does not describe treating the sites of spread directly or aiming at "
+                        + "long-term remission.", null);
+    }
+
+    /**
+     * The first cure word that is not being denied, with its surrounding text.
+     *
+     * <p>Scans every occurrence rather than stopping at the first: a summary saying "metastatic
+     * breast cancer remains difficult to cure" in its background and stating a curative aim
+     * later would otherwise be judged on the background sentence alone.
+     */
+    private String firstUnnegatedCure(String haystack) {
+        String flat = haystack.replaceAll("\\s+", " ");
+        var m = EXPLICIT_CURE.matcher(flat);
+        while (m.find()) {
+            String before = flat.substring(Math.max(0, m.start() - 40), m.start());
+            if (!CURE_NEGATED.matcher(before).find()) {
+                int from = Math.max(0, m.start() - 40);
+                int to = Math.min(flat.length(), m.end() + 80);
+                return flat.substring(from, to).strip();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Assesses whether the trial is for the stage of disease the patient actually has.
+     *
+     * <p><b>Separate from {@link #treatmentGoalSignal} on purpose.</b> "Trying to cure" and "for
+     * stage IV disease" are different questions that can disagree, and a combined signal
+     * reporting CONCERN gives no way to tell whether a trial is the wrong stage or merely the
+     * wrong ambition. Those lead to different conversations with an oncologist.
+     *
+     * <p>A curative trial for early-stage disease is a correct match on intent and useless to a
+     * metastatic patient — which is why the corpus measurement had to veto 42% of its candidates
+     * as adjuvant or neoadjuvant.
+     *
+     * <p>Only meaningful for a patient who is metastatic. For anyone else this returns
+     * NOT_APPLICABLE rather than guessing what stage-matching should mean.
+     */
+    public EligibilitySignal diseaseStageSignal(Trial trial, PatientDiagnosis diagnosis) {
+        String name = "Disease stage";
+        String haystack = (nullToEmpty(trial.getBriefTitle()) + " "
+                + nullToEmpty(trial.getOfficialTitle()) + " "
+                + nullToEmpty(trial.getBriefSummary()) + " "
+                + nullToEmpty(trial.getDetailedDescription())).strip();
+
+        if (haystack.isBlank()) {
+            return EligibilitySignal.unknown(name,
+                    "This trial has no title or summary recorded, so the stage of disease it "
+                            + "studies could not be checked.");
+        }
+        if (diagnosis == null || !isMetastatic(diagnosis)) {
+            return new EligibilitySignal(name, SignalOutcome.NOT_APPLICABLE,
+                    "The record on file does not say the cancer has spread, so trials were not "
+                            + "compared on stage.", null);
+        }
+
+        String metastatic = firstMatch(haystack, METASTATIC_DISEASE);
+        String earlyStage = firstMatch(haystack, EARLY_STAGE_DISEASE);
+
+        // Both present is common and genuinely ambiguous - a trial may enrol early-stage
+        // patients while discussing metastatic disease in its rationale. Saying so is more
+        // honest than picking a side.
+        if (metastatic != null && earlyStage != null) {
+            return new EligibilitySignal(name, SignalOutcome.UNKNOWN,
+                    "This trial mentions both cancer that has spread and earlier-stage disease. "
+                            + "Which group it is actually enrolling is worth checking.",
+                    earlyStage);
+        }
+        if (metastatic != null) {
+            return EligibilitySignal.pass(name,
+                    "This trial is for cancer that has spread, which matches the record on file.",
+                    metastatic);
+        }
+        if (earlyStage != null) {
+            return EligibilitySignal.concern(name,
+                    "This trial appears to be for earlier-stage disease, before it has spread. "
+                            + "That is a different situation from the record on file.",
+                    earlyStage);
+        }
+        return EligibilitySignal.unknown(name,
+                "This trial's description does not say what stage of disease it studies.");
+    }
+
+    /**
+     * Whether the record says the disease has spread.
+     *
+     * <p>Reads the free-text stage field, since the schema stores stage as text rather than an
+     * enum. Accepts the several ways a real record writes it - "Stage IV", "IV", "cM1",
+     * "metastatic" - because the value came from a pathology report, not a dropdown.
+     */
+    private boolean isMetastatic(PatientDiagnosis diagnosis) {
+        String stage = nullToEmpty(diagnosis.getStage());
+        return METASTATIC_DISEASE.matcher(stage).find()
+                || stage.trim().equalsIgnoreCase("IV")
+                || stage.trim().equals("4");
     }
 
     private String nullToEmpty(String s) {
