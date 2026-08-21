@@ -4,10 +4,10 @@ How a freshly deployed instance ends up with trials in it, so a user arriving fo
 time can search rather than being told to go and process trials first.
 
 Written 2026-08-10. Companion to `PAYLOAD_HASH_PLAN.md` (which is what would make a re-pull
-cheap) and `../CURRENT_STATE.md`.
+cheap) and `../../CURRENT_STATE.md`.
 
 **Status as of 2026-08-14: ✅ option 2 was chosen and is the live procedure.** Phase 4 of
-`../hosting/DEPLOY_RUNBOOK.md` is exactly this option — `curl` against
+`../../hosting/DEPLOY_RUNBOOK.md` is exactly this option — `curl` against
 `POST /api/ingestion/clinicaltrials` then `POST /api/rag/backfill`, run inside `tmux` so the
 session surviving matters rather than the HTTP request, with an Nginx `proxy_read_timeout`
 override on `^/api/(ingestion|rag/backfill)`. No application code was needed, as predicted.
@@ -116,7 +116,7 @@ the app to do it.
 rebuild those ids no longer exist. The collection must be deleted and re-created, never reused.
 
 ~~**Qdrant is currently published on all interfaces.**~~ ✅ **Fixed — verified 2026-08-14.**
-`docker-compose.yml` now binds both ports to `${QDRANT_BIND:-127.0.0.1}`, so the default is
+`../../../docker-compose.yml` now binds both ports to `${QDRANT_BIND:-127.0.0.1}`, so the default is
 localhost-only and a remote container needs an explicit override. Qdrant ships with no
 authentication of any kind, so put real auth in front before ever setting `QDRANT_BIND=0.0.0.0`.
 

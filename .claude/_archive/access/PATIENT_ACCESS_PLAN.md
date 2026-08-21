@@ -10,9 +10,9 @@ let a patient share her record with family.
   than the later draft's and are preserved with attribution below.
 - `ACCESS_MODEL_PLAN.md` (2026-08-13) — the sharing-focused draft, now folded in. Delete it.
 
-Rewritten 2026-08-13 against the current code. Companion to `../CURRENT_STATE.md`,
-`../frontend/ADMIN_ONLY_INGESTION_PLAN.md` (roles — a separable, much smaller change), and
-`../hosting/DEPLOY_RUNBOOK.md`.
+Rewritten 2026-08-13 against the current code. Companion to `../../CURRENT_STATE.md`,
+`../../frontend/ADMIN_ONLY_INGESTION_PLAN.md` (roles — a separable, much smaller change), and
+`../../hosting/DEPLOY_RUNBOOK.md`.
 
 > ✅ **Built and committed 2026-08-14** (`c9cb30d`). The model in this document shipped as
 > designed: `patient`, `user_patient` grants, the ranked `AccessLevel`, `CurrentUserService`
@@ -80,7 +80,7 @@ appUserApi.getAll() -> content.find(u => u.username === username)
 ```
 
 That is the cause of the "no app-user profile linked" state on three pages, and of the "No
-AppUser-seeding UI" gap in `../CURRENT_STATE.md` — which is really "there is a second account
+AppUser-seeding UI" gap in `../../CURRENT_STATE.md` — which is really "there is a second account
 table nobody can create accounts in."
 
 ### Definitions, stated plainly
@@ -152,7 +152,7 @@ note            varchar(255)               -- "my sister" - the patient's own wo
 ⚠️ **`date_of_birth` and `sex` move to `patient`.** From the archived plan, and missed by the
 later draft. They are properties of a *person*, not of a diagnosis — and if diagnosis ever becomes
 append-only history (`../_archive/diagnosis/DIAGNOSIS_MATCHING_DESIGN.md` §9), duplicating them
-per row is wrong. **Tier 1 matching reads both today** (`frontend/src/lib/tier1Matching.ts`), so
+per row is wrong. **Tier 1 matching reads both today** (`../../../frontend/src/lib/tier1Matching.ts`), so
 it changes with them.
 
 ⚠️ **Revoke by writing `revoked_at`, never by deleting.** Who had access to a medical record and
@@ -207,7 +207,7 @@ authority.
 
 **Out of scope, explicitly:** `/api/rag/search`, `/api/rag/backfill` and ingestion are not
 patient-scoped. Trial data is shared and public; only the patient's record is private. Those are
-governed by roles instead — `../frontend/ADMIN_ONLY_INGESTION_PLAN.md`.
+governed by roles instead — `../../frontend/ADMIN_ONLY_INGESTION_PLAN.md`.
 
 ### Roles are a separate axis
 
@@ -324,7 +324,7 @@ production. "No data to migrate" has become "migrate one real medical record, ca
 **Mitigating this: `PatientSeedLoader` rebuilds all four rows from the three gitignored CSVs.**
 So the migration path is *rebuild and re-seed* rather than *write a data migration* — provided
 the seed loader is updated in the same change (step 9). Verify the CSV vocabulary against
-`frontend/src/types/api.ts` first; that check has caught silent drift before.
+`../../../frontend/src/types/api.ts` first; that check has caught silent drift before.
 
 ⚠️ **Still far cheaper now than later. Prod's Qdrant corpus is empty today.** A rebuild
 invalidates the collection, and re-embedding after Phase 4 of the deploy runbook is hours on
@@ -374,7 +374,7 @@ Also: `spring.liquibase.drop-first` is `false`, so changeset edits need a rebuil
 - **Does `patient` need soft-delete semantics distinct from `active`?** Removing a patient a
   helper no longer works with is arguably a `user_patient` revocation, not a patient deletion.
 - **Is multi-patient in scope for the UI, or only the schema?** The schema becomes
-  multi-patient-capable either way. `../BREAST_FOCUS_PLAN.md` treats multi-patient as a cost of
+  multi-patient-capable either way. `../../BREAST_FOCUS_PLAN.md` treats multi-patient as a cost of
   narrowing to breast cancer.
 
 ---
@@ -382,7 +382,7 @@ Also: `spring.liquibase.drop-first` is `false`, so changeset edits need a rebuil
 ## 10. What this does not solve
 
 **No encryption at rest, and no audit log of who read what.** Both accepted knowingly by the user
-for a single-patient tool on his own host — see `../hosting/DEPLOY_RUNBOOK.md`. **Sharing changes
+for a single-patient tool on his own host — see `../../hosting/DEPLOY_RUNBOOK.md`. **Sharing changes
 that calculus**: once several people can read a record, "who read what and when" stops being
 hypothetical. `user_patient` records who *may* read; it does not record who *did*.
 

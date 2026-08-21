@@ -1,7 +1,7 @@
 # Patient Variants and Prior Treatments — Table Design
 
 Two new patient-side tables whose sole job is **killing false matches**. Companion to
-`../research/` (the three source docs), `trial-match-tables.md`, and `../CURRENT_STATE.md`.
+`../_archive/research/` (the three source docs), `trial-match-tables.md`, and `../CURRENT_STATE.md`.
 
 Written 2026-08-09. MySQL, Liquibase-managed, `BaseDb` conventions throughout.
 
@@ -39,7 +39,7 @@ completeness when there is one patient and the failure mode is a missing answer.
 
 Each table carries a free-text `other` column for what the fixed set does not cover.
 
-**Unknown is never negative.** From `../research/breast-cancer-clinical-trial-matching-chatgpt.md`
+**Unknown is never negative.** From `../_archive/research/breast-cancer-clinical-trial-matching-chatgpt.md`
 §16, and it is the single most important rule here. "Tested negative for BRCA1" and "never
 tested for BRCA1" are clinically different: the first may exclude her from a PARP trial, the
 second means the question is open and worth asking her oncologist. Collapsing them either
@@ -255,7 +255,7 @@ it, and that was "a real cost and a small one" — the migration moved five tabl
 Each of these appears in the research docs and is left out on purpose:
 
 - **HGVS nomenclature, ClinVar and COSMIC IDs.** Proposed by
-  `../research/breast-cancer-clinical-trial-matching-gemini.md`. A patient does not know the
+  `../_archive/research/breast-cancer-clinical-trial-matching-gemini.md`. A patient does not know the
   transcript reference for her PIK3CA mutation, and a column she cannot fill is a column that
   is always null. Revisit if variant data ever arrives from a structured lab feed rather than
   from a person.

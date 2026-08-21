@@ -77,9 +77,9 @@ error that predates this work.
 
 ### Also on this branch, from earlier in the session
 
-- **Mobile frontend work — all 9 items** of `../frontend/MOBILE_PLAN.md`, checked by the user.
-- `../frontend/MOBILE_TESTING.md` — how to test at phone size.
-- `.claude/settings.json` — 21 read-only Bash permissions added.
+- **Mobile frontend work — all 9 items** of `../../frontend/MOBILE_PLAN.md`, checked by the user.
+- `../../frontend/MOBILE_TESTING.md` — how to test at phone size.
+- `../../settings.json` — 21 read-only Bash permissions added.
 
 ---
 
@@ -106,7 +106,7 @@ regardless; this is the sharing feature itself.
 an account.
 
 ### Separate and unblocked
-`../frontend/ADMIN_ONLY_INGESTION_PLAN.md` — restricting trial ingestion to admins. Four
+`../../frontend/ADMIN_ONLY_INGESTION_PLAN.md` — restricting trial ingestion to admins. Four
 `@PreAuthorize` annotations plus a `SecurityConfig` matcher. Independent of everything above.
 ⬜ **Still not started — confirmed 2026-08-14**, no `@PreAuthorize` on `IngestionController` or
 `RagIndexController`.
@@ -158,7 +158,7 @@ Verified by the user.
 ## Timing, unchanged and still important
 
 ⚠️ **Prod's Qdrant corpus was empty as of 2026-08-11**, which is what made this migration's
-rebuilds nearly free. After Phase 4 of `../hosting/DEPLOY_RUNBOOK.md` a rebuild costs hours of
+rebuilds nearly free. After Phase 4 of `../../hosting/DEPLOY_RUNBOOK.md` a rebuild costs hours of
 re-embedding on 1 vCPU. **Do the schema work before the corpus pull, not after.** ⚠️ *Whether the
 pull has since happened is not recorded — check the server, not this document.*
 
@@ -175,5 +175,5 @@ this section recommended: `14aadff` (mobile), `c9cb30d` (the access model), `583
 ⚠️ **The branch is 3 ahead of `main` and 0 behind** — this work is unmerged, so merging is what
 ships it.
 
-⚠️ **Before any commit, confirm no patient file is in the index**: `.claude/patient-data/` is
+⚠️ **Before any commit, confirm no patient file is in the index**: `../_archive/patient-data/` is
 gitignored at directory level and has nearly been committed twice before.

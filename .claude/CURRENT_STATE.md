@@ -166,7 +166,7 @@ instead**, which is how the numbers above were obtained.
 **This is new and it is the fix for the worst repeat-pain of a rebuild.** `PatientSeedLoader`
 (root, `service/`) is a `CommandLineRunner` that recreates `AppUser`, `PatientDiagnosis`,
 `PatientVariant` and `PatientPriorTreatment` on startup from gitignored CSVs in
-`.claude/patient-data/`. **Verified working through a real rebuild on 2026-08-09** — all four
+`_archive/patient-data/`. **Verified working through a real rebuild on 2026-08-09** — all four
 rows came back automatically with correct values.
 
 Four rules it follows, each deliberate:
@@ -193,12 +193,12 @@ check any new CSV value against `frontend/src/types/api.ts`.
 
 A **UCHealth My Health Summary PDF** (generated 2026-08-08, 35,808 lines of extracted text)
 was read and mapped into all three patient tables. It is at
-`.claude/patient-data/my-health-summary.pdf`, gitignored, `600`.
+`_archive/patient-data/my-health-summary.pdf`, gitignored, `600`.
 
 ⚠️ **It arrived in `.claude/diagnosis/`, which is NOT gitignored, world-readable, and one
 `git add .` from being committed.** Moved on arrival. This is the second time a real medical
 record has landed in a tracked directory — the PET/CT report did the same on 2026-08-08.
-**Any new patient document goes straight to `.claude/patient-data/` before it is opened.**
+**Any new patient document goes straight to `_archive/patient-data/` before it is opened.**
 
 What the record established, beyond what was already recorded:
 
@@ -757,7 +757,7 @@ message naming the real cause. A startup check logs `SEARCH UNAVAILABLE` at boot
 condition is known before anyone presses a button — a warning, not a boot failure, since
 ingestion, the patient record and Tier 1 matching all work fine without search.
 
-Recreating the collection is a manual REST call by design; `ingestion/QDRANT_SETUP.md` has the
+Recreating the collection is a manual REST call by design; `_archive/ingestion/QDRANT_SETUP.md` has the
 exact command, the 384-dimension/Cosine requirement, and the REST-6333-vs-gRPC-6334 trap.
 
 ### Payload hashing — new 2026-08-10
@@ -785,7 +785,7 @@ returns null on failure so an unavailable algorithm degrades to the old behavior
 
 The pull result now separates **"Unchanged since last time"** from **"Already waiting to be
 saved"** — two different skip reasons that previously collapsed into one number. Design and
-open questions in `ingestion/PAYLOAD_HASH_PLAN.md`.
+open questions in `_archive/ingestion/PAYLOAD_HASH_PLAN.md`.
 
 ### Backend
 
@@ -824,7 +824,7 @@ to get wrong: on Variants, that "not tested" is not "not detected"; on Prior Tre
 `PatientVariant` (21 fields) and `PatientPriorTreatment` (24 fields), changesets `026`/`027`,
 full layered stack plus 62 tests. Design and rationale in
 `diagnosis/patient-variant-and-treatment-tables.md`; the three research documents behind it
-are in `research/`.
+are in `_archive/research/`.
 
 **Both use five-state vocabularies, not booleans**, and that is the whole point:
 
@@ -1034,13 +1034,13 @@ on some endpoints and not others, this is the cause. The fallback is to flip `dr
 to `true`, restart, and flip it back.
 
 **A rebuild used to destroy the AppUser and the real patient rows.** `PatientSeedLoader` now
-recreates all four from gitignored CSVs in `.claude/patient-data/` on startup — see "The
+recreates all four from gitignored CSVs in `_archive/patient-data/` on startup — see "The
 patient rows now seed themselves" above. Verified through two real rebuilds (2026-08-09 and
 2026-08-10).
 
 Rebuild also invalidates Qdrant: chunks reference trial extids that no longer exist, so the
 collection must be deleted and re-created, not reused. The recreate command and its required
-dimensions are in `ingestion/QDRANT_SETUP.md`.
+dimensions are in `_archive/ingestion/QDRANT_SETUP.md`.
 
 **Recreating the collection is safe; recreating the container is also safe.** `docker compose
 up -d` destroys and recreates the container, but the vectors live in the named volume
@@ -1220,7 +1220,7 @@ the moment a second real user exists"* — is what the grant model exists to ans
 
 **Only three files go to the server, 4.4 KB total**: `patient-diagnosis.csv`,
 `patient-variant.csv`, `patient-prior-treatment.csv`. `scp` straight into
-`.claude/patient-data/`, `700` on the directory and `600` on the files, owned by the app user —
+`_archive/patient-data/`, `700` on the directory and `600` on the files, owned by the app user —
 never through git, never through the app.
 
 ⚠️ **`my-health-summary.pdf` (21 MB) never goes to the server. Decided by the user, permanently.**
@@ -1289,7 +1289,7 @@ env-var driven — but a fresh deploy arrives with an empty MySQL and an empty Q
 Reproducing the current corpus on the target means a ~14-minute pull plus a ~25-minute backfill,
 assuming the box has the CPU for ~130,000 local ONNX inferences.
 
-**Seeding Qdrant is the harder half and is unanalysed.** `ingestion/DEPLOYMENT_SEEDING.md`
+**Seeding Qdrant is the harder half and is unanalysed.** `_archive/ingestion/DEPLOYMENT_SEEDING.md`
 covers only MySQL. The binding constraint: chunk payloads key on `trialExtid`, and extids
 regenerate on every rebuild, so a Qdrant snapshot is only valid against the exact MySQL rows it
 was built from. Three options — native Qdrant snapshots paired with a MySQL dump; ship MySQL
@@ -1438,7 +1438,7 @@ Frontend typecheck and build clean; one pre-existing lint error in `Login.tsx`.
 
 ### Files that must never be committed
 
-**`.claude/patient-data/`** — gitignored at directory level, `700`/`600`. Holds the real
+**`_archive/patient-data/`** — gitignored at directory level, `700`/`600`. Holds the real
 PET/CT and MRI reports, the full My Health Summary PDF, and the three seed CSVs. All real
 patient data.
 
@@ -1449,7 +1449,7 @@ record. Gitignored; treat as a credential.
 report) was `git add`-ed and staged before being caught. On 2026-08-09 the My Health Summary
 PDF arrived in `.claude/diagnosis/`, which is tracked and world-readable. Neither was ever
 committed or pushed. **Before any commit, confirm no patient file is in the index**, and put
-any new patient document in `.claude/patient-data/` before opening it.
+any new patient document in `_archive/patient-data/` before opening it.
 
 ---
 
@@ -1457,7 +1457,7 @@ any new patient document in `.claude/patient-data/` before opening it.
 
 Standalone Gradle Java build at `playwright/` (NOT in root `settings.gradle`), modelled on
 the user's existing `~/projects/viro/viro-playwright`. Plan and findings in
-`.claude/playwright/PLAYWRIGHT_SCRAPE_PLAN.md`.
+`_archive/playwright/PLAYWRIGHT_SCRAPE_PLAN.md`.
 
 **Step 1 is done and verified against the real portal:** login works, and **session reuse
 works** — a second run restored saved storage state and authenticated in ~3 seconds with no

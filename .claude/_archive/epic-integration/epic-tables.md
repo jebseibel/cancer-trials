@@ -2,7 +2,7 @@
 
 Companion document to `UCHEALTH_INGESTION_PLAN.md`, broken out for iterating on the
 schema independently — the same split `_archive/clinical-trials/clinical-trials-tables.md` has
-from `../PROJECT_PLAN.md`. MySQL, managed via Liquibase changelogs.
+from `../../PROJECT_PLAN.md`. MySQL, managed via Liquibase changelogs.
 
 This covers the **patient clinical record** pulled from UCHealth's Epic FHIR R4
 endpoint. It is additive: nothing here touches the trial/condition/sponsor tables.
@@ -111,7 +111,7 @@ is confirmed against real payloads.
 One row per laboratory `Observation` — a test result. Deduplicated by
 `fhir_resource_id`. This design is based on a **real Epic sandbox payload** (Camila
 Lopez's Hemoglobin A1C, captured at
-`../../datafetcher/src/test/resources/sample-epic-observation.json`), not on the spec alone.
+`../../../datafetcher/src/test/resources/sample-epic-observation.json`), not on the spec alone.
 
 ```
 fhir_resource_id       varchar(64)     not null, unique   -- Observation.id, the natural key

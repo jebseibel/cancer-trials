@@ -1,7 +1,7 @@
 # Qdrant Collection Setup
 
 What to do when semantic search stops working because the collection is missing, and why the
-app does not fix it for you. Companion to `DEPLOYMENT_SEEDING.md` and `../CURRENT_STATE.md`.
+app does not fix it for you. Companion to `DEPLOYMENT_SEEDING.md` and `../../CURRENT_STATE.md`.
 
 Verified 2026-08-10 against a real recovery.
 

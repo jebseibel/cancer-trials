@@ -17,7 +17,7 @@ per-step status markers rather than the prose, which is written in the future te
 
 ## Roles are a separate axis, and they are already planned
 
-**Not in this document, deliberately.** `../frontend/ADMIN_ONLY_INGESTION_PLAN.md` covers
+**Not in this document, deliberately.** `../../frontend/ADMIN_ONLY_INGESTION_PLAN.md` covers
 `ROLE_ADMIN` and restricting trial ingestion and backfill to admins.
 
 The two axes answer different questions and must not be conflated:
@@ -86,7 +86,7 @@ List<TrialStatusDb> findByAppUserId(Long appUserId);   // returns soft-deleted r
 
 The other four all filter on `ActiveEnum.ACTIVE` via a `default` method, and two of them carry a
 comment recording that `PatientDiagnosisRepository` shipped without it and had to be fixed on
-2026-08-08. `../CURRENT_STATE.md` predicted this one — *"`TrialStatusRepository.findByAppUserId`
+2026-08-08. `../../CURRENT_STATE.md` predicted this one — *"`TrialStatusRepository.findByAppUserId`
 has the same shape and has not been checked"* — and it is confirmed.
 
 **Fix it in step 5 when the finder is renamed anyway.** Do not fix it as a drive-by earlier: it
@@ -186,7 +186,7 @@ controller converter, both request DTOs, the response DTO, and changeset `023`.
 **Also move `date_of_birth` and `sex` off `patient_diagnosis` onto `patient`.** They are
 properties of a person, not of a diagnosis. Use the `database-column-change` skill for the drops.
 
-⚠️ **Tier 1 matching reads both fields** (`frontend/src/lib/tier1Matching.ts` takes a
+⚠️ **Tier 1 matching reads both fields** (`../../../frontend/src/lib/tier1Matching.ts` takes a
 `PatientDiagnosis`). The response DTO for diagnosis loses two fields, so **this step breaks the
 frontend until its own plan lands.** Expected and acceptable — but know it before running it, and
 do not interpret the resulting frontend failure as a defect in this step.
@@ -269,7 +269,7 @@ grantee's account came to exist. Decide the invite mechanism when you get here.
 record, locally and on production.
 
 **The migration path is rebuild-and-reseed, not a data migration**, because `PatientSeedLoader`
-recreates all four rows from the three gitignored CSVs in `.claude/patient-data/`. That is only
+recreates all four rows from the three gitignored CSVs in `../_archive/patient-data/`. That is only
 true if step 7 lands with steps 4-6.
 
 Sequence:
@@ -277,7 +277,7 @@ Sequence:
 1. Land steps 1-7 locally, tests green.
 2. Rebuild the local DB via the n8n `clear-db` webhook (**user's action**).
 3. Confirm the seed loader recreated patient + grant + the three clinical rows.
-4. Verify CSV vocabulary against `frontend/src/types/api.ts` first — that check has caught silent
+4. Verify CSV vocabulary against `../../../frontend/src/types/api.ts` first — that check has caught silent
    drift before, and the backend stores plain varchars that accept a wrong value silently.
 
 ⚠️ **Do this before the production corpus pull.** A rebuild invalidates the Qdrant collection,

@@ -3,7 +3,7 @@
 Design for pulling your wife's real clinical record from UCHealth (Epic/MyChart, via
 "My Health Connection") into this app's database, as a second `datafetcher` source
 alongside ClinicalTrials.gov. Companion to `uchealth-epic-api-notes.md` (the
-research notes this plan is based on), `../PROJECT_PLAN.md` (Phase 3 — matching/relevance),
+research notes this plan is based on), `../../PROJECT_PLAN.md` (Phase 3 — matching/relevance),
 and `.claude/_archive/datafetcher/datafetcher-module.md` (module architecture this
 follows). This doc is the concrete build plan — execute top to bottom once you're ready
 to start.
@@ -69,7 +69,7 @@ from the patient's browser and cannot carry a JWT. Verified 2026-08-14.
 > `020` patient medication, `021` lab result, `022` lab result component.
 >
 > **What is genuinely blocked is Epic's side, not this code** — see "Open questions" and
-> `../CURRENT_STATE.md`: no `offline_access` grant so the token dies in ~1 hour with no
+> `../../CURRENT_STATE.md`: no `offline_access` grant so the token dies in ~1 hour with no
 > refresh, `MedicationRequest` rejected pending a sub-resource grant, `DiagnosticReport`
 > returning 403, and panel handling untested against real data.
 
@@ -81,7 +81,7 @@ this project's usual two-pass convention (`database-restapi-template` then
 
 The end goal (per your direction this session) is **RAG over your wife's actual medical
 record** — not structured eligibility-matching against trial criteria (that's
-`../PROJECT_PLAN.md`'s Phase 3, and still on the table later, but not what this plan
+`../../PROJECT_PLAN.md`'s Phase 3, and still on the table later, but not what this plan
 builds). This plan covers **ingestion only**: getting FHIR data out of UCHealth's Epic
 endpoint and into this app's database in a form that's ready to be chunked/embedded
 later. The embedding/vector-store/retrieval pipeline itself is **out of scope for this
@@ -149,7 +149,7 @@ is out of scope until the research question above is resolved — see "Open ques
   lands in staging, normalized into readable rows in the DB." Chunking strategy,
   embedding model choice, vector store choice (pgvector, a dedicated vector DB,
   etc.), and retrieval/query design are a separate plan once this data exists.
-- **Trial-eligibility matching.** `../PROJECT_PLAN.md` Phase 3's structured-profile-based
+- **Trial-eligibility matching.** `../../PROJECT_PLAN.md` Phase 3's structured-profile-based
   matching is a different, still-deferred effort. This plan's normalized patient data
   could feed that later, but building the matching logic itself is not part of this
   pass.
@@ -242,7 +242,7 @@ before seeing real sandbox FHIR payloads), but the table shape should be:
   resource — the dedup key, analogous to `nct_id`), `raw_payload` (the FHIR JSON,
   `longtext`), `fetched_at`, `normalized_at`, `normalization_error`. **This table has
   already been scaffolded** (this session, ahead of Epic registration) — see
-  `../../database/src/main/resources/db/changelog/changes/019-staging-raw-fhir-resource.yaml`,
+  `../../../database/src/main/resources/db/changelog/changes/019-staging-raw-fhir-resource.yaml`,
   with the composite unique constraint on `(resource_type, fhir_resource_id)` already in
   place from the start, applying the CT.gov staging-dedup lesson from day one.
 - **Structured clinical facts** (test results, medications) — whether these get their

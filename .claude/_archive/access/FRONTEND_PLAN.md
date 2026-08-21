@@ -3,7 +3,7 @@
 The frontend half of `PATIENT_ACCESS_PLAN.md`, written against the API contract `BACKEND_PLAN.md`
 produces. Read both first.
 
-Written 2026-08-13 from a survey of `frontend/src`. The backend dependency it named — steps 1-5 —
+Written 2026-08-13 from a survey of `../../../frontend/src`. The backend dependency it named — steps 1-5 —
 is satisfied; those endpoints exist.
 
 **Status as of 2026-08-14: ✅ items 1-5 are BUILT and committed** (`c9cb30d`).

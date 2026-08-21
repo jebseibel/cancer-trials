@@ -66,7 +66,7 @@ frontend/pnpm-debug.log*
 # Real patient clinical data - radiology reports, pathology, oncology notes, anything
 # pulled from the portal. NEVER commit. Directory-level so a new file is protected the
 # moment it lands, without needing a pattern per filename.
-.claude/patient-data/
+.claude/_archive/patient-data/
 
 ### Playwright scraper (playwright/) - standalone Gradle build, Java Playwright ###
 playwright/.gradle/

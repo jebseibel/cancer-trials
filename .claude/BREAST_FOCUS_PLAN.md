@@ -95,7 +95,7 @@ call for the patient.
 
 **Table design now exists.** `diagnosis/patient-variant-and-treatment-tables.md` specifies
 `patient_variant` and `patient_prior_treatment` — the structured inputs receptor-aware and
-treatment-aware matching needs. Written after the three research docs in `research/`, which
+treatment-aware matching needs. Written after the three research docs in `_archive/research/`, which
 independently converge on splitting Diagnosis / Biomarkers / Molecular / Treatment History.
 
 **Open decision — where this logic lives.** Tier 1 matching is currently in the *frontend*
@@ -190,7 +190,7 @@ misleading scores.
   attractive?**~~ **Multi-patient won, and it shipped 2026-08-14.**
   `_archive/patient/PATIENT_MODEL_PLAN.md` is no longer unbuilt — `patient` plus `user_patient`
   grants replaced `app_user`, so the schema is multi-patient-capable and a record can be shared.
-  See `access/PATIENT_ACCESS_PLAN.md`.
+  See `_archive/access/PATIENT_ACCESS_PLAN.md`.
 - **Should the ingestion condition become a fixed constant rather than a default?** Keeping it
   overridable costs nothing and preserves an escape hatch. Recommend keeping it.
 - **Does `EligibilityRule` (scaffolded, never populated) get built for Tier 3, or dropped?**

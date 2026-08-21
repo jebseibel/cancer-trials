@@ -2,7 +2,7 @@
 
 Make a repeat ingestion cost time proportional to **what changed**, not to corpus size.
 Written 2026-08-10 from a read of `ClinicalTrialsGovIngestJob`, not from the design docs.
-Companion to `../CURRENT_STATE.md` and `DEPLOYMENT_SEEDING.md`.
+Companion to `../../CURRENT_STATE.md` and `DEPLOYMENT_SEEDING.md`.
 
 **Status: ✅ BUILT — verified 2026-08-14.** `payload_hash varchar(64)` is on changeset
 `010-staging-raw-trial.yaml`, `StagingRawTrialDb.payloadHash` exists, and
@@ -182,7 +182,7 @@ code, and the retrieval consequences of skipping have not been thought through h
 > deliberately: a cached `indexed_at` column can lie after a cleared collection or a DB rebuild,
 > which is exactly when it matters. `?force=true` bypasses the skip, and it is not optional —
 > after a chunking or embedding-model change every stored vector is stale despite the payload
-> being unchanged. See `../CURRENT_STATE.md`, "Backfill skips what is already indexed".
+> being unchanged. See `../../CURRENT_STATE.md`, "Backfill skips what is already indexed".
 
 **The fetch does not get cheaper.** Every study payload is still downloaded to discover that
 most are unchanged. `ClinicalTrialsGovClient` also accumulates every study in a

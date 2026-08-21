@@ -11,7 +11,7 @@
 > Epic granted `patient/*.read fhirUser launch/patient openid` but **silently dropped
 > `offline_access`**, so tokens die in ~1 hour with no refresh path.
 >
-> See `UCHEALTH_INGESTION_PLAN.md` for the build, and `../CURRENT_STATE.md` for the grants
+> See `UCHEALTH_INGESTION_PLAN.md` for the build, and `../../CURRENT_STATE.md` for the grants
 > still outstanding on Epic's side.
 
 ## Short Answer

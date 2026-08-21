@@ -2,15 +2,15 @@
 
 A second path to the patient record, alongside the Epic FHIR pipeline. Companion to
 `../epic-integration/UCHEALTH_INGESTION_PLAN.md` (the API path this supplements) and
-`../PROJECT_PLAN.md` §7 (which already anticipated a Playwright source writing into
+`../../PROJECT_PLAN.md` §7 (which already anticipated a Playwright source writing into
 staging).
 
 **Status as of 2026-08-14: ✅ step 1 is built; steps 2-6 are designed and not started.**
-The `playwright/` directory at the repo root is a working standalone Gradle build —
+The `../../../playwright` directory at the repo root is a working standalone Gradle build —
 `MyChartScraperApp`, plus `SessionManager`, `LoginService` and `ConfigLoader` under
-`scraper/common/`. It is deliberately **not** in root `settings.gradle`.
+`scraper/common/`. It is deliberately **not** in root `../../../settings.gradle`.
 
-⚠️ `playwright/.auth/` is currently empty, so the next run will do a fresh login and
+⚠️ `../../../playwright/.auth` is currently empty, so the next run will do a fresh login and
 **MFA will fire** — the code goes to the patient's phone, so allow the 10-minute wait.
 
 ---
@@ -97,13 +97,13 @@ What that project already solved, worth copying rather than reinventing:
 - **`ConfigLoader`** — selectors and URLs live in `application.yaml`, not in code, so a
   portal reskin is a config edit rather than a recompile. Exactly the right shape for the
   fragility this plan is budgeting for.
-- **Credentials via `java-dotenv`** from `.env`, never in the YAML or in code.
+- **Credentials via `java-dotenv`** from `../../../.env`, never in the YAML or in code.
 - **Logback + `@Slf4j`**, and an `outputDir` convention for captured artifacts.
 
 Structural decision to make when copying: `viro-playwright` is its own Gradle project with
-its own `settings.gradle`. Here it should become **a directory inside this repo** — either
+its own `../../../settings.gradle`. Here it should become **a directory inside this repo** — either
 a fifth Gradle module (`include 'playwright'`) or a standalone Gradle build under
-`playwright/` that is not part of the root build. Prefer **standalone**: it keeps ~300MB of
+`../../../playwright` that is not part of the root build. Prefer **standalone**: it keeps ~300MB of
 browser binaries and a `main()`-driven scraper out of `./gradlew build` and off the
 deployment jar, while still living in this repo where the staging contract lives.
 
@@ -126,7 +126,7 @@ Each step is verifiable on its own. Do not start a step before the one above it 
 
 Verified against the real portal with the real account:
 
-- Login works: the form is on the main page (no iframe), credentials fill from `.env`,
+- Login works: the form is on the main page (no iframe), credentials fill from `../../../.env`,
   submit succeeds.
 - **MFA prompts on a first login from a new device**, and the code goes to the patient's
   phone — not the operator's. The wait is 10 minutes for that reason; 2 minutes was not
@@ -266,7 +266,7 @@ decision, informed by real scraped payloads.
   Answered by step 2.
 - **How much does the DOM change between visits?** Unknowable up front. Budget for
   selectors breaking, and prefer text/role-based selectors over structural ones.
-- **Where do portal credentials live?** `.env` is gitignored and is where the project's
+- **Where do portal credentials live?** `../../../.env` is gitignored and is where the project's
   other secrets go. Whether a real portal password warrants more than that is the same
   unresolved question already open for the OAuth refresh token.
 - **Does scraped data need provenance marking?** A `lab_result` row from a scrape and one

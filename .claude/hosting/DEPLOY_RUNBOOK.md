@@ -23,8 +23,8 @@ written 2026-08-08 against sample data and is wrong in three ways that matter (s
 "What the archived guide gets wrong"). Its infrastructure steps are still sound and are folded
 in here.
 
-Companion docs: `../CURRENT_STATE.md` (what is built), `../ingestion/QDRANT_SETUP.md` (the
-collection), `../ingestion/DEPLOYMENT_SEEDING.md` (why the corpus is the hard part).
+Companion docs: `../CURRENT_STATE.md` (what is built), `../_archive/ingestion/QDRANT_SETUP.md` (the
+collection), `../_archive/ingestion/DEPLOYMENT_SEEDING.md` (why the corpus is the hard part).
 
 ---
 
@@ -170,7 +170,7 @@ found the hard way:
 - The bind address stays `127.0.0.1`.
 
 Create the collection **before** backfilling — 384 dimensions, Cosine. Exact command and the
-REST-6333-vs-gRPC-6334 trap are in `../ingestion/QDRANT_SETUP.md`. The app logs
+REST-6333-vs-gRPC-6334 trap are in `../_archive/ingestion/QDRANT_SETUP.md`. The app logs
 `SEARCH UNAVAILABLE` at boot if the collection is missing, which is the check that it worked.
 
 ---
@@ -278,7 +278,7 @@ embedding model changed.
 **Why a snapshot from the dev machine will not work:** chunk payloads key on `trialExtid`, and
 extids regenerate on every database rebuild, so a snapshot is only valid against the exact MySQL
 rows it was built from. Making chunks key on `nctId` instead would make snapshots portable and
-turn this phase into a restore — see `../ingestion/DEPLOYMENT_SEEDING.md`. It is a chunking
+turn this phase into a restore — see `../_archive/ingestion/DEPLOYMENT_SEEDING.md`. It is a chunking
 change, so it costs a full re-index whenever it is adopted; cheaper now than later.
 
 ---
