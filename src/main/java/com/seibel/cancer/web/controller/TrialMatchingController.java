@@ -10,15 +10,19 @@ import com.seibel.cancer.common.enums.AccessLevel;
 import com.seibel.cancer.service.CurrentUserService;
 import com.seibel.cancer.service.TrialService;
 import com.seibel.cancer.service.matching.CriteriaSignalEvaluator;
+import com.seibel.cancer.service.matching.TreatmentGoalBackfillService;
 import com.seibel.cancer.service.matching.TrialMatchingService;
 import com.seibel.cancer.web.response.ResponseEligibilitySignal;
+import com.seibel.cancer.web.response.ResponseTreatmentGoalBackfill;
 import com.seibel.cancer.web.response.ResponseTrialAssessment;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -47,6 +51,7 @@ import java.util.List;
 public class TrialMatchingController {
 
     private final TrialMatchingService matchingService;
+    private final TreatmentGoalBackfillService treatmentGoalBackfillService;
     private final TrialService trialService;
     private final CurrentUserService currentUserService;
     private final TrialMatchingConverter converter;
@@ -101,6 +106,29 @@ public class TrialMatchingController {
             throw new ResourceNotFoundException("Trial", trialExtid);
         }
         return converter.toResponse(assessment, List.of());
+    }
+
+    /**
+     * Re-derives {@code treatment_goal} for every trial already in the database.
+     *
+     * <p>Ingestion stamps this at normalization and skips trials whose payload has not changed,
+     * so a re-pull will not populate it for trials already loaded — CT.gov's text has not
+     * changed, only the code reading it. This is how a pattern change reaches the corpus.
+     *
+     * <p>ADMIN-only: it rewrites a column across every trial, which is an operator action rather
+     * than something a reader of the ranked list should be able to trigger.
+     */
+    @PostMapping("/backfill-treatment-goals")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Re-derive the treatment-goal column for all trials")
+    public ResponseTreatmentGoalBackfill backfillTreatmentGoals() {
+        var result = treatmentGoalBackfillService.backfillAll();
+        return ResponseTreatmentGoalBackfill.builder()
+                .trialsRead(result.trialsRead())
+                .updated(result.updated())
+                .unchanged(result.unchanged())
+                .errors(result.errors())
+                .build();
     }
 }
 
