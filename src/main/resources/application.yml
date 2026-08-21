@@ -27,6 +27,36 @@ spring:
     drop-first: false
 
   ai:
+    anthropic:
+      # Empty default on purpose: an unconfigured AI provider must disable the one feature that
+      # needs it, not stop the backend booting. AiService reads this to answer "is AI available"
+      # and the button is hidden when it is not.
+      #
+      # ⚠️ This is the only place clinical text leaves the machine. Embeddings run locally in
+      # ONNX precisely so trial and patient text stays here; a trial-match call is a deliberate
+      # exception, and it sends a de-identified subset built by an explicit allowlist - never a
+      # serialized PatientDiagnosis. See TrialDiagnosisMatchService.
+      api-key: ${ANTHROPIC_API_KEY:}
+      chat:
+        options:
+          model: claude-sonnet-4-5
+          # A match assessment quotes criteria back and lists open questions; 500 (the starter
+          # default) truncates it mid-sentence.
+          max-tokens: 4096
+          # Low rather than zero. This is a reading task over supplied text - there is nothing
+          # to be creative about, and drift between runs on the same trial would undermine the
+          # whole point of showing the quoted criterion.
+          temperature: 0.2
+    retry:
+      # The starter defaults to 10 attempts with a 5x multiplier against a paid API - a
+      # sustained outage would retry for minutes and bill every attempt. Three rides out a
+      # transient 429 or 529.
+      max-attempts: 3
+      backoff:
+        initial-interval: 2s
+        max-interval: 20s
+      # 4xx means the request is wrong; retrying spends money to fail the same way.
+      on-client-errors: false
     # Local in-process ONNX embeddings - no cloud account, no API key, no per-chunk cost,
     # and clinical text never leaves the machine.
     model:

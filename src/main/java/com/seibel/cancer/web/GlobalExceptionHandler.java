@@ -3,6 +3,7 @@ package com.seibel.cancer.web;
 import com.seibel.cancer.common.exceptions.ResourceAlreadyExistsException;
 import com.seibel.cancer.common.exceptions.ResourceNotFoundException;
 import com.seibel.cancer.common.exceptions.ServiceException;
+import com.seibel.cancer.service.ai.AiGenerationException;
 import com.seibel.cancer.common.exceptions.ValidationException;
 import com.seibel.cancer.web.response.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -86,5 +87,19 @@ public class GlobalExceptionHandler {
                 .field(field)
                 .message(violation.getMessage())
                 .build();
+    }
+
+    /**
+     * AI failure is a normal operating condition, not a bug.
+     *
+     * <p>503 rather than 500: a timeout, a rate limit or a missing key means "not right now",
+     * and the message is written to be shown to a reader rather than logged and hidden.
+     */
+    @ExceptionHandler(AiGenerationException.class)
+    public ResponseEntity<ErrorResponse> handleAiGeneration(AiGenerationException ex,
+                                                            HttpServletRequest req) {
+        // AiService already logged the cause with timing. Nothing to add here, and this class
+        // deliberately does not log - it translates exceptions, it does not observe them.
+        return build(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), req, null);
     }
 }

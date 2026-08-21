@@ -494,3 +494,23 @@ export interface TreatmentGoalBackfillResult {
     unchanged: number;
     errors: string[];
 }
+
+// A model's reading of one trial's criteria against the patient record.
+//
+// There is deliberately no eligibility field and no score. `rulesPatientOut` is the only
+// assertion the model may make and it must carry a quoted criterion; its absence means nothing
+// ruled her out, NOT that she qualifies.
+export interface AiTrialCheck {
+    rulesPatientOut?: boolean | null;
+    exclusionCriterion?: string | null;
+    summary?: string | null;
+    criteriaSheAppearsToMeet?: string[] | null;
+    openQuestions?: string[] | null;
+    concerns?: string[] | null;
+    model?: string | null;
+}
+
+export interface AiStatus {
+    available: boolean;
+    model: string;
+}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, MapPin, Target, UserCircle, Layers, Check, X, HelpCircle, Stethoscope, ListChecks } from 'lucide-react';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { ArrowLeft, MapPin, Target, UserCircle, Layers, Check, X, HelpCircle, Stethoscope, ListChecks, Sparkles, AlertTriangle, Loader2 } from 'lucide-react';
 import {
     trialApi,
     locationApi,
@@ -16,6 +16,7 @@ import { useCurrentPatient } from '../lib/PatientContext';
 import { runTier1Checks } from '../lib/tier1Matching';
 import SignalRow from '../components/SignalRow';
 import type { CheckOutcome } from '../lib/tier1Matching';
+import type { AiTrialCheck } from '../types/api';
 import { TRIAL_STATUS_VALUES } from '../types/api';
 
 export default function TrialDetail() {
@@ -40,6 +41,19 @@ export default function TrialDetail() {
         queryFn: async () => (await matchingApi.assessTrial(extid!, patient!.extid)).data,
         enabled: !!extid && !!patient?.extid,
         retry: false,
+    });
+
+    // Hidden rather than disabled when unconfigured: a button that always fails is worse than
+    // no button, and "not set up" is not something a reader can act on.
+    const { data: aiStatus } = useQuery({
+        queryKey: ['ai-status'],
+        queryFn: async () => (await matchingApi.aiStatus()).data,
+        retry: false,
+        staleTime: Infinity,
+    });
+
+    const aiCheck = useMutation({
+        mutationFn: async () => (await matchingApi.aiCheck(extid!, patient!.extid)).data,
     });
 
     const { data: locations } = useQuery({
@@ -289,6 +303,47 @@ export default function TrialDetail() {
                 </div>
             )}
 
+            {/* Reads criteria the patterns cannot - a carve-out inside an exclusion, an
+                unusual phrasing, a criterion nobody wrote a rule for. Runs on a press, never
+                on load: it costs money and takes seconds. */}
+            {patient && aiStatus?.available && (
+                <div className="bg-white shadow rounded-lg p-6 mb-6">
+                    <h2 className="text-lg font-medium text-gray-900 mb-1 flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-purple-600" />
+                        Read This Trial Against Your Record
+                    </h2>
+                    <p className="text-sm text-gray-500 mb-4">
+                        Reads this trial's eligibility criteria line by line against your record and
+                        reports what it finds. It can tell you if something rules you out, and what
+                        it could not judge &mdash; it cannot tell you that you qualify.
+                    </p>
+
+                    <button
+                        type="button"
+                        onClick={() => aiCheck.mutate()}
+                        disabled={aiCheck.isPending}
+                        className="inline-flex items-center gap-2 rounded-md bg-purple-600 px-4 py-2 text-white hover:bg-purple-700 disabled:opacity-50 min-h-[2.5rem]"
+                    >
+                        {aiCheck.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Sparkles className="h-4 w-4" />
+                        )}
+                        {aiCheck.isPending ? 'Reading the criteria...' : 'Check this trial'}
+                    </button>
+
+                    {aiCheck.isError && (
+                        <p className="mt-3 text-sm text-red-600">
+                            {(aiCheck.error as { response?: { data?: { message?: string } } })
+                                ?.response?.data?.message
+                                ?? 'The check could not be run. Nothing about this trial has changed.'}
+                        </p>
+                    )}
+
+                    {aiCheck.data && <AiCheckResult check={aiCheck.data} />}
+                </div>
+            )}
+
             {/* Eligibility */}
             {trial.eligibilityCriteria && (
                 <div className="bg-white shadow rounded-lg p-6 mb-6">
@@ -377,6 +432,90 @@ export default function TrialDetail() {
 }
 
 /** Amber, not red, for a failed check - it is a flag to ask about, never an auto-exclusion. */
+/**
+ * What the model reported.
+ *
+ * <p>An exclusion is stated plainly with its quoted criterion, because that is a checkable
+ * claim. Its absence is rendered as "nothing here rules you out" and never as a match - the
+ * whole point of the response shape is that eligibility is not the model's to declare.
+ */
+function AiCheckResult({ check }: { check: AiTrialCheck }) {
+    const ruledOut = check.rulesPatientOut === true;
+
+    return (
+        <div className="mt-4 space-y-4">
+            <div
+                className={`rounded border px-4 py-3 text-sm ${
+                    ruledOut
+                        ? 'border-amber-300 bg-amber-50 text-amber-900'
+                        : 'border-gray-200 bg-gray-50 text-gray-700'
+                }`}
+            >
+                <div className="flex items-start gap-2">
+                    {ruledOut ? (
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    ) : (
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                    )}
+                    <div>
+                        <p className="font-medium">
+                            {ruledOut
+                                ? 'Something in this trial would rule you out'
+                                : 'Nothing in these criteria rules you out'}
+                        </p>
+                        {check.summary && <p className="mt-1">{check.summary}</p>}
+                    </div>
+                </div>
+                {ruledOut && check.exclusionCriterion && (
+                    <blockquote className="mt-3 border-l-2 border-amber-400 pl-3 text-xs italic">
+                        &ldquo;{check.exclusionCriterion}&rdquo;
+                    </blockquote>
+                )}
+            </div>
+
+            {/* Listed before the matches on purpose: these are the reason to run this at all.
+                They are what turns an appointment into specific questions. */}
+            <AiList
+                title="Worth asking your care team"
+                items={check.openQuestions}
+                className="border-sky-200 bg-sky-50 text-sky-900"
+            />
+            <AiList
+                title="Things to be aware of"
+                items={check.concerns}
+                className="border-amber-200 bg-amber-50 text-amber-900"
+            />
+            <AiList
+                title="Criteria your record appears to meet"
+                items={check.criteriaSheAppearsToMeet}
+                className="border-gray-200 bg-gray-50 text-gray-600"
+            />
+
+            <p className="border-t pt-3 text-xs text-gray-500">
+                Read by {check.model ?? 'an AI model'}, which can misread a criterion. Nothing here
+                decides whether you qualify &mdash; only the study team can do that. Take the
+                questions above to your care team rather than acting on this.
+            </p>
+        </div>
+    );
+}
+
+function AiList({ title, items, className }: { title: string; items?: string[] | null; className: string }) {
+    if (!items || items.length === 0) {
+        return null;
+    }
+    return (
+        <div className={`rounded border px-4 py-3 text-sm ${className}`}>
+            <p className="mb-2 font-medium">{title}</p>
+            <ul className="list-disc space-y-1 pl-5">
+                {items.map((item, i) => (
+                    <li key={i}>{item}</li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
 function OutcomeIcon({ outcome }: { outcome: CheckOutcome }) {
     if (outcome === 'pass') {
         return <Check className="h-5 w-5 text-green-600 shrink-0 mt-0.5" aria-label="matches" />;

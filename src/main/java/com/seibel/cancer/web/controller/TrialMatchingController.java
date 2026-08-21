@@ -10,8 +10,12 @@ import com.seibel.cancer.common.enums.AccessLevel;
 import com.seibel.cancer.service.CurrentUserService;
 import com.seibel.cancer.service.TrialService;
 import com.seibel.cancer.service.matching.CriteriaSignalEvaluator;
+import com.seibel.cancer.service.ai.AiService;
+import com.seibel.cancer.service.ai.TrialDiagnosisMatchService;
+import com.seibel.cancer.service.ai.TrialMatchAssessment;
 import com.seibel.cancer.service.matching.TrialClassificationBackfillService;
 import com.seibel.cancer.service.matching.TrialMatchingService;
+import com.seibel.cancer.web.response.ResponseAiTrialCheck;
 import com.seibel.cancer.web.response.ResponseEligibilitySignal;
 import com.seibel.cancer.web.response.ResponseTreatmentGoalBackfill;
 import com.seibel.cancer.web.response.ResponseTrialAssessment;
@@ -51,6 +55,8 @@ import java.util.List;
 public class TrialMatchingController {
 
     private final TrialMatchingService matchingService;
+    private final TrialDiagnosisMatchService aiMatchService;
+    private final AiService aiService;
     private final TrialClassificationBackfillService trialClassificationBackfillService;
     private final TrialService trialService;
     private final CurrentUserService currentUserService;
@@ -128,6 +134,57 @@ public class TrialMatchingController {
                 .updated(result.updated())
                 .unchanged(result.unchanged())
                 .errors(result.errors())
+                .build();
+    }
+
+    /**
+     * Whether the AI check can run at all.
+     *
+     * <p>Lets the page hide the button rather than offer one that always fails. "Not configured"
+     * and "failed" are different problems and a reader should not have to tell them apart.
+     */
+    @GetMapping("/ai/status")
+    @Operation(summary = "Whether the AI trial check is configured")
+    public java.util.Map<String, Object> aiStatus() {
+        return java.util.Map.of(
+                "available", aiService.isAvailable(),
+                "model", aiService.getModelName());
+    }
+
+    /**
+     * Reads one trial's criteria against one patient's record, using a model.
+     *
+     * <p>Fills the gap the deterministic signals cannot: a carve-out inside an exclusion, an
+     * unusual phrasing, a criterion nobody wrote a pattern for.
+     *
+     * <p>⚠️ <b>This is the only endpoint that sends clinical text off the machine.</b> The payload
+     * is a de-identified subset built by an explicit allowlist - no name, no date of birth, no
+     * free-text notes, dates coarsened to a year. See {@link TrialDiagnosisMatchService}.
+     */
+    @PostMapping("/ai/trial/{trialExtid}/for/{patientExtid}")
+    @Operation(summary = "Ask a model to read this trial's criteria against a patient's record")
+    public ResponseAiTrialCheck aiCheck(
+            @PathVariable String trialExtid,
+            @PathVariable String patientExtid
+    ) {
+        Long patientId = currentUserService.requireAccessId(patientExtid, AccessLevel.VIEW_RECORD);
+        Trial trial = trialService.findByExtid(trialExtid);
+        if (trial == null) {
+            throw new ResourceNotFoundException("Trial", trialExtid);
+        }
+
+        var record = matchingService.loadPatientRecord(patientId);
+        TrialMatchAssessment assessment = aiMatchService.assess(
+                trial, record.diagnosis(), record.variant(), record.treatment());
+
+        return ResponseAiTrialCheck.builder()
+                .rulesPatientOut(assessment.getRulesPatientOut())
+                .exclusionCriterion(assessment.getExclusionCriterion())
+                .summary(assessment.getSummary())
+                .criteriaSheAppearsToMeet(assessment.getCriteriaSheAppearsToMeet())
+                .openQuestions(assessment.getOpenQuestions())
+                .concerns(assessment.getConcerns())
+                .model(aiService.getModelName())
                 .build();
     }
 }

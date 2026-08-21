@@ -30,6 +30,8 @@ import type {
     TrialAssessment,
     TrialSearchMatch,
     TreatmentGoalBackfillResult,
+    AiTrialCheck,
+    AiStatus,
 } from '../types/api';
 
 // API Configuration
@@ -120,6 +122,12 @@ export const matchingApi = {
     // Re-derives the treatment-goal column for every trial. Needed because ingestion skips
     // trials whose ClinicalTrials.gov payload has not changed, so a re-pull cannot pick up a
     // change to the code that reads that payload. ADMIN-only.
+    // ⚠️ The only call that sends clinical text off the machine. The backend builds a
+    // de-identified payload from an explicit allowlist - no name, no date of birth, no
+    // free-text notes, dates coarsened to a year.
+    aiCheck: (trialExtid: string, patientExtid: string) =>
+        apiClient.post<AiTrialCheck>(`/matching/ai/trial/${trialExtid}/for/${patientExtid}`),
+    aiStatus: () => apiClient.get<AiStatus>('/matching/ai/status'),
     backfillTreatmentGoals: () =>
         apiClient.post<TreatmentGoalBackfillResult>('/matching/backfill-treatment-goals'),
 };
