@@ -8,7 +8,7 @@ import com.seibel.cancer.common.domain.Location;
 import com.seibel.cancer.common.domain.Outcome;
 import com.seibel.cancer.common.domain.OverallOfficial;
 import com.seibel.cancer.common.domain.Trial;
-import com.seibel.cancer.common.util.TreatmentGoalClassifier;
+import com.seibel.cancer.common.util.TrialTextClassifier;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -81,9 +81,12 @@ public class ClinicalTrialsGovParser implements TrialSourceParser {
         //
         // A cached inference. Change the patterns and every stored value is stale, so re-derive
         // by re-normalizing rather than trusting an old one.
-        trial.setTreatmentGoal(TreatmentGoalClassifier.classify(
-                joinForGoal(trial.getBriefTitle(), trial.getOfficialTitle(),
-                        trial.getBriefSummary(), trial.getDetailedDescription())).name());
+        String describable = joinForGoal(trial.getBriefTitle(), trial.getOfficialTitle(),
+                trial.getBriefSummary(), trial.getDetailedDescription());
+        trial.setTreatmentGoal(TrialTextClassifier.classify(describable).name());
+        // The other half: what a trial is trying to do and who it is for are different
+        // questions that can disagree, so they are stored separately.
+        trial.setDiseaseStage(TrialTextClassifier.classifyStage(describable).name());
 
         List<ArmGroup> armGroups = new ArrayList<>();
         for (JsonNode node : armsInterventions.path("armGroups")) {

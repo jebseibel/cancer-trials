@@ -1,11 +1,12 @@
 package com.seibel.cancer.common.util;
 
+import com.seibel.cancer.common.enums.DiseaseStage;
 import com.seibel.cancer.common.enums.TreatmentGoal;
 
 import java.util.regex.Pattern;
 
 /**
- * Reads a trial's own words to decide what it appears to be trying to achieve.
+ * Reads a trial's own words to decide what it is trying to achieve, and for whom.
  *
  * <p><b>Why this lives in {@code :common}.</b> Two callers need it and they are on opposite sides
  * of the module graph: {@code :datafetcher} stamps the value at normalization, and root's
@@ -23,7 +24,7 @@ import java.util.regex.Pattern;
  * therapy someone already received, which inverts the meaning on exactly the phrases that matter
  * most.
  */
-public final class TreatmentGoalClassifier {
+public final class TrialTextClassifier {
 
     /**
      * Metastasis-directed and ablative strategy — the language that actually works.
@@ -65,10 +66,33 @@ public final class TreatmentGoalClassifier {
                     + "|difficult to|unlikely to be|hard to|fail\\w* to)\\b[\\s\\-]{0,4}$",
             Pattern.CASE_INSENSITIVE);
 
+    /**
+     * Metastatic disease vocabulary.
+     *
+     * <p>Bare {@code advanced} is deliberately absent: "locally advanced" is stage III, and
+     * matching it would admit exactly the early-stage trials the other pattern exists to catch.
+     */
+    private static final Pattern METASTATIC_DISEASE = Pattern.compile(
+            "metasta(tic|sis|ses|tases)\\w*|stage IV|stage 4|\\bMBC\\b|\\bM1\\b|\\brecurrent\\b",
+            Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Early-stage scope — a third of the corpus, and a mismatch for a metastatic patient.
+     *
+     * <p>⚠️ {@code \b} on {@code operable} and {@code resectable} is not decoration. Without it
+     * they match inside "inoperable" and "unresectable", which mean the opposite, and a trial
+     * reading "recurrent unresectable ... metastatic" was classified early-stage on that
+     * substring during the corpus measurement. Third occurrence of this class of bug here.
+     */
+    private static final Pattern EARLY_STAGE_DISEASE = Pattern.compile(
+            "\\badjuvant\\b|neoadjuvant|early[- ]stage|\\bstage (0|I|II|III)\\b|\\boperable\\b"
+                    + "|\\bresectable\\b|postoperative|preoperative|\\bDCIS\\b|\\bin situ\\b",
+            Pattern.CASE_INSENSITIVE);
+
     /** Characters of context searched for a negation. Covers every observed case. */
     private static final int NEGATION_LOOKBEHIND = 40;
 
-    private TreatmentGoalClassifier() {
+    private TrialTextClassifier() {
     }
 
     /**
@@ -129,6 +153,54 @@ public final class TreatmentGoalClassifier {
         }
         String flat = text.replaceAll("\\s+", " ");
         var m = ABLATIVE_STRATEGY.matcher(flat);
+        if (!m.find()) {
+            return null;
+        }
+        int from = Math.max(0, m.start() - 40);
+        int to = Math.min(flat.length(), m.end() + 80);
+        return flat.substring(from, to).strip();
+    }
+
+    /**
+     * Classifies what stage of disease a trial studies, from its own description.
+     *
+     * @param titleAndSummary title, summary and description concatenated; null or blank yields
+     *                        {@link DiseaseStage#NOT_STATED}
+     */
+    public static DiseaseStage classifyStage(String titleAndSummary) {
+        if (titleAndSummary == null || titleAndSummary.isBlank()) {
+            return DiseaseStage.NOT_STATED;
+        }
+        String flat = titleAndSummary.replaceAll("\\s+", " ");
+
+        boolean metastatic = METASTATIC_DISEASE.matcher(flat).find();
+        boolean early = EARLY_STAGE_DISEASE.matcher(flat).find();
+
+        if (metastatic && early) {
+            return DiseaseStage.BOTH;
+        }
+        if (metastatic) {
+            return DiseaseStage.METASTATIC;
+        }
+        return early ? DiseaseStage.EARLY_STAGE : DiseaseStage.NOT_STATED;
+    }
+
+    /** The metastatic phrase that matched, with context, or null. Shown as evidence. */
+    public static String firstMetastaticPhrase(String text) {
+        return firstWithContext(text, METASTATIC_DISEASE);
+    }
+
+    /** The early-stage phrase that matched, with context, or null. Shown as evidence. */
+    public static String firstEarlyStagePhrase(String text) {
+        return firstWithContext(text, EARLY_STAGE_DISEASE);
+    }
+
+    private static String firstWithContext(String text, Pattern pattern) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        String flat = text.replaceAll("\\s+", " ");
+        var m = pattern.matcher(flat);
         if (!m.find()) {
             return null;
         }

@@ -1,5 +1,6 @@
 package com.seibel.cancer.common.util;
 
+import com.seibel.cancer.common.enums.DiseaseStage;
 import com.seibel.cancer.common.enums.TreatmentGoal;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * phrasings. The wordings that broke the first pattern set were ones nobody would have guessed,
  * and a test written from imagination would have missed every one of them.
  */
-class TreatmentGoalClassifierTest {
+class TrialTextClassifierTest {
 
     @ParameterizedTest
     @DisplayName("metastasis-directed trials classify as ablative")
@@ -39,7 +40,7 @@ class TreatmentGoalClassifierTest {
                     + "oncological treatment, with resection of oligometastases"
     })
     void ablativeStrategy(String text) {
-        assertThat(TreatmentGoalClassifier.classify(text)).isEqualTo(TreatmentGoal.ABLATIVE);
+        assertThat(TrialTextClassifier.classify(text)).isEqualTo(TreatmentGoal.ABLATIVE);
     }
 
     /**
@@ -60,7 +61,7 @@ class TreatmentGoalClassifierTest {
                     + "acquired resistance develops"
     })
     void negatedCureIsNotStated(String text) {
-        assertThat(TreatmentGoalClassifier.classify(text)).isEqualTo(TreatmentGoal.NOT_STATED);
+        assertThat(TrialTextClassifier.classify(text)).isEqualTo(TreatmentGoal.NOT_STATED);
     }
 
     @Test
@@ -68,7 +69,7 @@ class TreatmentGoalClassifierTest {
     void scansPastNegatedOccurrence() {
         String text = "Metastatic breast cancer remains difficult to cure in the majority of "
                 + "cases. This study treats selected patients with curative intent.";
-        assertThat(TreatmentGoalClassifier.classify(text)).isEqualTo(TreatmentGoal.CURE_LANGUAGE);
+        assertThat(TrialTextClassifier.classify(text)).isEqualTo(TreatmentGoal.CURE_LANGUAGE);
     }
 
     @Test
@@ -78,7 +79,7 @@ class TreatmentGoalClassifierTest {
         String text = "A multimodal approach, including LRT with curative intent should be "
                 + "considered for selected dnMBC patients, especially the subset of bone-only "
                 + "metastatic ones";
-        assertThat(TreatmentGoalClassifier.classify(text)).isEqualTo(TreatmentGoal.CURE_LANGUAGE);
+        assertThat(TrialTextClassifier.classify(text)).isEqualTo(TreatmentGoal.CURE_LANGUAGE);
     }
 
     /**
@@ -95,24 +96,24 @@ class TreatmentGoalClassifierTest {
                     + "have an excellent prognosis"
     })
     void responseEndpointsAreNotStated(String text) {
-        assertThat(TreatmentGoalClassifier.classify(text)).isEqualTo(TreatmentGoal.NOT_STATED);
+        assertThat(TrialTextClassifier.classify(text)).isEqualTo(TreatmentGoal.NOT_STATED);
     }
 
     @Test
     @DisplayName("absent text is not-stated rather than an assumption either way")
     void absentTextIsNotStated() {
-        assertThat(TreatmentGoalClassifier.classify(null)).isEqualTo(TreatmentGoal.NOT_STATED);
-        assertThat(TreatmentGoalClassifier.classify("   ")).isEqualTo(TreatmentGoal.NOT_STATED);
+        assertThat(TrialTextClassifier.classify(null)).isEqualTo(TreatmentGoal.NOT_STATED);
+        assertThat(TrialTextClassifier.classify("   ")).isEqualTo(TreatmentGoal.NOT_STATED);
     }
 
     @Test
     @DisplayName("the matched phrase comes back as evidence, not just a verdict")
     void evidenceIsReturned() {
-        assertThat(TreatmentGoalClassifier.firstAblativePhrase(
+        assertThat(TrialTextClassifier.firstAblativePhrase(
                 "SBRT to all sites of disease in 1-5 metastases")).isNotBlank();
-        assertThat(TreatmentGoalClassifier.firstUnnegatedCure(
+        assertThat(TrialTextClassifier.firstUnnegatedCure(
                 "treated with curative intent")).isNotBlank();
-        assertThat(TreatmentGoalClassifier.firstUnnegatedCure(
+        assertThat(TrialTextClassifier.firstUnnegatedCure(
                 "these regimens are not curative")).isNull();
     }
 
@@ -131,5 +132,78 @@ class TreatmentGoalClassifierTest {
         assertThat(TreatmentGoal.fromValue("CURATIVE")).isEqualTo(TreatmentGoal.NOT_STATED);
         assertThat(TreatmentGoal.fromValue(null)).isEqualTo(TreatmentGoal.NOT_STATED);
         assertThat(TreatmentGoal.fromValue("ablative")).isEqualTo(TreatmentGoal.ABLATIVE);
+    }
+
+    @ParameterizedTest
+    @DisplayName("metastatic trials are recognised, including the plural noun")
+    @ValueSource(strings = {
+            "A study in metastatic breast cancer",
+            // NCT03808337 - "metastases", which a `metastatic`-only pattern missed entirely
+            "SBRT delivered to all sites of disease in participants with 1-5 metastases",
+            "Patients with stage IV breast cancer",
+            "recurrent unresectable disease"
+    })
+    void metastaticStage(String text) {
+        assertThat(TrialTextClassifier.classifyStage(text)).isEqualTo(DiseaseStage.METASTATIC);
+    }
+
+    @ParameterizedTest
+    @DisplayName("early-stage trials are recognised")
+    @ValueSource(strings = {
+            "Postoperative adjuvant therapy with T-DM1 for one year",
+            "neoadjuvant chemotherapy in operable breast cancer",
+            "Ductal Carcinoma in Situ (DCIS) active surveillance",
+            "patients with stage II disease"
+    })
+    void earlyStage(String text) {
+        assertThat(TrialTextClassifier.classifyStage(text)).isEqualTo(DiseaseStage.EARLY_STAGE);
+    }
+
+    /**
+     * Without word boundaries these match inside "unresectable" and "inoperable", which mean the
+     * opposite. A trial reading "recurrent unresectable ... metastatic" was classified
+     * early-stage on that substring during the corpus measurement.
+     */
+    @ParameterizedTest
+    @DisplayName("a negative prefix does not read as early-stage")
+    @ValueSource(strings = {
+            "recurrent unresectable metastatic disease",
+            "inoperable metastatic breast cancer"
+    })
+    void negativePrefixesAreNotEarlyStage(String text) {
+        assertThat(TrialTextClassifier.classifyStage(text)).isEqualTo(DiseaseStage.METASTATIC);
+    }
+
+    @Test
+    @DisplayName("a trial naming both stages says so rather than picking one")
+    void bothStages() {
+        assertThat(TrialTextClassifier.classifyStage(
+                "adjuvant therapy in early-stage and metastatic breast cancer"))
+                .isEqualTo(DiseaseStage.BOTH);
+    }
+
+    /**
+     * "Locally advanced" is stage III. Matching bare "advanced" as metastatic would admit
+     * exactly the early-stage trials this test exists to keep out.
+     */
+    @Test
+    @DisplayName("locally advanced alone is not metastatic")
+    void locallyAdvancedIsNotMetastatic() {
+        assertThat(TrialTextClassifier.classifyStage(
+                "patients with locally advanced breast cancer"))
+                .isEqualTo(DiseaseStage.NOT_STATED);
+    }
+
+    @Test
+    @DisplayName("silence is not-stated, and only a clear early-stage trial is filtered out")
+    void silenceAndFilterSafety() {
+        assertThat(TrialTextClassifier.classifyStage("A study of drug X versus placebo"))
+                .isEqualTo(DiseaseStage.NOT_STATED);
+        assertThat(TrialTextClassifier.classifyStage(null)).isEqualTo(DiseaseStage.NOT_STATED);
+
+        // A filter built on an inference must fail towards showing a trial, not hiding one.
+        assertThat(DiseaseStage.NOT_STATED.couldIncludeMetastatic()).isTrue();
+        assertThat(DiseaseStage.BOTH.couldIncludeMetastatic()).isTrue();
+        assertThat(DiseaseStage.EARLY_STAGE.couldIncludeMetastatic()).isFalse();
     }
 }

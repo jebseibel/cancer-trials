@@ -42,6 +42,15 @@ public class TrialDb extends BaseDb {
     @Column(name = "treatment_goal", length = 24)
     private String treatmentGoal;
 
+    /**
+     * Inferred disease stage - see {@link com.seibel.cancer.common.enums.DiseaseStage}.
+     *
+     * <p>Stored as a string for the same reason as treatment goal: an unrecognised value maps
+     * to NOT_STATED rather than failing to load the row.
+     */
+    @Column(name = "disease_stage", length = 24)
+    private String diseaseStage;
+
     @Column(name = "brief_summary", columnDefinition = "text")
     private String briefSummary;
 

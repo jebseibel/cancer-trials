@@ -2,6 +2,7 @@ package com.seibel.cancer.service.matching;
 
 import com.seibel.cancer.common.domain.Trial;
 import com.seibel.cancer.common.enums.ActiveEnum;
+import com.seibel.cancer.common.enums.DiseaseStage;
 import com.seibel.cancer.common.enums.TreatmentGoal;
 import com.seibel.cancer.database.db.service.TrialDbService;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,24 +27,29 @@ import static org.mockito.Mockito.when;
  * already in the database picks up a new classification. The patterns moved twice during the
  * measurement that produced them, so this will run again.
  */
-class TreatmentGoalBackfillServiceTest {
+class TrialClassificationBackfillServiceTest {
 
     private TrialDbService trialDbService;
-    private TreatmentGoalBackfillService service;
+    private TrialClassificationBackfillService service;
 
     @BeforeEach
     void setUp() {
         trialDbService = mock(TrialDbService.class);
-        service = new TreatmentGoalBackfillService(trialDbService);
+        service = new TrialClassificationBackfillService(trialDbService);
     }
 
     private Trial trial(String extid, String summary, String storedGoal) {
+        return trial(extid, summary, storedGoal, null);
+    }
+
+    private Trial trial(String extid, String summary, String storedGoal, String storedStage) {
         Trial t = new Trial();
         t.setExtid(extid);
         t.setNctId("NCT" + extid);
         t.setBriefTitle("A Study");
         t.setBriefSummary(summary);
         t.setTreatmentGoal(storedGoal);
+        t.setDiseaseStage(storedStage);
         return t;
     }
 
@@ -68,10 +74,14 @@ class TreatmentGoalBackfillServiceTest {
      * touch updated_at across the whole corpus for nothing.
      */
     @Test
-    @DisplayName("a trial already carrying the right value is not rewritten")
+    @DisplayName("a trial already carrying the right values is not rewritten")
     void skipsUnchanged() {
+        // Both columns have to already be right. A trial with the correct goal but a missing
+        // stage still needs the write - that is the state every row was in before the stage
+        // column existed.
         when(trialDbService.findByActive(ActiveEnum.ACTIVE)).thenReturn(List.of(
-                trial("a", "SBRT to all sites of disease", TreatmentGoal.ABLATIVE.name())));
+                trial("a", "SBRT to all sites of disease", TreatmentGoal.ABLATIVE.name(),
+                        DiseaseStage.NOT_STATED.name())));
 
         var result = service.backfillAll();
 
@@ -145,5 +155,24 @@ class TreatmentGoalBackfillServiceTest {
 
         assertThat(result.trialsRead()).isZero();
         assertThat(result.errors()).isEmpty();
+    }
+
+    /**
+     * The state every row was in when the stage column was added: treatment goal already
+     * correct, stage never set. It must still be written.
+     */
+    @Test
+    @DisplayName("a correct goal with a missing stage is still written")
+    void fillsMissingStageAlongsideCorrectGoal() {
+        when(trialDbService.findByActive(ActiveEnum.ACTIVE)).thenReturn(List.of(
+                trial("a", "A study in metastatic breast cancer",
+                        TreatmentGoal.NOT_STATED.name(), null)));
+
+        var result = service.backfillAll();
+
+        ArgumentCaptor<Trial> patch = ArgumentCaptor.forClass(Trial.class);
+        verify(trialDbService).update(anyString(), patch.capture());
+        assertThat(patch.getValue().getDiseaseStage()).isEqualTo(DiseaseStage.METASTATIC.name());
+        assertThat(result.updated()).isEqualTo(1);
     }
 }

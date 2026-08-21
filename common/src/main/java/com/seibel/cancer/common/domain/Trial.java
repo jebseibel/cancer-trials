@@ -29,6 +29,15 @@ public class Trial extends BaseDomain {
      * treatment-intent field. A cached inference: it goes stale when the patterns change.
      */
     private String treatmentGoal;
+
+    /**
+     * What stage of disease the trial studies, as
+     * {@link com.seibel.cancer.common.enums.DiseaseStage}'s name.
+     *
+     * <p>A third of the corpus is early-stage and therefore a mismatch for a metastatic
+     * patient. Derived from prose at normalization; a cached inference like treatment goal.
+     */
+    private String diseaseStage;
     private String briefSummary;
     private String detailedDescription;
     private LocalDate startDate;

@@ -10,7 +10,7 @@ import com.seibel.cancer.common.domain.matching.SignalOutcome;
 import com.seibel.cancer.common.enums.ReceptorStatus;
 import com.seibel.cancer.common.enums.TreatmentStatus;
 import com.seibel.cancer.common.enums.VariantStatus;
-import com.seibel.cancer.common.util.TreatmentGoalClassifier;
+import com.seibel.cancer.common.util.TrialTextClassifier;
 import com.seibel.cancer.rag.chunk.EligibilityChunk;
 import com.seibel.cancer.rag.chunk.EligibilityCriteriaChunker;
 import org.springframework.stereotype.Component;
@@ -281,7 +281,7 @@ public class CriteriaSignalEvaluator {
      * the same reason.
      *
      * <p><b>Ablative language leads, cure language confirms.</b> Measured across 2,473 trials:
-     * 26 of 38 survivors come from {@link TreatmentGoalClassifier} at near-perfect precision, while
+     * 26 of 38 survivors come from {@link TrialTextClassifier} at near-perfect precision, while
      * the 12 that arrive on cure language alone carry every false positive. Response-endpoint
      * vocabulary — "complete response", "disease-free survival" — was measured and
      * <b>excluded</b>: 232 trials say it, and 5 of 5 hand-checked were reporting how outcomes are
@@ -303,7 +303,7 @@ public class CriteriaSignalEvaluator {
                             + "could not be checked.");
         }
 
-        String ablative = TreatmentGoalClassifier.firstAblativePhrase(haystack);
+        String ablative = TrialTextClassifier.firstAblativePhrase(haystack);
         if (ablative != null) {
             return EligibilitySignal.pass(name,
                     "This trial treats the individual sites of spread rather than only slowing "
@@ -312,7 +312,7 @@ public class CriteriaSignalEvaluator {
                     ablative);
         }
 
-        String cure = TreatmentGoalClassifier.firstUnnegatedCure(haystack);
+        String cure = TrialTextClassifier.firstUnnegatedCure(haystack);
         if (cure != null) {
             return new EligibilitySignal(name, SignalOutcome.UNKNOWN,
                     "This trial's description uses the language of cure or long-term remission. "

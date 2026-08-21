@@ -183,6 +183,7 @@ class TrialConverter {
                 .overallStatus(item.getOverallStatus())
                 .studyType(item.getStudyType())
                 .treatmentGoal(item.getTreatmentGoal())
+                .diseaseStage(item.getDiseaseStage())
                 .briefSummary(item.getBriefSummary())
                 .detailedDescription(item.getDetailedDescription())
                 .startDate(item.getStartDate())

@@ -36,6 +36,9 @@ export interface Trial {
     // ABLATIVE (treats the sites of spread directly), CURE_LANGUAGE (talks about cure or
     // long-term remission), or NOT_STATED. Absent on trials loaded before this existed.
     treatmentGoal?: 'ABLATIVE' | 'CURE_LANGUAGE' | 'NOT_STATED';
+    // What stage of disease the trial studies. EARLY_STAGE is a mismatch for a metastatic
+    // patient and is a third of the corpus. Absent on trials loaded before this existed.
+    diseaseStage?: 'METASTATIC' | 'EARLY_STAGE' | 'BOTH' | 'NOT_STATED';
     // Where the trial runs. Populated on the list endpoint only - the single-trial endpoint has
     // a full locations section instead. "City, State" for US sites, country names otherwise.
     siteLabels?: string[];

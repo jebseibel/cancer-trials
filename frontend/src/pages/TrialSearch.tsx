@@ -76,6 +76,9 @@ function KeywordSearch() {
     // Travel is often what decides whether a trial is possible at all, and she will travel
     // anywhere in the USA but not abroad. Off by default, like the other hiding control.
     const [usOnly, setUsOnly] = useState(false);
+    // A third of the corpus is adjuvant or early-stage, which cannot apply to someone already
+    // metastatic. Off by default like the others - it hides trials.
+    const [metastaticOnly, setMetastaticOnly] = useState(false);
     const { patient } = useCurrentPatient();
 
     const { data, isLoading, isError } = useQuery({
@@ -103,9 +106,12 @@ function KeywordSearch() {
             // Undefined means locations were never looked up, which is not the same as having
             // none - so an unknown trial stays in the list rather than being hidden by silence.
             const matchesLocation = !usOnly || trial.hasUnitedStatesSite !== false;
-            return matchesTerm && matchesStatus && matchesGoal && matchesLocation;
+            // Only an unambiguously early-stage trial is hidden. BOTH and NOT_STATED stay,
+            // because a filter built on an inference must fail towards showing a trial.
+            const matchesStage = !metastaticOnly || trial.diseaseStage !== 'EARLY_STAGE';
+            return matchesTerm && matchesStatus && matchesGoal && matchesLocation && matchesStage;
         });
-    }, [data, term, status, curativeOnly, usOnly]);
+    }, [data, term, status, curativeOnly, usOnly, metastaticOnly]);
 
     return (
         <>
@@ -150,6 +156,15 @@ function KeywordSearch() {
                     />
                     In the United States
                 </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer min-h-[2.25rem]">
+                    <input
+                        type="checkbox"
+                        checked={metastaticOnly}
+                        onChange={(e) => setMetastaticOnly(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                    />
+                    Not for early-stage only
+                </label>
             </div>
 
             {isLoading && <p className="text-gray-500">Loading trials...</p>}
@@ -179,6 +194,7 @@ function KeywordSearch() {
                                 <div className="flex flex-wrap items-center gap-2">
                                     {patient && <Tier1Badge patient={patient} trial={trial} />}
                                     <TreatmentGoalBadge goal={trial.treatmentGoal} />
+                                    <DiseaseStageBadge stage={trial.diseaseStage} />
                                 </div>
                             </div>
                             {trial.overallStatus && (
@@ -396,6 +412,30 @@ function sourceLabel(source: string): string {
         default:
             return source.replaceAll('_', ' ').toLowerCase();
     }
+}
+
+/**
+ * Flags a trial that is for disease before it has spread.
+ *
+ * <p>Only EARLY_STAGE renders. Marking the metastatic ones would badge most of a breast corpus
+ * with something the reader already assumes, and the useful signal is the mismatch - a third of
+ * the corpus is adjuvant or early-stage and cannot apply to someone already metastatic.
+ *
+ * <p>Amber, not red, and the trial still appears: this is read from prose and can be wrong.
+ */
+function DiseaseStageBadge({ stage }: { stage?: string }) {
+    if (stage !== 'EARLY_STAGE') {
+        return null;
+    }
+    return (
+        <span
+            className="mt-2 inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800"
+            title="This trial describes disease before it has spread - adjuvant, neoadjuvant or stage I-III"
+        >
+            <AlertTriangle className="h-3 w-3" />
+            Earlier-stage disease
+        </span>
+    );
 }
 
 /**

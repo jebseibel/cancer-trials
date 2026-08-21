@@ -10,7 +10,7 @@ import com.seibel.cancer.common.enums.AccessLevel;
 import com.seibel.cancer.service.CurrentUserService;
 import com.seibel.cancer.service.TrialService;
 import com.seibel.cancer.service.matching.CriteriaSignalEvaluator;
-import com.seibel.cancer.service.matching.TreatmentGoalBackfillService;
+import com.seibel.cancer.service.matching.TrialClassificationBackfillService;
 import com.seibel.cancer.service.matching.TrialMatchingService;
 import com.seibel.cancer.web.response.ResponseEligibilitySignal;
 import com.seibel.cancer.web.response.ResponseTreatmentGoalBackfill;
@@ -51,7 +51,7 @@ import java.util.List;
 public class TrialMatchingController {
 
     private final TrialMatchingService matchingService;
-    private final TreatmentGoalBackfillService treatmentGoalBackfillService;
+    private final TrialClassificationBackfillService trialClassificationBackfillService;
     private final TrialService trialService;
     private final CurrentUserService currentUserService;
     private final TrialMatchingConverter converter;
@@ -122,7 +122,7 @@ public class TrialMatchingController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Re-derive the treatment-goal column for all trials")
     public ResponseTreatmentGoalBackfill backfillTreatmentGoals() {
-        var result = treatmentGoalBackfillService.backfillAll();
+        var result = trialClassificationBackfillService.backfillAll();
         return ResponseTreatmentGoalBackfill.builder()
                 .trialsRead(result.trialsRead())
                 .updated(result.updated())

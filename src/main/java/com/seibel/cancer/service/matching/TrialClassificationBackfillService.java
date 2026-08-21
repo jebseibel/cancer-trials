@@ -2,8 +2,9 @@ package com.seibel.cancer.service.matching;
 
 import com.seibel.cancer.common.domain.Trial;
 import com.seibel.cancer.common.enums.ActiveEnum;
+import com.seibel.cancer.common.enums.DiseaseStage;
 import com.seibel.cancer.common.enums.TreatmentGoal;
-import com.seibel.cancer.common.util.TreatmentGoalClassifier;
+import com.seibel.cancer.common.util.TrialTextClassifier;
 import com.seibel.cancer.database.db.service.TrialDbService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,7 +14,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Re-derives {@code trial.treatment_goal} for trials already in the database.
+ * Re-derives {@code trial.treatment_goal} and {@code trial.disease_stage} for trials
+ * already in the database.
  *
  * <p><b>Why this exists rather than relying on ingestion.</b> The value is stamped at
  * normalization, and ingestion skips trials whose {@code payload_hash} is unchanged — correctly,
@@ -35,7 +37,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class TreatmentGoalBackfillService {
+public class TrialClassificationBackfillService {
 
     private final TrialDbService trialDbService;
 
@@ -67,18 +69,26 @@ public class TreatmentGoalBackfillService {
 
         for (Trial trial : trials) {
             try {
-                TreatmentGoal goal = TreatmentGoalClassifier.classify(describableText(trial));
-                if (goal.name().equals(trial.getTreatmentGoal())) {
+                String text = describableText(trial);
+                TreatmentGoal goal = TrialTextClassifier.classify(text);
+                DiseaseStage stage = TrialTextClassifier.classifyStage(text);
+
+                // Both in one pass: they read the same text, and a second walk of the corpus to
+                // set the second column would double the cost for nothing.
+                boolean goalSame = goal.name().equals(trial.getTreatmentGoal());
+                boolean stageSame = stage.name().equals(trial.getDiseaseStage());
+                if (goalSame && stageSame) {
                     unchanged++;
                     continue;
                 }
 
                 Trial patch = new Trial();
                 patch.setTreatmentGoal(goal.name());
+                patch.setDiseaseStage(stage.name());
                 trialDbService.update(trial.getExtid(), patch);
                 updated++;
             } catch (Exception e) {
-                log.debug("treatment-goal backfill failed for extid={}", trial.getExtid(), e);
+                log.debug("classification backfill failed for extid={}", trial.getExtid(), e);
                 errors.add("Failed for " + trial.getNctId() + ": " + e.getMessage());
             }
         }

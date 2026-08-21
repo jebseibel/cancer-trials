@@ -26,6 +26,14 @@ public class ResponseTrial {
     private String treatmentGoal;
 
     /**
+     * What stage of disease the trial studies: METASTATIC, EARLY_STAGE, BOTH or NOT_STATED.
+     *
+     * <p>Read-only, like treatment goal - derived from the trial's own text rather than
+     * supplied by a caller.
+     */
+    private String diseaseStage;
+
+    /**
      * Where the trial runs, as "City, State" for US sites or country names otherwise.
      *
      * <p>Populated on the list endpoint, where a reader is scanning and travel is often what
