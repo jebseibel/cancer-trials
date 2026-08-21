@@ -36,16 +36,36 @@ public class TrialRetrievalService {
     private final RagProperties ragProperties;
 
     /**
+     * Chunk sources that state who may enrol, as opposed to what the trial is or does.
+     *
+     * <p>{@code ELIGIBILITY_UNPARSED} belongs here: it is criteria text the chunker could not
+     * split into sections, not prose. Excluding it would silently drop the ~5% of trials whose
+     * criteria carry no section header.
+     */
+    private static final String CRITERIA_SOURCES_CLAUSE =
+            "(source == 'INCLUSION_CRITERION'"
+                    + " || source == 'EXCLUSION_CRITERION'"
+                    + " || source == 'ELIGIBILITY_UNPARSED')";
+
+    /**
      * @param query          natural-language query
      * @param maxTrials      how many distinct trials to return
      * @param recruitingOnly restrict to actively recruiting trials
      * @param excludeExclusionCriteria drop exclusion-criteria matches. Useful when asking
      *        "what might fit", since matching an exclusion means the opposite of qualifying.
      *        Leave false to see disqualifying matches too - often the more important answer.
+     * @param criteriaOnly restrict to eligibility-criteria chunks, dropping titles, summaries,
+     *        descriptions, interventions and outcomes. Measured 2026-08-21: on a whole-profile
+     *        query, 15 of the top 25 hits were trial-design prose ("This is a first-in-human,
+     *        open-label, phase I/Ib study...") repeated across unrelated trials, which crowds
+     *        out the criteria that decide whether a patient qualifies. Filtering removes them.
+     *        <p>Deliberately not the default: a query like "what is this trial testing" is
+     *        answered by the summary, and defaulting to true would silently break it.
      * @param similarityThreshold minimum score, 0..1. Below this a match is noise.
      */
     public List<TrialMatch> search(String query, int maxTrials, boolean recruitingOnly,
-                                   boolean excludeExclusionCriteria, Double similarityThreshold) {
+                                   boolean excludeExclusionCriteria, boolean criteriaOnly,
+                                   Double similarityThreshold) {
         if (query == null || query.isBlank()) {
             return List.of();
         }
@@ -65,7 +85,7 @@ public class TrialRetrievalService {
                 .topK(Math.max(maxTrials, 1) * multiplier)
                 .similarityThreshold(threshold);
 
-        String filter = buildFilter(recruitingOnly, excludeExclusionCriteria);
+        String filter = buildFilter(recruitingOnly, excludeExclusionCriteria, criteriaOnly);
         if (filter != null) {
             request.filterExpression(filter);
         }
@@ -82,13 +102,20 @@ public class TrialRetrievalService {
      * Builds a Spring AI portable filter expression, which the store translates to its own
      * native filter syntax.
      */
-    private String buildFilter(boolean recruitingOnly, boolean excludeExclusionCriteria) {
+    private String buildFilter(boolean recruitingOnly, boolean excludeExclusionCriteria,
+                               boolean criteriaOnly) {
         List<String> clauses = new ArrayList<>();
         if (recruitingOnly) {
             clauses.add("overallStatus == 'RECRUITING'");
         }
         if (excludeExclusionCriteria) {
             clauses.add("isExclusion == false");
+        }
+        if (criteriaOnly) {
+            // OR-of-equals rather than `source in [...]`. Both parse, but == is the operator
+            // the two clauses above already use against this store, and IN's translation to
+            // Qdrant's native filter is the thing that was not proven when this was written.
+            clauses.add(CRITERIA_SOURCES_CLAUSE);
         }
         return clauses.isEmpty() ? null : String.join(" && ", clauses);
     }
@@ -107,10 +134,17 @@ public class TrialRetrievalService {
         for (Map.Entry<String, List<Document>> e : byTrial.entrySet()) {
             if (results.size() >= maxTrials) break;
 
-            Trial trial = trialDbService.findByExtid(e.getKey());
-            if (trial == null) {
-                // Vector store is ahead of MySQL - a trial was deleted but its chunks remain.
-                // Expected under eventual consistency; backfill reconciles it (section 6).
+            // The vector store routinely holds chunks for trials MySQL no longer has - a
+            // database rebuild invalidates every extid while the collection keeps its points,
+            // and nothing reconciles the two. Skipping one orphan must not fail the search.
+            //
+            // findByExtid throws rather than returning null, so this has to be a catch: the
+            // null guard that used to stand here could never fire, and one stale chunk turned
+            // the whole request into a 500.
+            Trial trial;
+            try {
+                trial = trialDbService.findByExtid(e.getKey());
+            } catch (RuntimeException ex) {
                 log.warn("retrieval: chunks reference missing trial extid={}", e.getKey());
                 continue;
             }

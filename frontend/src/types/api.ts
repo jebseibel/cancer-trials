@@ -447,3 +447,28 @@ export interface TrialAssessment {
     siteCount: number;
     hasUnitedStatesSite: boolean;
 }
+
+// One semantically matched trial, from GET /api/rag/search. Distinct from Trial: this carries
+// the chunks that matched and why, which is what lets a reader check the reasoning rather
+// than trust a ranking.
+export interface TrialSearchMatch {
+    trialExtid: string;
+    nctId?: string | null;
+    briefTitle?: string | null;
+    overallStatus?: string | null;
+    // Best similarity among this trial's matched chunks, 0..1.
+    topScore: number;
+    matches: TrialSearchChunkMatch[];
+}
+
+export interface TrialSearchChunkMatch {
+    text: string;
+    // Which field it came from: INCLUSION_CRITERION, EXCLUSION_CRITERION,
+    // ELIGIBILITY_UNPARSED, BRIEF_SUMMARY, DETAILED_DESCRIPTION, INTERVENTION, OUTCOME.
+    source: string;
+    ordinal: number;
+    score: number;
+    // A high score on an exclusion suggests the patient may be disqualified - the opposite
+    // of a fit. Shown as a caution, never counted as evidence of eligibility.
+    isExclusion: boolean;
+}
