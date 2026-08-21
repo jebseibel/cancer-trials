@@ -118,7 +118,10 @@ cancer:
       # Seed-if-absent, never sync. An existing row is left alone, so edits made through the UI
       # survive a restart. A missing file or directory is not an error.
       enabled: ${PATIENT_SEED_ENABLED:true}
-      directory: ${PATIENT_SEED_DIR:.claude/patient-data}
+      # Moved under _archive/ with the rest of the finished work. A wrong path here fails
+      # silently by design - a missing directory is not an error - so the symptom is an empty
+      # patient record after the next rebuild, not a startup failure.
+      directory: ${PATIENT_SEED_DIR:.claude/_archive/patient-data}
       diagnosis-file: ${PATIENT_SEED_DIAGNOSIS_FILE:patient-diagnosis.csv}
       variant-file: ${PATIENT_SEED_VARIANT_FILE:patient-variant.csv}
       prior-treatment-file: ${PATIENT_SEED_TREATMENT_FILE:patient-prior-treatment.csv}
