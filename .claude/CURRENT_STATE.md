@@ -5,34 +5,38 @@ Where the project stands, what is deliberately unfinished, and what that blocks.
 (schema design). This is the "where are we right now" view — update it as things change rather
 than keeping it as history.
 
-**Last verified against the code: 2026-08-14.** Status facts below (security, authorization,
-the `AppUser` → `Patient` rename, Tier 2 wiring, git state) were re-checked against the source
-on that date. **Everything in "What's built" further down is engineering narrative kept for its
-reasoning and is dated where it happened — treat those sections as history, not as current
-state.**
+**Last verified against the code: 2026-08-21.** **Everything in "What's built" further down is
+engineering narrative kept for its reasoning and is dated where it happened — treat those
+sections as history, not as current state.**
 
-⚠️ **Runtime numbers in this document are stale unless marked otherwise.** Trial counts, Qdrant
-chunk counts, and prod contents were last observed 2026-08-11 and have not been re-verified
-since. They are kept because the ratios are still informative, not because the absolutes are
-current.
+⚠️ **Runtime numbers below the "Picking the project back up" table are stale unless marked
+otherwise.** Prod contents were last observed 2026-08-11. Local figures were re-measured
+2026-08-21 and are in the table.
 
 ---
 
 ## Picking the project back up
 
-Code facts verified 2026-08-14; runtime figures last observed 2026-08-11 and **not re-checked**:
+**Measured 2026-08-21** unless noted:
 
 | | |
 | --- | --- |
-| Trials in MySQL | ~**4,634** — 2,108 mention breast in title/summary (45.5%). *Unverified since 2026-08-11.* |
-| Qdrant | ~**136,345 chunks**, 384 dims, Cosine. *Unverified since 2026-08-11.* |
-| Patient / PatientDiagnosis / PatientVariant / PatientPriorTreatment | 1 row each — **auto-seeded**. *Unverified since 2026-08-11.* |
-| SavedTrialMatch | 0. *Unverified since 2026-08-11.* |
-| Tests | `:database` 820, `:datafetcher` 55, root **71**, `:common` 12, `:rag` 35 (2026-08-11). *Not re-run since; counts will have moved with the ownership and mobile work.* |
-| Branch | **`frontend-mobile`** — **3 ahead of `main`, 0 behind**; the access model, mobile work and docs are unmerged. Verified 2026-08-14. |
+| Trials in MySQL | **2,473** — the corpus was rebuilt and re-pulled this day |
+| Qdrant | **71,712 points**, 2,473 distinct trials, **zero orphans**, 384 dims, Cosine |
+| Curative-intent + stage IV | **38 trials (1.54%)** — see `matching/CURATIVE_STEP1_MEASUREMENT.md` |
+| Early-stage trials | **823 (33.3%)** — a third of the corpus cannot apply to a metastatic patient |
+| Patient / PatientDiagnosis / PatientVariant / PatientPriorTreatment | 1 row each — **auto-seeded** |
+| Tests | `:common` **43**, root **128**, `:database` **862**, `:datafetcher` **55**, `:rag` **44** (1 skip: `RetrievalEvaluation`, needs a live backend by design) |
+| Branch | `curative-work`, branched from `main` at `82e299b`. `main` is pushed and in sync with `origin/main`. |
 
-**The demo happened and went well, and the corpus is complete and searchable.** Both blockers
-from the last session are gone.
+⚠️ **The corpus shrank on purpose.** It was 4,634 trials, then a database rebuild regenerated
+every extid while Qdrant kept its 136,345 points — leaving **4,634 orphans out of 4,884 indexed
+trials**, so search matched chunks pointing at trials MySQL no longer had. That surfaced as a 500
+on 2026-08-21; the collection was recreated and the corpus re-pulled to 2,473.
+
+⚠️ **Nothing in the app detects that condition.** It has now happened three times. A startup check
+comparing Qdrant's distinct trial count against MySQL's would catch it in one line at boot — see
+`TODO.md`.
 
 ### 🚀 DEPLOYED — https://breastcancertrialfinder.com, 2026-08-11
 
@@ -63,13 +67,22 @@ Full procedure and every correction found by doing it: `hosting/DEPLOY_RUNBOOK.m
 
 ### Do this first when you return
 
-⚠️ **Merge this branch to `main`.** `frontend-mobile` is **3 commits ahead of `main` and 0
-behind** (verified 2026-08-14) — the authorization model, the mobile work and the current docs
-are all unmerged, so `main` still reflects the app as deployed on 2026-08-11.
+✅ **`frontend-mobile` is merged and pushed.** `main` and `origin/main` are in sync as of
+2026-08-21. Work since then sits on `curative-work`.
 
 **Check whether the corpus was ever pulled on the server.** As of 2026-08-11 prod had 0 Qdrant
 points and "Trials for You" would return nothing. Nothing in the code tells you whether that was
 done since — verify against the running site rather than trusting this line.
+
+⚠️ **Set `PATIENT_SEED_DIR` or confirm the default.** The patient CSVs moved to
+`.claude/_archive/patient-data/` and the seed loader's default followed them. A wrong path here
+fails silently by design — a missing directory is not an error — so the symptom is a patient
+record that does not come back after a rebuild. There is now a test pinning the two defaults to
+each other and to the files on disk.
+
+⚠️ **`LOGIN_ALLOWED_USERNAMES` is empty**, so the seeded `admin` account can still log in. The
+allowlist code shipped in `1b663cb`; setting the variable is a deployment action. Check the box,
+not the repo.
 
 ✅ **The Rank Trials page is built and wired.** `TrialMatchingController`,
 `ResponseTrialAssessment`, and `frontend/src/pages/RankedTrials.tsx` all exist; the REST boundary
@@ -312,6 +325,74 @@ now that the database holds a real medical record rather than sample data.
 ---
 
 ## What's built
+
+### Treatment goal and disease stage — 2026-08-21
+
+**The first signals about what a trial is trying to do, rather than who it will enrol.** Every
+signal before these answered "does she qualify"; none asked what a trial would be trying to
+achieve for her. `CriteriaSignalEvaluator` now has **seven** signals, not five.
+
+The request was specific: *"Trials that are trying to cure stage 4 cancer. They are out there but
+they are few. They are the primary ones I am trying to find."*
+
+**Measured before building, and the measurement overturned the plan.** Full numbers in
+`matching/CURATIVE_STEP1_MEASUREMENT.md`. Across all 2,473 trials, **38 (1.54%)** are
+metastasis-directed or curative-intent studies for stage IV disease — the "low tens" the plan
+called success.
+
+- **Response-endpoint vocabulary was excluded entirely.** The plan named "complete response" and
+  "disease-free survival" as the workhorse. 232 trials use it; **5 of 5 hand-checked were
+  describing how an outcome is measured**, not what the study aims at. Two were adjuvant trials.
+- **Ablative language is the signal**: 26 of the 38, at near-perfect precision. It names something
+  being done to a metastasis, so it cannot appear in an endpoint definition or a patient history.
+- **Every cure-language false positive was a negation** — "considered non-curative", "unlikely to
+  be cured", "are not curative". One token separates those from the real thing, the same reason
+  embeddings cannot read receptor polarity. A 40-character lookbehind handles it.
+
+⚠️ **Two pattern bugs surfaced that no amount of review would have caught.** `metastases` did not
+match `metastatic`, which silently dropped **the single clearest curative trial in the corpus**
+while the distribution looked healthy. And `resectable` matched inside `unresectable`, vetoing a
+metastatic trial as early-stage. **That word-boundary bug is now its third occurrence in this
+project** — check any new pattern against the words that contain it.
+
+**Treatment goal ranks above concern count, and that placement is the feature.** Curative trials
+are ~1.5% of the corpus, so ranking on concerns alone meant a well-matched disease-control trial
+with zero concerns outranked a curative trial with one, every time. Identifying them correctly
+and leaving them ranked 40th would not have delivered anything.
+
+**Verified live**: NCT04563507 ranked **first** — SBRT to each metastatic lesion on
+a CDK4/6-inhibitor-plus-aromatase-inhibitor backbone, matching the patient's own regimen and disease pattern. NCT05334459 (LRT with curative intent,
+bone-only metastatic) also surfaces.
+
+**Both are stored columns**, `trial.treatment_goal` and `trial.disease_stage` (changesets `031`,
+`032`), so the 38 can be queried rather than only appearing inside a ranking run.
+`TrialTextClassifier` lives in `:common` because `:datafetcher` stamps the values at
+normalization and root reports them as signals, and datafetcher cannot see root — one copy of the
+patterns, not two that drift.
+
+⚠️ **Ingestion cannot repopulate them.** It skips trials whose payload hash is unchanged, so a
+re-pull picks up nothing when only the *code* changed. `POST /api/matching/backfill-treatment-goals`
+(ADMIN-only) re-derives both, and there is a "Recheck Treatment Goals" button on Process Trials.
+
+### Semantic search reached the frontend — 2026-08-21
+
+**Trial Search had no semantic search at all.** It fetched 200 trials and filtered substrings in
+the browser. It now has two modes, and "By meaning" queries the vector store.
+
+`criteriaOnly` restricts matching to eligibility-criteria chunks. Measured on a whole-profile
+query: **15 of the top 25 hits were trial-design prose** — "first-in-human, open-label, phase
+I/Ib" repeated across unrelated trials — crowding out the criteria that decide who can join.
+Filtering removes them. Off by default, since prose is the right answer to "what is this trial
+testing".
+
+⚠️ **The first live call returned 500, and two guesses at the cause were both wrong.** The backend
+log named it in one line: `ServiceException: TrialDb with extid=... not found`. Retrieval was
+working; hydration hit an orphan chunk. **The guard for that already existed and could never
+fire** — it checked for null, but `findByExtid` throws. One stale chunk failed the whole search.
+
+⚠️ **`TrialIndexService.reindexTrial` has the identical dead guard**, so
+`POST /api/rag/reindex/{extid}` with an unknown extid still 500s. Tracked as TODO 2b.
+
 
 ### Tier 2 matching — service layer, 2026-08-11
 
@@ -1334,10 +1415,17 @@ those exist.
 
 ## Candidate next steps
 
+> **Superseded by `TODO.md` as of 2026-08-21** — that is the live list; this section is kept for
+> the reasoning behind each item.
+>
 > **Reviewed 2026-08-14.** Items 1-3 and 7 are done — Tier 2, the Rank Trials page, and endpoint
-> security all shipped. They are kept below with ✅ markers because their reasoning explains the
-> current design. **Items 4-6 (the after-commit event hook, the join tables, and generation) are
-> the ones still open.**
+> security all shipped. **Items 4-6 (the after-commit event hook, the join tables, and
+> generation) remain open.**
+>
+> ⚠️ **Item 1's open question is answered.** The two TRACKED retrieval numbers were never read,
+> but the corpus-versus-model question was settled a different way: BRCA went 0.388 → 0.930 once
+> a real corpus existed, so a bigger embedding model was ruled out. The colloquial query
+> (0.526 → 0.600) is still the one genuine weakness.
 
 The ordering rationale that produced this list still stands: the corpus must exist before
 retrieval can be measured, and retrieval should be measured before matching logic is built on
@@ -1402,39 +1490,37 @@ against the corpus in bulk, cannot inform ranking, and cannot be reused by Tier 
 
 ## Git state
 
-**Verified 2026-08-14.** Current branch is **`frontend-mobile`** — **3 commits ahead of `main`,
-0 behind.** The `qdrant-fixes` state this section used to describe is long merged.
+**Verified 2026-08-21.** `main` and `origin/main` are in sync at `82e299b`. Current work is on
+**`curative-work`**, 11 commits ahead of `main` and unmerged.
 
-⚠️ **Being 3 ahead means `main` lacks the access model, the mobile work and these docs.** `main`'s
-tip is `0544c6a`, the deploy commit — so anything built from `main` is the app as it stood on
-2026-08-11. Merge to ship.
+⚠️ **The remote moved.** GitHub redirects `Cancer.git` to `cancer-trials.git`; the local remote
+URL was updated on 2026-08-21, so a stale clone may still be pushing through the redirect.
 
-The most recent commits, newest first. **The top three are on `frontend-mobile` only**; `main`
-stops at `0544c6a`:
+Commits on `curative-work`, newest first:
 
-| Commit | On `main`? | What |
-| --- | --- | --- |
-| `5836a0b` | ❌ branch only | Write down the plans and the decisions behind them |
-| `14aadff` | ❌ branch only | Make the app usable on a phone, and stop it fetching everyone to find one |
-| `c9cb30d` | ❌ branch only | Give clinical data an owner — the authorization model |
-| `0544c6a` | ✅ **tip of `main`** | Record the deploy, and the four things that only doing it revealed |
-| `1b663cb` | Hash passwords on user create/update, and add a login allowlist |
-| `6037500` | Close the application's authentication holes before it goes public |
-| `9e9719e` | Add the "Trials for You" page |
-| `3152d32` | Expose trial ranking over REST, and batch the location lookups |
-| `89f3960` | Add Tier 2 matching: assess trials against the patient's structured record |
+| Commit | What |
+| --- | --- |
+| `d146ceb` | Tell trials for stage IV apart from trials for early disease |
+| `ec6277a` | Show where a trial runs while someone is still choosing one |
+| `97178c5` | Let someone search for the trials that are aiming higher |
+| `43fbc7e` | Give the treatment-goal recheck a button |
+| `7529b8d` | Give the treatment goal a way to be recomputed |
+| `3dd31d7` | Explain a trial on the page where someone is reading it |
+| `0dd89cb` | Record what a trial is trying to do, so it can be searched for |
+| `2db64df` | Stop asking whether she wants trials for her own cancer |
+| `f9fb39d` | Ask what a trial is trying to do, not only who can join |
+| `dc6d9e7` | Lock the login door after five tries, not eight |
+| `de6afc8` | Point the seed loader at where the patient data actually is |
 
-Test counts below were read 2026-08-11 from the test XML rather than the build result:
-`:database` **820**, `:datafetcher` 55, root **71**, `:common` 12, `:rag` 35 — 0 skipped, 0
-failures. ⚠️ **Not re-run since**, and the ownership and mobile work has landed in between, so
-treat these as a floor rather than a current count.
-
-`:rag`'s one skip is `RetrievalEvaluation`, which needs a running backend; it fails loudly
-without one by design, and was run with `-Deval.skipWithoutBackend=true`. Root's 71 includes
-`CorpusSweep`, which self-skips unless `-Dsweep.enabled=true` — so a normal build never depends
-on a live backend.
+Test counts read from the test XML, not the build result: `:common` **43**, root **128**,
+`:database` **862**, `:datafetcher` **55**, `:rag` **44** — 1 skip, 0 failures.
 
 Frontend typecheck and build clean; one pre-existing lint error in `Login.tsx`.
+
+⚠️ **Editing an applied changeset breaks its checksum and fails startup.** Adding
+`treatment_goal` to `005-trial.yaml` did exactly that, and would have forced a database rebuild —
+destroying a 2,473-trial corpus and its index to add a column. New changesets (`031`, `032`)
+apply with no rebuild. Prefer a new number over an edit, always.
 
 ### Files that must never be committed
 

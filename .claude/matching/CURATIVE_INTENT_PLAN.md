@@ -6,9 +6,29 @@ Written 2026-08-14 from a read of `CriteriaSignalEvaluator`, `TrialMatchingServi
 Companion to `../CURRENT_STATE.md`, `../BREAST_FOCUS_PLAN.md`, and
 `../diagnosis/patient-variant-and-treatment-tables.md`.
 
-**Status: planned, nothing built — re-confirmed 2026-08-14.** No curative-intent signal exists
-in `CriteriaSignalEvaluator`, which still has exactly the five the plan describes:
-`diseaseTypeSignal`, `receptorSignal`, `treatmentLineSignal`, `pi3kSignal`, `locationSignal`.
+> ## ✅ BUILT 2026-08-21. Read `CURATIVE_STEP1_MEASUREMENT.md` alongside this.
+>
+> `treatmentGoalSignal` and `diseaseStageSignal` exist, the ranking tier is in place above concern
+> count, `trial.treatment_goal` and `trial.disease_stage` are columns, and Trial Search has
+> filters and badges for both.
+>
+> **⚠️ The measurement overturned this plan's central call.** Family 2 — response endpoints,
+> described below as "the workhorse" — was measured across 2,473 trials and excluded entirely: 232
+> trials use that vocabulary and 5 of 5 hand-checked were describing how an outcome is *measured*,
+> not what the study aims at. Family 3 (oligometastatic/ablative), described here as a special
+> case, carries 26 of the 38 survivors and is the actual signal. **Read the measurement before
+> trusting the family priorities below.**
+>
+> Two pattern bugs also surfaced that this plan could not have predicted: `metastases` did not
+> match `metastatic` (dropping the single clearest curative trial), and `resectable` matched
+> inside `unresectable`.
+>
+> **Step 4 — the visible badge on the ranked list — is the one step not built.** A curative trial
+> ranks first with its reason collapsed behind "What matched".
+
+**Status when written: planned, nothing built.** `CriteriaSignalEvaluator` then had exactly five
+signals: `diseaseTypeSignal`, `receptorSignal`, `treatmentLineSignal`, `pi3kSignal`,
+`locationSignal`. It now has seven.
 
 **Decided up front, so the rest of this plan is answerable to it:**
 
@@ -173,11 +193,9 @@ confirms the user's own framing and it means the ranking tier will be visible ra
 diluted. If it comes back in the hundreds, the patterns are too broad and need narrowing
 before anything is built on them.
 
-⚠️ **The local backend currently returns 500 on `/api/trial`, `/api/patient/mine` and
-`/api/rag/search`** (verified 2026-08-14; login works, so it is not auth). The access-model
-migration on this branch moved five tables onto `patient` and the local database has probably
-not been rebuilt since. **`CorpusSweep` reads through the REST API, so this must be resolved
-before step 1 can run** — most likely the n8n `clear-db` rebuild, which is the user's action.
+✅ **Resolved.** Step 1 ran on 2026-08-21 against the full corpus — see
+`CURATIVE_STEP1_MEASUREMENT.md`. It was measured against Qdrant directly rather than through
+`CorpusSweep`, which needs a live backend and a token; reading the indexed prose needs neither.
 
 ---
 

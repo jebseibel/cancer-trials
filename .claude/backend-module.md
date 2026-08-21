@@ -38,7 +38,8 @@ com.seibel.cancer
 │       └── service/      # Database service layer
 ├── security/             # JWT and authentication
 ├── service/              # Business service layer
-│   └── matching/         # TrialMatchingService, CriteriaSignalEvaluator
+│   └── matching/         # TrialMatchingService, CriteriaSignalEvaluator,
+│                         # TrialClassificationBackfillService
 └── web/
     ├── controller/       # REST controllers
     ├── request/          # Request DTOs
@@ -76,7 +77,7 @@ this domain.
 - **CustomUserDetailsService**: Loads user details from `UserDb`, filtering out soft-deleted
   accounts so a deleted user cannot log in
 - **JwtAuthenticationFilter**: Extracts and validates the bearer token
-- **LoginRateLimitFilter**: 8 consecutive failures per IP+username → 429 with `Retry-After`,
+- **LoginRateLimitFilter**: 5 consecutive failures per IP+username → 429 with `Retry-After`,
   registered ahead of authentication so a locked-out caller costs no bcrypt work
 - **SecurityConfig**: Configures the filter chain
   - Permits `/api/auth/**`, static assets, and `/api/uchealth/callback` (Epic's OAuth redirect
@@ -115,7 +116,15 @@ This affects every `*DbService` following the template.
 - **Entity Services**: CRUD delegating to the db service, input validation, pagination with a
   configurable max page size (100), allowed sort-field validation, `@Transactional` operations
 - **`service/matching/`**: `TrialMatchingService` ranks the corpus against a patient record;
-  `CriteriaSignalEvaluator` produces per-signal outcomes with the criteria text that caused them
+  `CriteriaSignalEvaluator` produces per-signal outcomes with the text that caused them, across
+  **seven signals** — disease type, receptor polarity, treatment line, PI3K pathway, location, and
+  since 2026-08-21 **treatment goal** and **disease stage**;
+  `TrialClassificationBackfillService` re-derives the two stored classifications
+- **Ranking is lexicographic**, since there is deliberately no score: breast trials first, then
+  **treatment goal**, then fewest concerns, then most passes, then most applicable signals.
+  Treatment goal sits above concern count on purpose — curative-intent trials are ~1.5% of the
+  corpus, so ranking on concerns alone buried the ones most wanted beneath well-matched
+  disease-control trials
 - **`PatientSeedLoader`**: A `CommandLineRunner` that recreates patient rows on startup from
   gitignored CSVs. Seeds if absent, never syncs — an existing row is left alone, so UI edits
   survive a restart
@@ -197,12 +206,17 @@ patient-scoped entities expose `GET /api/{entity}/by-patient/{patientExtid}`.
 ### Matching
 - `GET /api/matching/rank/{patientExtid}?breastOnly=&limit=` — rank the corpus, best first
 - `GET /api/matching/trial/{trialExtid}/for/{patientExtid}` — assess a single trial
+- `POST /api/matching/backfill-treatment-goals` — re-derive `treatment_goal` and `disease_stage`
+  for every trial. **ADMIN-only.** Needed because ingestion skips trials whose ClinicalTrials.gov
+  payload is unchanged, so a re-pull cannot pick up a change to the code that reads that payload
 
 ### Ingestion and retrieval
 - `POST /api/ingestion/clinicaltrials` — pull and stage trials
 - `POST /api/uchealth/observation`, `POST /api/uchealth/medicationrequest` — Epic FHIR pulls
 - `POST /api/rag/backfill` — embed and index staged trials
-- `GET /api/rag/search` — semantic search over criteria
+- `GET /api/rag/search?criteriaOnly=` — semantic search. `criteriaOnly` restricts matching to
+  eligibility-criteria chunks, dropping summaries, descriptions, interventions and outcomes;
+  off by default, since prose is the right answer to "what is this trial testing"
 - `POST /api/rag/reindex/{trialExtid}` — re-index one trial
 
 ## Build and deployment

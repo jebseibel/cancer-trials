@@ -64,11 +64,17 @@ frontend/
 │   ├── pages/      # Login, Dashboard, PatientRecord, Diagnosis, Variants,
 │   │               # PriorTreatment, TrialSearch, TrialDetail, RankedTrials,
 │   │               # SavedTrials, Ingestion
-│   ├── components/ # Layout, ProtectedRoute, FormControls, JobResultModal
+│   ├── components/ # Layout, ProtectedRoute, FormControls, JobResultModal, SignalRow
 │   ├── services/   # api.ts — API client with JWT interceptor
 │   ├── types/      # api.ts — TypeScript interfaces and controlled vocabularies
 │   └── lib/        # PatientContext, accessLevel, receptorSubtype, tier1Matching
 ```
+
+**Trial Search has two modes** — "By keyword" filters loaded trials on substrings, and "By
+meaning" is semantic search over indexed criteria. Cards carry the trial's locations, a
+curative-intent badge and an early-stage warning, with filters for each. **Trial Detail** shows
+the full seven-signal assessment, not only the age/sex/recruiting checks. `SignalRow` is shared
+between the two so they cannot describe the same assessment differently.
 
 ## Technology stack
 
@@ -108,6 +114,13 @@ is `NEVER | CURRENT | PROGRESSED | STOPPED_OTHER | UNKNOWN`. "Not tested" is not
 and a patient currently on a drug is not the same as one who progressed on it; collapsing either
 to a boolean matches the patient to the wrong half of the corpus.
 
+The same reasoning shapes the two trial-side vocabularies added 2026-08-21. `TreatmentGoal` is
+`ABLATIVE | CURE_LANGUAGE | NOT_STATED` rather than a boolean, because the middle tier is where
+every false positive lives — 26 of 38 curative trials are found by ablative language at
+near-perfect precision, while the dozen arriving on cure language alone carry all the mistakes.
+`DiseaseStage` is `METASTATIC | EARLY_STAGE | BOTH | NOT_STATED`, four-valued because a trial
+naming both stages is common and genuinely ambiguous.
+
 ## Key features
 
 - **Complete CRUD** on every core entity, paginated and sortable
@@ -115,10 +128,16 @@ to a boolean matches the patient to the wrong half of the corpus.
 - **UUID-based external ids** — `extid` is the only identifier crossing the API boundary
 - **JWT authentication** plus ranked authorization: `VIEW_TRIALS < VIEW_RECORD < EDIT_RECORD <
   OWNER`, enforced by `CurrentUserService`
-- **Login rate limiting** — 8 consecutive failures per IP+username returns 429 with `Retry-After`
+- **Login rate limiting** — 5 consecutive failures per IP+username returns 429 with `Retry-After`
 - **Two-step ingestion** — pulling trials and making them searchable are separate operations
-- **Trial ranking** — assesses the corpus against the patient record on file and orders by
-  concern and applicable-signal counts
+- **Trial ranking** — assesses the corpus against the patient record on file across seven
+  signals, ordering by treatment goal first and then by concern and applicable-signal counts
+- **Curative-intent and stage classification** — `trial.treatment_goal` and `trial.disease_stage`
+  are derived from each trial's own prose, since ClinicalTrials.gov publishes neither. Measured
+  across 2,473 trials: 38 are metastasis-directed or curative-intent studies for stage IV disease,
+  and 823 (33%) are early-stage and therefore a mismatch for a metastatic patient
+- **Semantic search with a criteria-only mode** — restricts matching to eligibility criteria,
+  because trial-design prose otherwise crowds out the text that decides who can join
 
 ⚠️ There is **no automatic string cleanup**. Empty strings are stored as-is; a blank CSV cell
 loaded by Liquibase lands as `''`, not NULL.
