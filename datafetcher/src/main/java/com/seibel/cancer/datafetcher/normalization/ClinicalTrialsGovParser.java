@@ -8,6 +8,7 @@ import com.seibel.cancer.common.domain.Location;
 import com.seibel.cancer.common.domain.Outcome;
 import com.seibel.cancer.common.domain.OverallOfficial;
 import com.seibel.cancer.common.domain.Trial;
+import com.seibel.cancer.common.util.TreatmentGoalClassifier;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -68,6 +69,21 @@ public class ClinicalTrialsGovParser implements TrialSourceParser {
                 .maximumAge(text(eligibility, "maximumAge"))
                 .eligibilityCriteria(text(eligibility, "eligibilityCriteria"))
                 .build();
+
+        // What the trial is trying to achieve, inferred from its own words - CT.gov publishes
+        // no field for it. Stamped here so curative-intent trials can be queried directly
+        // rather than only surfacing inside a ranking run; they are ~1.5% of the corpus and
+        // finding them is the point of the tool.
+        //
+        // Read from title, summary and description, never the eligibility criteria: criteria
+        // describe a patient's treatment history, where "curative intent" means therapy someone
+        // already had, which inverts the meaning.
+        //
+        // A cached inference. Change the patterns and every stored value is stale, so re-derive
+        // by re-normalizing rather than trusting an old one.
+        trial.setTreatmentGoal(TreatmentGoalClassifier.classify(
+                joinForGoal(trial.getBriefTitle(), trial.getOfficialTitle(),
+                        trial.getBriefSummary(), trial.getDetailedDescription())).name());
 
         List<ArmGroup> armGroups = new ArrayList<>();
         for (JsonNode node : armsInterventions.path("armGroups")) {
@@ -210,5 +226,16 @@ public class ClinicalTrialsGovParser implements TrialSourceParser {
                 return null;
             }
         }
+    }
+
+    /** The trial's own descriptive text, for treatment-goal classification. Nulls skipped. */
+    private static String joinForGoal(String... parts) {
+        StringBuilder sb = new StringBuilder();
+        for (String p : parts) {
+            if (p != null && !p.isBlank()) {
+                sb.append(p).append(' ');
+            }
+        }
+        return sb.toString().strip();
     }
 }

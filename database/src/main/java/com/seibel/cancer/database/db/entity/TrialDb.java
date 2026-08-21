@@ -32,6 +32,16 @@ public class TrialDb extends BaseDb {
     @Column(name = "study_type", length = 32)
     private String studyType;
 
+    /**
+     * Inferred treatment goal - see {@link com.seibel.cancer.common.enums.TreatmentGoal}.
+     *
+     * <p>Stored as a string rather than an enum type, matching how every other vocabulary in
+     * this schema is persisted, so an unrecognised value maps to NOT_STATED instead of failing
+     * to load the row.
+     */
+    @Column(name = "treatment_goal", length = 24)
+    private String treatmentGoal;
+
     @Column(name = "brief_summary", columnDefinition = "text")
     private String briefSummary;
 

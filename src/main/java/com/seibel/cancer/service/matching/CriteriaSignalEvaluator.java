@@ -10,6 +10,7 @@ import com.seibel.cancer.common.domain.matching.SignalOutcome;
 import com.seibel.cancer.common.enums.ReceptorStatus;
 import com.seibel.cancer.common.enums.TreatmentStatus;
 import com.seibel.cancer.common.enums.VariantStatus;
+import com.seibel.cancer.common.util.TreatmentGoalClassifier;
 import com.seibel.cancer.rag.chunk.EligibilityChunk;
 import com.seibel.cancer.rag.chunk.EligibilityCriteriaChunker;
 import org.springframework.stereotype.Component;
@@ -180,56 +181,6 @@ public class CriteriaSignalEvaluator {
             Pattern.CASE_INSENSITIVE);
 
     /**
-     * Metastasis-directed and ablative strategy — the language that actually works.
-     *
-     * <p>Measured across all 2,473 trials on 2026-08-21: <b>26 of the 38 trials that survive
-     * this whole signal come from this pattern alone</b>, at near-perfect precision. Ablative
-     * vocabulary is specific in a way response vocabulary is not — it names a thing being done
-     * to a metastasis, so it cannot appear in an endpoint definition or a patient's history.
-     *
-     * <p>This is also the clinically real route: it is the strategy under which a stage IV
-     * patient is treated with curative intent at all, and it maps onto bone-dominant disease
-     * with a small number of named sites.
-     */
-    private static final Pattern ABLATIVE_STRATEGY = Pattern.compile(
-            "oligometasta\\w*|oligoprogress\\w*|metastasis[- ]directed|\\bSBRT\\b"
-                    + "|stereotactic body|ablation|ablative|metastasectomy"
-                    + "|total metastatic ablation|radical local",
-            Pattern.CASE_INSENSITIVE);
-
-    /**
-     * Explicit cure language. A confirmer, never the primary test.
-     *
-     * <p>Measured: 72 trials say one of these, but only 12 reach the final signal on this alone,
-     * and that dozen is where every false positive lives. Kept because a curative-intent trial
-     * sometimes states its ambition in exactly these words and nowhere else.
-     *
-     * <p>{@code eradicat*} is deliberately absent: its only corpus matches described axillary
-     * disease "eradicated by NACT", which is neoadjuvant, early-stage, and the opposite of the
-     * target.
-     */
-    private static final Pattern EXPLICIT_CURE = Pattern.compile(
-            "\\bcure\\b|\\bcured\\b|\\bcurable\\b|curative[- ]intent|\\bcurative\\b",
-            Pattern.CASE_INSENSITIVE);
-
-    /**
-     * Negation immediately before a cure word, which inverts it.
-     *
-     * <p><b>Every family-1 false positive in the corpus was a negation</b>: "metastatic
-     * (considered non-curative)", "cancer that is unlikely to be cured", "aromatase inhibitors
-     * improve outcomes, but are not curative". The phrase and its denial differ by one token —
-     * the same reason embeddings cannot read receptor polarity — so the only way to tell them
-     * apart is to look left.
-     *
-     * <p>Applied to the ~40 characters before the match, which covers the intervening words in
-     * every observed case without reaching into an unrelated clause.
-     */
-    private static final Pattern CURE_NEGATED = Pattern.compile(
-            "\\b(not|non|never|rarely|seldom|un\\w*|cannot|can't|incurable|no longer|without"
-                    + "|difficult to|unlikely to be|hard to|fail\\w* to)\\b[\\s\\-]{0,4}$",
-            Pattern.CASE_INSENSITIVE);
-
-    /**
      * Metastatic disease vocabulary.
      *
      * <p>{@code metasta(tic|sis|ses|tases)} as one stem rather than {@code metastatic} alone:
@@ -330,7 +281,7 @@ public class CriteriaSignalEvaluator {
      * the same reason.
      *
      * <p><b>Ablative language leads, cure language confirms.</b> Measured across 2,473 trials:
-     * 26 of 38 survivors come from {@link #ABLATIVE_STRATEGY} at near-perfect precision, while
+     * 26 of 38 survivors come from {@link TreatmentGoalClassifier} at near-perfect precision, while
      * the 12 that arrive on cure language alone carry every false positive. Response-endpoint
      * vocabulary — "complete response", "disease-free survival" — was measured and
      * <b>excluded</b>: 232 trials say it, and 5 of 5 hand-checked were reporting how outcomes are
@@ -352,7 +303,7 @@ public class CriteriaSignalEvaluator {
                             + "could not be checked.");
         }
 
-        String ablative = firstMatch(haystack, ABLATIVE_STRATEGY);
+        String ablative = TreatmentGoalClassifier.firstAblativePhrase(haystack);
         if (ablative != null) {
             return EligibilitySignal.pass(name,
                     "This trial treats the individual sites of spread rather than only slowing "
@@ -361,7 +312,7 @@ public class CriteriaSignalEvaluator {
                     ablative);
         }
 
-        String cure = firstUnnegatedCure(haystack);
+        String cure = TreatmentGoalClassifier.firstUnnegatedCure(haystack);
         if (cure != null) {
             return new EligibilitySignal(name, SignalOutcome.UNKNOWN,
                     "This trial's description uses the language of cure or long-term remission. "
@@ -375,27 +326,6 @@ public class CriteriaSignalEvaluator {
         return new EligibilitySignal(name, SignalOutcome.NOT_APPLICABLE,
                 "This trial does not describe treating the sites of spread directly or aiming at "
                         + "long-term remission.", null);
-    }
-
-    /**
-     * The first cure word that is not being denied, with its surrounding text.
-     *
-     * <p>Scans every occurrence rather than stopping at the first: a summary saying "metastatic
-     * breast cancer remains difficult to cure" in its background and stating a curative aim
-     * later would otherwise be judged on the background sentence alone.
-     */
-    private String firstUnnegatedCure(String haystack) {
-        String flat = haystack.replaceAll("\\s+", " ");
-        var m = EXPLICIT_CURE.matcher(flat);
-        while (m.find()) {
-            String before = flat.substring(Math.max(0, m.start() - 40), m.start());
-            if (!CURE_NEGATED.matcher(before).find()) {
-                int from = Math.max(0, m.start() - 40);
-                int to = Math.min(flat.length(), m.end() + 80);
-                return flat.substring(from, to).strip();
-            }
-        }
-        return null;
     }
 
     /**

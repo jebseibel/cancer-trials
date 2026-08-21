@@ -20,6 +20,15 @@ public class Trial extends BaseDomain {
     private String officialTitle;
     private String overallStatus;
     private String studyType;
+
+    /**
+     * What the trial appears to be trying to achieve, as
+     * {@link com.seibel.cancer.common.enums.TreatmentGoal}'s name.
+     *
+     * <p>Derived from the title and summary at normalization, because CT.gov publishes no
+     * treatment-intent field. A cached inference: it goes stale when the patterns change.
+     */
+    private String treatmentGoal;
     private String briefSummary;
     private String detailedDescription;
     private LocalDate startDate;
