@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /**
- * Remote (Streamable HTTP) entry point — Phase 1 of MCP_PRACTICE_PLAN.md's production path.
+ * Remote (Streamable HTTP) entry point — Phase 2 of MCP_PRACTICE_PLAN.md's production path.
  *
- * This proves the network transport works for more than one connected client. It is
- * DELIBERATELY still single-token: every session forwards the same CANCER_API_TOKEN to the
- * backend, so every caller acts as the one seeded user regardless of who connects. That is
- * fine for "does the plumbing work" and NOT fine for "a family member logs in as themselves" —
- * Phase 2 replaces the static token with a per-session credential before this is handed to
- * anyone but the person who set up CANCER_API_TOKEN.
+ * Each session is bound to the JWT the caller presented on their initialize request's
+ * Authorization header — logged into the existing POST /api/auth/login, same as the web app.
+ * The server never holds a shared token: it forwards each caller's own JWT to the backend, so
+ * CurrentUserService's existing UserPatient grants and AccessLevel checks are what actually
+ * decide what that caller can see. A missing/malformed Authorization header is rejected before
+ * a session is created — fail fast, matching how the REST API itself behaves, rather than
+ * connecting successfully and failing on the first tool call.
  *
  * One MCP session = one McpServer + one StreamableHTTPServerTransport pair, keyed by the
  * `Mcp-Session-Id` header the SDK generates on the initialize request. This mirrors the
@@ -19,6 +20,7 @@ import { randomUUID } from "node:crypto";
 import http from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { buildServer } from "./buildServer.js";
+import { CancerApiClient } from "./apiClient.js";
 
 const PORT = Number(process.env.MCP_HTTP_PORT ?? 3939);
 const HOST = process.env.MCP_HTTP_HOST ?? "127.0.0.1";
@@ -29,8 +31,17 @@ interface Session {
 
 const sessions = new Map<string, Session>();
 
-async function createSession(): Promise<StreamableHTTPServerTransport> {
-  const server = buildServer();
+/** Pulls the bearer token out of `Authorization: Bearer <jwt>`, or undefined if absent/malformed. */
+function extractBearerToken(req: http.IncomingMessage): string | undefined {
+  const header = req.headers.authorization;
+  if (!header) return undefined;
+  const match = /^Bearer\s+(.+)$/i.exec(header);
+  return match?.[1];
+}
+
+async function createSession(callerToken: string): Promise<StreamableHTTPServerTransport> {
+  const api = new CancerApiClient(callerToken);
+  const server = buildServer(api);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => randomUUID(),
     onsessioninitialized: (sessionId) => {
@@ -70,12 +81,20 @@ const httpServer = http.createServer(async (req, res) => {
       return;
     }
 
+    const callerToken = extractBearerToken(req);
+    if (!callerToken) {
+      res
+        .writeHead(401, { "Content-Type": "application/json" })
+        .end(JSON.stringify({ error: "Missing Authorization: Bearer <jwt>. Log in via POST /api/auth/login first." }));
+      return;
+    }
+
     const chunks: Buffer[] = [];
     for await (const chunk of req) chunks.push(chunk as Buffer);
     const bodyText = Buffer.concat(chunks).toString("utf8");
     const parsedBody = bodyText ? JSON.parse(bodyText) : undefined;
 
-    const transport = await createSession();
+    const transport = await createSession(callerToken);
     await transport.handleRequest(req, res, parsedBody);
   } catch (err) {
     console.error("Request handling error:", err);
@@ -90,7 +109,7 @@ const httpServer = http.createServer(async (req, res) => {
 httpServer.listen(PORT, HOST, () => {
   console.error(`cancer-trial-mcp listening on http://${HOST}:${PORT}/mcp`);
   console.error(
-    "⚠️  Phase 1: every session shares CANCER_API_TOKEN — do not point anyone but the token's " +
-      "own owner at this until per-session auth (Phase 2) lands.",
+    "Each connecting client must send Authorization: Bearer <jwt> from its own " +
+      "POST /api/auth/login — the server forwards that token as-is and holds no shared credential.",
   );
 });

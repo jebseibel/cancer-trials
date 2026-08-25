@@ -9,9 +9,10 @@
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { buildServer } from "./buildServer.js";
+import { defaultApiClient } from "./apiClient.js";
 
 async function main() {
-  const server = buildServer();
+  const server = buildServer(defaultApiClient());
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("cancer-trial-mcp running on stdio");

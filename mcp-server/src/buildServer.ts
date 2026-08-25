@@ -6,8 +6,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import * as api from "./apiClient.js";
-import { ApiError } from "./apiClient.js";
+import { ApiError, CancerApiClient } from "./apiClient.js";
 
 // Shared reminder appended to every tool touching an assessment, so a client model doesn't
 // paraphrase a CONCERN as a disqualification. This is the app's central rule — see
@@ -38,11 +37,12 @@ function safe<Args extends unknown[]>(
 }
 
 /**
- * Creates a fresh McpServer with every tool registered. Call once per stdio process, or once
- * per HTTP session (see httpServer.ts) — tool handlers hold no per-server state, so a new
- * instance per session is cheap and keeps sessions from being able to see each other.
+ * Creates a fresh McpServer with every tool registered, bound to the given API client's
+ * identity. Call once per stdio process (defaultApiClient(), one shared token from env), or
+ * once per HTTP session (see httpServer.ts, one CancerApiClient per caller's own JWT) — each
+ * server instance's tools only ever act as the identity `api` was constructed with.
  */
-export function buildServer(): McpServer {
+export function buildServer(api: CancerApiClient): McpServer {
   const server = new McpServer({
     name: "cancer-trial-mcp",
     version: "0.1.0",

@@ -1,10 +1,14 @@
 /**
  * Thin HTTP client over the existing Spring Boot REST API. No business logic lives here —
  * every tool handler calls one of these functions and shapes the result for the model.
+ *
+ * The bearer token is per-instance, not a module-level constant: the stdio entry point (one
+ * user, one env var) and the HTTP entry point (one JWT per connected session, forwarded from
+ * that caller's own Authorization header) both need their own token, and instances must never
+ * share one another's — that is the whole point of Phase 2's per-user auth.
  */
 
 const BASE_URL = process.env.CANCER_API_BASE_URL ?? "http://localhost:8080";
-const TOKEN = process.env.CANCER_API_TOKEN;
 
 export class ApiError extends Error {
   constructor(
@@ -13,36 +17,6 @@ export class ApiError extends Error {
   ) {
     super(`Cancer API returned ${status}: ${body}`);
   }
-}
-
-async function request<T>(path: string, params?: Record<string, string | number | boolean | undefined>): Promise<T> {
-  const url = new URL(path, BASE_URL);
-  if (params) {
-    for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined) url.searchParams.set(key, String(value));
-    }
-  }
-
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (TOKEN) headers.Authorization = `Bearer ${TOKEN}`;
-
-  const res = await fetch(url, { method: "GET", headers });
-  return handleResponse<T>(res);
-}
-
-async function post<T>(path: string): Promise<T> {
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (TOKEN) headers.Authorization = `Bearer ${TOKEN}`;
-
-  const res = await fetch(new URL(path, BASE_URL), { method: "POST", headers });
-  return handleResponse<T>(res);
-}
-
-async function handleResponse<T>(res: Response): Promise<T> {
-  if (res.status === 204) return null as T;
-  const text = await res.text();
-  if (!res.ok) throw new ApiError(res.status, text);
-  return text ? (JSON.parse(text) as T) : (null as T);
 }
 
 // --- Response shapes (trimmed to the fields tools actually use) ---
@@ -115,44 +89,85 @@ interface Page<T> {
   number: number;
 }
 
-// --- API calls, one per tool ---
+/**
+ * One instance per caller identity. Construct with the JWT that identifies whoever is
+ * actually asking — never a shared/global token once more than one person can connect.
+ */
+export class CancerApiClient {
+  constructor(private readonly token: string | undefined) {}
 
-export function rankTrials(patientExtid: string, breastOnly: boolean, limit: number) {
-  return request<TrialAssessment[]>(`/api/matching/rank/${patientExtid}`, { breastOnly, limit });
+  private async request<T>(path: string, params?: Record<string, string | number | boolean | undefined>): Promise<T> {
+    const url = new URL(path, BASE_URL);
+    if (params) {
+      for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined) url.searchParams.set(key, String(value));
+      }
+    }
+
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (this.token) headers.Authorization = `Bearer ${this.token}`;
+
+    const res = await fetch(url, { method: "GET", headers });
+    return this.handleResponse<T>(res);
+  }
+
+  private async post<T>(path: string): Promise<T> {
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (this.token) headers.Authorization = `Bearer ${this.token}`;
+
+    const res = await fetch(new URL(path, BASE_URL), { method: "POST", headers });
+    return this.handleResponse<T>(res);
+  }
+
+  private async handleResponse<T>(res: Response): Promise<T> {
+    if (res.status === 204) return null as T;
+    const text = await res.text();
+    if (!res.ok) throw new ApiError(res.status, text);
+    return text ? (JSON.parse(text) as T) : (null as T);
+  }
+
+  rankTrials(patientExtid: string, breastOnly: boolean, limit: number) {
+    return this.request<TrialAssessment[]>(`/api/matching/rank/${patientExtid}`, { breastOnly, limit });
+  }
+
+  assessTrial(trialExtid: string, patientExtid: string) {
+    return this.request<TrialAssessment>(`/api/matching/trial/${trialExtid}/for/${patientExtid}`);
+  }
+
+  searchTrials(
+    query: string,
+    maxTrials: number,
+    recruitingOnly: boolean,
+    criteriaOnly: boolean,
+    similarityThreshold?: number,
+  ) {
+    return this.request<TrialSearchMatch[]>("/api/rag/search", {
+      query,
+      maxTrials,
+      recruitingOnly,
+      criteriaOnly,
+      similarityThreshold,
+    });
+  }
+
+  getTrial(extid: string) {
+    return this.request<Trial>(`/api/trial/${extid}`);
+  }
+
+  listTrials(page: number, size: number) {
+    return this.request<Page<Trial>>("/api/trial", { page, size });
+  }
+
+  runAiTrialCheck(trialExtid: string, patientExtid: string) {
+    return this.post<AiTrialCheck>(`/api/matching/ai/trial/${trialExtid}/for/${patientExtid}`);
+  }
+
+  getLatestAiTrialCheck(trialExtid: string, patientExtid: string) {
+    return this.request<AiTrialCheck | null>(`/api/matching/ai/trial/${trialExtid}/for/${patientExtid}`);
+  }
 }
 
-export function assessTrial(trialExtid: string, patientExtid: string) {
-  return request<TrialAssessment>(`/api/matching/trial/${trialExtid}/for/${patientExtid}`);
-}
-
-export function searchTrials(
-  query: string,
-  maxTrials: number,
-  recruitingOnly: boolean,
-  criteriaOnly: boolean,
-  similarityThreshold?: number,
-) {
-  return request<TrialSearchMatch[]>("/api/rag/search", {
-    query,
-    maxTrials,
-    recruitingOnly,
-    criteriaOnly,
-    similarityThreshold,
-  });
-}
-
-export function getTrial(extid: string) {
-  return request<Trial>(`/api/trial/${extid}`);
-}
-
-export function listTrials(page: number, size: number) {
-  return request<Page<Trial>>("/api/trial", { page, size });
-}
-
-export function runAiTrialCheck(trialExtid: string, patientExtid: string) {
-  return post<AiTrialCheck>(`/api/matching/ai/trial/${trialExtid}/for/${patientExtid}`);
-}
-
-export function getLatestAiTrialCheck(trialExtid: string, patientExtid: string) {
-  return request<AiTrialCheck | null>(`/api/matching/ai/trial/${trialExtid}/for/${patientExtid}`);
+/** Convenience for the stdio entry point: one process, one token, from its own env. */
+export function defaultApiClient(): CancerApiClient {
+  return new CancerApiClient(process.env.CANCER_API_TOKEN);
 }
