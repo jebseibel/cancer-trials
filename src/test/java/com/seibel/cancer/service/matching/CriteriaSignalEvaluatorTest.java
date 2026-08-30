@@ -22,8 +22,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * assertion here is a phrasing that appeared in real criteria text or a real pathology report,
  * not an invented string.
  *
- * <p>The patient this was measured against has a real, de-identified clinical profile, HER2 IHC
- * <p>The patient this was measured against has a real, de-identified clinical profile —
+ * <p>The patient this was measured against has a real, de-identified clinical profile — so the
+ * "must not flag" cases matter as much as the "must flag" ones.
  */
 class CriteriaSignalEvaluatorTest {
 
@@ -108,8 +108,8 @@ class CriteriaSignalEvaluatorTest {
         }
 
         /**
-         * A HER2-low patient (IHC 1+, not amplified) is still HER2-negative. A trial requiring HER2-positive
-         * disease is a genuine mismatch worth raising.
+         * A HER2-low patient (IHC 1+, not amplified) is still HER2-negative for eligibility
+         * purposes. A trial requiring HER2-positive disease is a genuine mismatch worth raising.
          */
         @Test
         void flagsATrialRequiringHer2PositiveDisease() {
@@ -134,8 +134,8 @@ class CriteriaSignalEvaluatorTest {
     class TripleNegative {
 
         /**
-         * The 2026-08-08 mis-ranking, as a test. NCT06685796 scored highest for a hormone-positive patient on
-         * "HR-negative, HER2-negative" — a different disease subtype.
+         * The 2026-08-08 mis-ranking, as a test. NCT06685796 scored highest for a
+         * hormone-positive patient on "HR-negative, HER2-negative" — a different disease subtype.
          */
         @ParameterizedTest
         @ValueSource(strings = {
@@ -266,8 +266,8 @@ class CriteriaSignalEvaluatorTest {
     }
 
     /**
-     * Treatment-line polarity, against the profile this suite is measured against: on a CDK4/6 inhibitor now, no progression on
-     * it, and no cytotoxic chemotherapy ever.
+     * Treatment-line polarity, against the profile this suite is measured against: on a CDK4/6
+     * inhibitor now, no progression on it, and no cytotoxic chemotherapy ever.
      */
     @Nested
     @DisplayName("treatment history in context")

@@ -109,7 +109,7 @@ feature wrong.
 `stereotactic body radiotherapy`, `ablation`, `metastasectomy`, `consolidation`,
 `total metastatic ablation`. This is the strategy under which a stage IV patient is
 occasionally treated with curative intent at all, and it maps onto her situation directly —
-she has bone-dominant disease with a small number of named sites.
+a bone-dominant disease pattern with a small number of named sites.
 
 **4. Modality signals — trials whose whole premise is durable immune control**
 `CAR-T`, `chimeric antigen receptor`, `adoptive cell`, `TIL`, `tumor infiltrating lymphocyte`,

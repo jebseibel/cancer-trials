@@ -6,11 +6,12 @@ import java.util.stream.Collectors;
 /**
  * A patient's history with a drug class, in the five states that change trial eligibility.
  *
- * <p><b>This is the vocabulary a boolean gets wrong, and the failure is concrete.</b> This
- * patient case is on a CDK4/6 inhibitor now and has not progressed. A boolean {@code priorCdk46 =
- * true} is literally accurate and reads as post-CDK4/6 — which matches that patient to trials designed
- * for people whose CDK4/6 inhibitor stopped working, the wrong half of the corpus. One
- * dropdown is the difference between a useful shortlist and a misleading one.
+ * <p><b>This is the vocabulary a boolean gets wrong, and the failure is concrete.</b> A patient
+ * on a CDK4/6 inhibitor now, with no progression, is a real case this schema was built against.
+ * A boolean {@code priorCdk46 = true} is literally accurate and reads as post-CDK4/6 — which
+ * matches that patient to trials designed for people whose CDK4/6 inhibitor stopped working, the
+ * wrong half of the corpus. One dropdown is the difference between a useful shortlist and a
+ * misleading one.
  *
  * <p>The three states trials actually distinguish:
  * <ul>

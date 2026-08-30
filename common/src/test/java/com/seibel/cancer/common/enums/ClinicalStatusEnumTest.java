@@ -25,7 +25,8 @@ class ClinicalStatusEnumTest {
         void untestedIsNotTheSameAsNegative() {
             // The whole reason the vocabulary has five states. A trial requiring BRCA1 is a
             // genuine mismatch for a tested-negative patient and an open question for an
-            // untested one - and this app was built against a real record with a negative germline panel.
+            // untested one - and this app was built against a real record with a negative
+            // germline panel, which is the former case.
             assertThat(VariantStatus.NOT_DETECTED.isRuledOut()).isTrue();
             assertThat(VariantStatus.NOT_TESTED.isRuledOut()).isFalse();
             assertThat(VariantStatus.NOT_TESTED.isUnresolved()).isTrue();

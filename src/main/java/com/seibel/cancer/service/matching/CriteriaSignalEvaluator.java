@@ -140,8 +140,9 @@ public class CriteriaSignalEvaluator {
      * about any untreated illness.
      *
      * <p>Endocrine therapy belongs here alongside CDK4/6: the two are given together as
-     * first-line treatment for HR+/HER2- disease — a common combination is a CDK4/6 inhibitor plus an aromatase inhibitor — so a
-     * trial's endocrine-naive requirement bears on a patient's CDK4/6 status directly.
+     * first-line treatment for HR+/HER2- disease — a common combination is a CDK4/6 inhibitor
+     * plus an aromatase inhibitor — so a trial's endocrine-naive requirement bears on a
+     * patient's CDK4/6 status directly.
      */
     private static final Pattern RELEVANT_THERAPY_CLASS = Pattern.compile(
             "\\bCDK\\s?4/?6\\b|\\bpalbociclib\\b|\\bribociclib\\b|\\babemaciclib\\b"
