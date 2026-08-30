@@ -5,6 +5,10 @@ Two new patient-side tables whose sole job is **killing false matches**. Compani
 
 Written 2026-08-09. MySQL, Liquibase-managed, `BaseDb` conventions throughout.
 
+**Redaction note (2026-08-30):** exact values from the real patient record that motivated this
+design have been generalized before this repo was made public. The schema and reasoning are
+unchanged.
+
 ## Why these exist
 
 On 2026-08-08 a semantic search over 249 trials ranked a **triple-negative** trial as the
@@ -41,9 +45,9 @@ Each table carries a free-text `other` column for what the fixed set does not co
 
 **Unknown is never negative.** From `../_archive/research/breast-cancer-clinical-trial-matching-chatgpt.md`
 §16, and it is the single most important rule here. "Tested negative for BRCA1" and "never
-tested for BRCA1" are clinically different: the first may exclude her from a PARP trial, the
-second means the question is open and worth asking her oncologist. Collapsing them either
-hides an option or invents a qualification she does not have.
+tested for BRCA1" are clinically different: the first may exclude a patient from a PARP trial,
+the second means the question is open and worth asking her oncologist. Collapsing them either
+hides an option or invents a qualification the patient does not have.
 
 Every status column therefore defaults to `NOT_TESTED` or `UNKNOWN`, never to a negative.
 
@@ -112,7 +116,7 @@ might mean "not on the panel."
 ### Why these genes
 
 `PIK3CA` first: 30-40% of HR+ cases, and the patient has a detected PIK3CA mutation, which is
-what matched NCT05753657 at 0.717 on her exact profile line. `ESR1` gates next-generation SERD
+what matched NCT05753657 at 0.717 on the patient's exact profile line. `ESR1` gates next-generation SERD
 trials and marks AI resistance. `BRCA1/2` gate PARP inhibitor trials and are the germline
 questions most often already answered. `PD-L1` gates most TNBC immunotherapy trials — included
 even though this patient is HR+, because a status column that is `NOT_TESTED` still correctly
@@ -156,8 +160,8 @@ anthracycline_status   varchar(24)
 platinum_status        varchar(24)
 
 -- Named drugs, for the classes above where the specific agent matters
-current_drug_names     varchar(1000)   -- what she is on right now, free text
-prior_drug_names       varchar(1000)   -- what she has been on, free text
+current_drug_names     varchar(1000)   -- what the patient is on right now, free text
+prior_drug_names       varchar(1000)   -- what the patient has been on, free text
 
 -- Line and setting: cheap to ask, and they gate hard
 lines_of_therapy_metastatic  int       -- 0 = treatment-naive in the metastatic setting
@@ -189,14 +193,14 @@ NEVER | CURRENT | PROGRESSED | STOPPED_OTHER | UNKNOWN
 
 ### Why this cannot be a boolean
 
-This is the concrete case that decides the design. **The patient is currently on abemaciclib
-(a CDK4/6 inhibitor) and has not progressed on it.**
+This is the concrete case that decides the design. **The patient is currently on a CDK4/6
+inhibitor and has not progressed on it.**
 
 A boolean `prior_cdk46 = true` is literally true and clinically misleading: trials split into
 *CDK4/6-naive* (first-line) and *post-CDK4/6 progression* populations, and a bare `true` reads
-as the second. She belongs to neither — she is on it now. Matching her to post-CDK4/6 trials
-on the strength of a boolean is the same category of error as the triple-negative match: a
-true fact producing a wrong conclusion.
+as the second. The patient belongs to neither — she is on it now. Matching her to post-CDK4/6
+trials on the strength of a boolean is the same category of error as the triple-negative match:
+a true fact producing a wrong conclusion.
 
 `CURRENT` vs `PROGRESSED` vs `NEVER` is one dropdown on a form and it is the difference between
 a useful shortlist and a misleading one.
@@ -220,10 +224,10 @@ These do not replace it. The split follows the research docs' recommendation of 
 Diagnosis / Biomarkers / Molecular / Treatment History:
 
 - **`patient_diagnosis`** keeps what it has: histology, stage, receptor status (ER/PR/HER2),
-  metastatic sites, ECOG, menopausal status, demographics. It is the "who she is clinically"
-  row.
-- **`patient_variant`** is the "what her tumor and germline carry" row.
-- **`patient_prior_treatment`** is the "what she has been through" row.
+  metastatic sites, ECOG, menopausal status, demographics. It is the "who the patient is
+  clinically" row.
+- **`patient_variant`** is the "what the tumor and germline carry" row.
+- **`patient_prior_treatment`** is the "what the patient has been through" row.
 
 **One row of each per patient, keyed on `patient_id`**, with a nullable
 `patient_diagnosis_id` so a row survives the diagnosis being deleted and recreated — which

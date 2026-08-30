@@ -23,8 +23,9 @@ that shaped it: `matching/CURATIVE_STEP1_MEASUREMENT.md`.
 - **A backfill endpoint** and a "Recheck Treatment Goals" button, because ingestion skips
   unchanged payloads and cannot repopulate an existing corpus.
 
-**Verified live:** NCT04563507 ranked first — SBRT to each metastatic lesion on
-a CDK4/6-inhibitor-plus-aromatase-inhibitor backbone, matching the patient's own regimen and disease.
+**Verified live:** NCT04563507 ranked first — SBRT to each metastatic lesion on a
+CDK4/6-inhibitor-plus-aromatase-inhibitor backbone, matching the patient's own regimen and
+disease.
 
 ⚠️ **The measurement overturned the plan it tested.** The plan named response-endpoint vocabulary
 ("complete response", "disease-free survival") as the workhorse; 232 trials say it and 5 of 5

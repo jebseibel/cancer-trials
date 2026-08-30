@@ -13,6 +13,11 @@ sections as history, not as current state.**
 otherwise.** Prod contents were last observed 2026-08-11. Local figures were re-measured
 2026-08-21 and are in the table.
 
+**Redaction note (2026-08-30):** this document originally quoted exact values from the real
+patient record it was built and tested against — receptor percentages, drug start dates,
+radiation fields, and similar. Those have been replaced with generic placeholders before this
+repo was made public; the engineering narrative, bug fixes, and measurements are unchanged.
+
 ---
 
 ## Picking the project back up
@@ -41,7 +46,7 @@ comparing Qdrant's distinct trial count against MySQL's would catch it in one li
 
 ### 🚀 DEPLOYED — https://breastcancertrialfinder.com, 2026-08-11
 
-**The app is live on a public host with her real record on it.** HTTPS via Let's Encrypt (expires
+**The app is live on a public host with a real patient record on it.** HTTPS via Let's Encrypt (expires
 9 Nov, `certbot.timer` armed), HTTP redirects to HTTPS, both apex and `www`. She can sign in as
 `jeb` and open "Trials for You".
 
@@ -214,37 +219,37 @@ was read and mapped into all three patient tables. It is at
 record has landed in a tracked directory — the PET/CT report did the same on 2026-08-08.
 **Any new patient document goes straight to `_archive/patient-data/` before it is opened.**
 
-What the record established, beyond what was already recorded:
+What the record established, beyond what was already recorded (values below are illustrative,
+not the real record — see the redaction note at the top of this document):
 
 - **Germline testing: a multi-gene panel, negative for pathogenic variants.**
   BRCA1, BRCA2, PALB2, ATM and CHEK2 are therefore `NOT_DETECTED`, not blank. This is the
   distinction the five-state vocabulary exists for: it moves PARP-inhibitor trials from
   *open question* to *genuine mismatch*.
-- **Precise receptor values**, at the level of detail a pathology report carries.
-  HER2 IHC low-positive, DISH not amplified.
+- **Precise receptor values**, down to intensity/percentage and antibody clone — a level of
+  detail routine pathology reports carry and the schema needs to capture rather than round off.
 - **Histology and stage**: invasive ductal carcinoma, with a full AJCC staging code.
-- **ECOG 0 → 1** per the recent oncology note.
-- **Palliative radiation** to named sites, left sacroiliac
-  joint, and right proximal femur. Not previously recorded.
-- **A bone-modifying agent, started several months into treatment.**
-- **Corrected drug start dates** — two different dates for the same drug (an earlier
-  note in the same record says 3/31 — unresolved).
-- **A follow-up scan showing mixed response.** Some sites resolved,
-  osseous lesions mixed, some larger and more avid. Progressive asymptomatic right femoral
-  neck metastasis, fracture risk.
-- **A documented decision to continue the current regimen rather than pivot to a PI3K
-  inhibitor.** So `pi3kAktMtorStatus` is `NEVER` *despite* the PIK3CA mutation — she is
-  PIK3CA-mutant and PI3K-inhibitor-naive, which is an inclusion criterion for a whole class
-  of trials.
-- **Confirmed: no cytotoxic chemotherapy, ever.** The neoadjuvant AC-then-taxane regimen was
-  planned early on and abandoned when staging found metastatic disease. Every "chemo"
-  mention in the record is supportive care or that abandoned plan.
+- **A performance-status change** (ECOG) per a recent oncology note.
+- **Palliative radiation** to named sites, previously unrecorded.
+- **A bone-modifying agent**, started several months into treatment.
+- **Corrected drug start dates** — two different dates for the same drug appeared in the same
+  record, one from an earlier note, unresolved.
+- **A follow-up scan showing mixed response** — some sites resolved, others progressed, plus a
+  new asymptomatic finding worth flagging for fracture risk.
+- **A documented decision to continue the current regimen rather than pivot** to a targeted
+  therapy her mutation would otherwise qualify her for. So the corresponding pathway-inhibitor
+  field is `NEVER` *despite* the mutation being present — she is mutation-positive and
+  inhibitor-naive, which is an inclusion criterion for a whole class of trials.
+- **Confirmed: no cytotoxic chemotherapy, ever.** A neoadjuvant regimen was planned early on and
+  abandoned when staging found metastatic disease. Every "chemo" mention in the record is
+  supportive care or that abandoned plan.
 
 **Two unresolved conflicts, recorded in the notes fields rather than silently resolved:**
 
-- **A proliferation index (Ki-67) disagreed by several-fold between two notes in the oncology and
-  radiation notes.** A 4.5× discrepancy on a proliferation index is not rounding. The user
-  chose 45%; both values are in the notes. Worth asking the oncology team.
+- **A proliferation index (Ki-67) disagreed by several-fold between two notes in the same
+  record** — surgical pathology reported one value, oncology and radiation notes another. Not
+  rounding error. The user chose the higher value; both are in the notes. Worth asking the
+  oncology team.
 - **A drug start date** appears as two different dates in the same record.
 
 **The tool was used for a real person for the first time (2026-08-08).** See
@@ -253,21 +258,21 @@ the candidate list.
 
 ### First real search — 2026-08-08
 
-The patient's real diagnosis is now in `patient_diagnosis`: de novo **stage IV invasive
-carcinoma of the left breast**, **ER+ / PR− / HER2−**, **PIK3CA mutation detected**,
-postmenopausal, ECOG 0, bone and extensive nodal metastases, on **abemaciclib (Verzenio) +
-letrozole** since April 2026 with **no prior cytotoxic chemotherapy**. Sourced from an MRI
-plus details supplied directly by the user.
+The patient's real diagnosis is now in `patient_diagnosis`: de novo **stage IV breast
+carcinoma**, **hormone-receptor-positive / HER2-negative**, with **a targetable mutation
+detected**, postmenopausal, ECOG 0, bone and extensive nodal metastases, on a **CDK4/6
+inhibitor + aromatase inhibitor** combination with **no prior cytotoxic chemotherapy**.
+Sourced from imaging plus details supplied directly by the user.
 
 A semantic search over all 249 trials using that profile returned real, relevant matches —
-most notably **NCT05753657**, which matched at 0.717 on *"ER positive HER2 negative
-metastatic breast cancer, harboring an activating PIK3CA mutation"*. That is the patient's profile
-line for line, including the biomarker.
+including one that matched at 0.717 on *"ER positive HER2 negative metastatic breast cancer,
+harboring an activating PIK3CA mutation"*. That is the patient's profile line for line, including the
+biomarker.
 
-**But the top-scoring hit was wrong, and the reason matters.** NCT06685796 scored highest
-(0.718) on the criterion *"HR-**negative**, HER2-negative"* — triple-negative disease. She
-is HR-**positive**. Two more of the top ten (NCT07045311 triple-negative, NCT06770296
-HER2-**positive**) got in the same way.
+**But the top-scoring hit was wrong, and the reason matters.** A different trial scored
+highest (0.718) on the criterion *"HR-**negative**, HER2-negative"* — triple-negative disease.
+She is HR-**positive**. Two more of the top ten matched the same way, on the wrong receptor
+polarity.
 
 **Embedding similarity cannot distinguish receptor polarity.** "HR-negative HER2-negative"
 and "HR-positive HER2-negative" differ by one token inside an otherwise identical phrase,
@@ -304,8 +309,8 @@ What was in flight when the session ended:
      mention "HER2-negative" anywhere, so NCT07371585 — a HER2-**positive** first-line
      trial — scored 0.8333 against a HER2-negative patient. Reject trials *requiring*
      HER2-positive or triple-negative disease.
-   - **US-wide location filter.** The user will travel anywhere in the USA. Geography was
-     not part of matching at all, and the top-ranked trial (NCT05753657) has exactly one
+   - **US-wide location filter.** The patient will travel anywhere in the USA. Geography was
+     not part of matching at all, and the top-ranked trial had exactly one
      site, outside the US. `location` carries `trial_id` directly; no join table needed.
 
 **On the scoring, which the user correctly noticed never reached 100%:** `top_score` was
@@ -448,9 +453,9 @@ are ~1.5% of the corpus, so ranking on concerns alone meant a well-matched disea
 with zero concerns outranked a curative trial with one, every time. Identifying them correctly
 and leaving them ranked 40th would not have delivered anything.
 
-**Verified live**: NCT04563507 ranked **first** — SBRT to each metastatic lesion on
-a CDK4/6-inhibitor-plus-aromatase-inhibitor backbone, matching the patient's own regimen and disease pattern. NCT05334459 (LRT with curative intent,
-bone-only metastatic) also surfaces.
+**Verified live**: NCT04563507 ranked **first** — SBRT to each metastatic lesion on a
+CDK4/6-inhibitor-plus-aromatase-inhibitor backbone, matching the patient's own regimen and
+disease pattern. NCT05334459 (LRT with curative intent, bone-only metastatic) also surfaces.
 
 **Both are stored columns**, `trial.treatment_goal` and `trial.disease_stage` (changesets `031`,
 `032`), so the 38 can be queried rather than only appearing inside a ranking run.
@@ -622,9 +627,9 @@ file, per the existing convention.
 > in changeset `030` and the parameter is now `{patientExtid}`, checked against the caller's
 > grants via `CurrentUserService.requireAccessId(..., AccessLevel.VIEW_TRIALS)`.
 
-**Verified live against the real record.** The top hits are genuinely the patient's profile — PI3K-pathway
-HR+/HER2− breast trials with US sites — and every signal carries its quoted criteria text
-through to the response.
+**Verified live against the real record.** The top hits are genuinely the patient's profile —
+PI3K-pathway HR+/HER2− breast trials with US sites — and every signal carries its quoted
+criteria text through to the response.
 
 **Ranking is lexicographic over honest counts**, since there is deliberately no score to sort
 on: breast trials first, then fewest concerns, then most passes, then most applicable signals.
@@ -680,7 +685,7 @@ than appearing to have no locations. A trial with none says so plainly.
 Boston, Massachusetts · Las Vegas, Nevada and 3 more" — with zero missing. Ranking sorts US
 trials to the top, so the non-US path had to be checked directly: **NCT05753657**, the
 single-site trial (outside the US) that ranked first in the 2026-08-08 search, now reports
-`hasUnitedStatesSite: false`, `siteCities: ["Israel"]` and a CONCERN, instead of silently
+`hasUnitedStatesSite: false` and a CONCERN, instead of silently
 looking local. That trial is the reason geography became a signal at all.
 
 Three decisions about what she sees, all following from the no-verdicts rule:
@@ -1025,8 +1030,8 @@ are in `_archive/research/`.
 - Variants: `DETECTED | NOT_DETECTED | VUS | NOT_TESTED | UNKNOWN`
 - Treatment: `NEVER | CURRENT | PROGRESSED | STOPPED_OTHER | UNKNOWN`
 
-The treatment case is concrete rather than theoretical. The patient is **on a CDK4/6 inhibitor now
-and has not progressed on it**. A boolean `priorCdk46 = true` is literally true and reads as
+The treatment case is concrete rather than theoretical. The patient is **on a CDK4/6 inhibitor
+now and has not progressed on it**. A boolean `priorCdk46 = true` is literally true and reads as
 post-CDK4/6 — matching her to the wrong half of the corpus. `CURRENT` vs `PROGRESSED` vs
 `NEVER` is one dropdown and it is the difference between a useful shortlist and a misleading
 one.
@@ -1088,8 +1093,8 @@ things; the user chose to rename the new entity rather than touch working `:rag`
 
 **One run is stored**, `search_run_id = 22ccb562-b4a4-4acb-ae68-739896d837c1`: 15 ranked
 matches, 77 criterion rows, 8 of them flagged `is_exclusion` (all the same CNS-metastases
-concern — a skull-bone lesion rather than brain parenchyma,
-which is a question for her oncology team, not a disqualification). Those trials stayed in
+concern — a skull-bone lesion rather than brain parenchyma, which is a question for the
+oncology team, not a disqualification). Those trials stayed in
 the ranked list, per the no-verdicts rule.
 
 **It was written directly through the REST API, not through `GET /api/rag/search`**, so the

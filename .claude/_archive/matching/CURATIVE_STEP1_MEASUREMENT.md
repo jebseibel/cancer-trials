@@ -92,8 +92,8 @@ warned about exactly this for criteria text and then read prose, where it also o
 in participants with 1-5 metastases will increase the length of time before disease progresses."*
 
 **This is the real thing.** All sites of disease, oligometastatic, ablative. It is the strategy
-under which a stage IV patient is treated with curative intent at all, and it maps onto this
-patient's bone-dominant disease with a small number of named sites.
+under which a stage IV patient is treated with curative intent at all, and it maps onto a
+bone-dominant disease pattern with a small number of named sites.
 
 `no evidence of disease` / `NED` / `durable response` matched **zero** trials.
 
@@ -236,7 +236,7 @@ Controls both behaved: `overall survival` 211 (8.5%) — excluding it was right;
 | NCT06055881, NCT06144346, NCT06246968, NCT06918262, NCT05933876, NCT06260033, NCT06889610 | MDT / SBRT / cryoablation in metastatic breast |
 
 **Two of these match the patient's specific situation**, not just the category — NCT04563507 on
-her exact drug regimen, NCT05334459 on bone-dominant disease.
+the patient's exact drug regimen, NCT05334459 on bone-dominant disease.
 
 ## The finding that shapes the signal
 
