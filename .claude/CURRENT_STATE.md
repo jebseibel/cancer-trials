@@ -332,6 +332,30 @@ now that the database holds a real medical record rather than sample data.
 
 ## What's built
 
+### Change password — 2026-09-02
+
+Ported from the jobhunting project's `AuthController.changePassword` /
+`ChangePassword.tsx`, same shape. `POST /api/auth/change-password` takes the identity from the
+security context, never the request body, and re-checks the current password before accepting a
+new one — a JWT outlives the tab it was issued to, so holding a valid token alone is not proof of
+recent intent. Refuses a new password identical to the current one. `RequestChangePassword`
+carries the same `@Size(min = 6)` floor as registration.
+
+⚠️ **Existing tokens stay valid afterwards.** This app signs stateless JWTs with no server-side
+revocation list, so a password change cannot retroactively invalidate a token issued before it —
+the response text says so and tells the user to sign out elsewhere if that matters to them.
+
+Frontend: `ChangePassword.tsx`, reached from a key icon next to Logout (desktop) and a row in the
+mobile nav panel, both in `Layout.tsx`. Route is `/change-password`, nested inside the existing
+`ProtectedRoute`/`Layout` tree — no `SecurityConfig` change needed, since `/api/auth/**` was
+already `permitAll()` and the real check happens in the controller via
+`SecurityContextHolder`.
+
+`ChangePasswordTest` (7 tests, `web/controller/`) is written as attacks rather than feature
+coverage — wrong current password, no auth in context, a token naming a deleted user, cross-user
+protection, and that only a bcrypt hash is ever stored, using a real `BCryptPasswordEncoder`
+rather than a mock so the encoder itself is under test.
+
 ### The AI trial check — 2026-08-21
 
 **The first thing in this project that sends clinical text off the machine**, and the first that

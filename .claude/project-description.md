@@ -192,6 +192,9 @@ patient-scoped entities expose `GET /api/{entity}/by-patient/{patientExtid}`.
 ### Authentication
 - `POST /api/auth/login` — login; rate-limited
 - `POST /api/auth/register` — ADMIN-only
+- `POST /api/auth/change-password` — the signed-in user's own password; identity comes from the
+  JWT, never the request body, and the current password must be re-supplied even though the
+  caller already holds a valid token
 
 ### Matching
 - `GET /api/matching/rank/{patientExtid}?breastOnly=&limit=` — rank the corpus, best first

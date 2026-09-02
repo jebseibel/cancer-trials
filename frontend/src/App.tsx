@@ -12,6 +12,7 @@ import TrialDetail from './pages/TrialDetail';
 import SavedTrials from './pages/SavedTrials';
 import Ingestion from './pages/Ingestion';
 import PatientRecord from './pages/PatientRecord';
+import ChangePassword from './pages/ChangePassword';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -54,6 +55,7 @@ function App() {
                             element={<Navigate to="/diagnosis" replace />}
                         />
                         <Route path="ingestion" element={<Ingestion />} />
+                        <Route path="change-password" element={<ChangePassword />} />
                     </Route>
                 </Routes>
             </Router>

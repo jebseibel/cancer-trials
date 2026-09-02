@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
-import { Home, Search, Bookmark, LogOut, FlaskConical, Download, Stethoscope, ListChecks, Menu, X, Heart, Microscope } from 'lucide-react';
+import { Home, Search, Bookmark, LogOut, FlaskConical, Download, Stethoscope, ListChecks, Menu, X, Heart, Microscope, KeyRound } from 'lucide-react';
 import { authHelpers } from '../services/api';
 import { useAudience } from '../lib/AudienceContext';
 import type { AudienceMode } from '../lib/AudienceContext';
@@ -69,6 +69,14 @@ export default function Layout() {
                             </div>
                         </div>
                         <div className="flex items-center gap-1 sm:gap-4">
+                            <Link
+                                to="/change-password"
+                                className="hidden sm:inline-flex h-11 w-11 items-center justify-center text-green-100 hover:text-white"
+                                title="Change password"
+                                aria-label="Change password"
+                            >
+                                <KeyRound className="h-5 w-5" />
+                            </Link>
                             <button
                                 onClick={handleLogout}
                                 className="inline-flex h-11 w-11 items-center justify-center text-green-100 hover:text-white"
@@ -124,6 +132,14 @@ export default function Layout() {
                                     {label}
                                 </Link>
                             ))}
+                            <Link
+                                to="/change-password"
+                                onClick={() => setMenuOpen(false)}
+                                className="flex min-h-11 items-center rounded-md px-3 py-2 text-base font-normal text-green-50 hover:bg-brand-green-hover hover:text-white"
+                            >
+                                <KeyRound className="mr-3 h-5 w-5 shrink-0 text-green-100" />
+                                Change password
+                            </Link>
                         </div>
                     </div>
                 )}

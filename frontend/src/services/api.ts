@@ -275,6 +275,13 @@ export const authApi = {
     register: (userData: RegisterRequest) => apiClient.post<AuthResponse>('/auth/register', userData),
 };
 
+// The signed-in user's own account. Distinct from authApi: these calls require an existing
+// token rather than producing one.
+export const accountApi = {
+    changePassword: (currentPassword: string, newPassword: string) =>
+        apiClient.post<string>('/auth/change-password', { currentPassword, newPassword }),
+};
+
 // Auth helper functions
 export const authHelpers = {
     saveToken: (token: string) => localStorage.setItem('token', token),
