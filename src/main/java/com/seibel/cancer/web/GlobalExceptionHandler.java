@@ -4,6 +4,7 @@ import com.seibel.cancer.common.exceptions.ResourceAlreadyExistsException;
 import com.seibel.cancer.common.exceptions.ResourceNotFoundException;
 import com.seibel.cancer.common.exceptions.ServiceException;
 import com.seibel.cancer.service.ai.AiGenerationException;
+import com.seibel.cancer.service.ai.PhiDetectedException;
 import com.seibel.cancer.common.exceptions.ValidationException;
 import com.seibel.cancer.web.response.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -101,5 +102,17 @@ public class GlobalExceptionHandler {
         // AiService already logged the cause with timing. Nothing to add here, and this class
         // deliberately does not log - it translates exceptions, it does not observe them.
         return build(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), req, null);
+    }
+
+    /**
+     * A document rejected by the local PHI/PHI gate before it ever reached the AI service.
+     *
+     * <p>422: the request was well-formed, but its content is refused on content grounds - not
+     * a validation error (400) and not an AI failure (503).
+     */
+    @ExceptionHandler(PhiDetectedException.class)
+    public ResponseEntity<ErrorResponse> handlePhiDetected(PhiDetectedException ex,
+                                                            HttpServletRequest req) {
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), req, null);
     }
 }
