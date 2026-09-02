@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This guide covers the **one-time setup** for provisioning a new QA/demo VPS environment. Day-to-day deployment operations are not documented — the previous `qa-deployment.md` was inherited from another project (wrong host, wrong paths, and a `DROP DATABASE`) and has been removed rather than half-corrected.
+This guide covers the **one-time setup** for provisioning a new QA/demo VPS environment. `qa-deployment.md` covers day-to-day deployment. An earlier version of that file was inherited from another project (wrong host, wrong paths, and a `DROP DATABASE` naming the wrong schema) and was deleted rather than half-corrected; it was rewritten 2026-09-02 from a real deploy against this box instead.
 
 ---
 
@@ -357,7 +357,7 @@ Your environment should now be accessible at:
 | API | http://YOUR_IP/api/ |
 | Swagger | http://YOUR_IP/swagger-ui.html |
 
-There is no deployment runbook yet. Write one from a real deploy rather than adapting another project's.
+Day-to-day deployment is `qa-deployment.md`, written from a real deploy rather than adapted from another project.
 
 ---
 
