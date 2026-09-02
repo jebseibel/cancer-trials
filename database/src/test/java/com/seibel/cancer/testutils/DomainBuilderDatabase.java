@@ -176,6 +176,7 @@ public class DomainBuilderDatabase extends DomainBuilderBase {
         item.setNctId(nctId != null ? nctId : getCodeRandom("NCT"));
         item.setBriefTitle(briefTitle != null ? briefTitle : getNameRandom("Trial_"));
         item.setOfficialTitle(getNameRandom("OfficialTrial_"));
+        item.setFriendlyTitle(getNameRandom("FriendlyTrial_"));
         item.setOverallStatus(overallStatus != null ? overallStatus : getStatusRandom("Sta_"));
         item.setStudyType(getStatusRandom("Type_"));
         item.setBriefSummary(getDescriptionRandom("Summary "));

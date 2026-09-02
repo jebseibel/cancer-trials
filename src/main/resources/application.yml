@@ -208,6 +208,28 @@ cancer:
       # bar moving visibly without meaningful syscall cost.
       flush-interval: ${RAG_PROGRESS_FLUSH_INTERVAL:5}
 
+  matching:
+    progress:
+      # Character-per-trial progress bar on the friendly-title backfill console: * generated,
+      # . already had a title, ! error, with the line's first trial number in a left gutter.
+      #
+      #      1 | ....................*****!**********************  38s 0.6/s ETA 41m
+      #
+      # The bar matters most here of the three progress bars in this project: every record is a
+      # real network round-trip to the AI provider (roughly a second or more), not a local
+      # computation, so a corpus-wide run is slow AND otherwise silent until the single summary
+      # line at the very end.
+      #
+      # true (default) / auto / false. Defaults to true because the backfill is triggered from
+      # the frontend on an HTTP request thread, which has no attached console - auto resolves to
+      # false there and nothing draws.
+      enabled: ${MATCHING_PROGRESS_ENABLED:true}
+      line-width: ${MATCHING_PROGRESS_LINE_WIDTH:100}
+      # Every record is a full AI round-trip, unlike ingestion's 10 or rag's 5 - flush after
+      # every single one rather than batching, since there is no meaningful syscall cost to
+      # amortize against a call that already takes a second or more.
+      flush-interval: ${MATCHING_PROGRESS_FLUSH_INTERVAL:1}
+
 uchealth:
   # Epic / SMART on FHIR settings. Point at Epic's sandbox first; switch to UCHealth
   # production only after the sandbox round-trip works. Values live in .env.

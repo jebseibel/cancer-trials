@@ -13,6 +13,12 @@ public class ResponseTrial {
     private String nctId;
     private String briefTitle;
     private String officialTitle;
+
+    /**
+     * A plain-language, non-technical version of {@link #briefTitle}. ClinicalTrials.gov titles
+     * are written for a scientific audience.
+     */
+    private String friendlyTitle;
     private String overallStatus;
     private String studyType;
 

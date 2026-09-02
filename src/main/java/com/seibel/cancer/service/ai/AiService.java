@@ -83,7 +83,14 @@ public class AiService {
 
         // Logged before the call: a request takes seconds, and without this line a stalled one is
         // indistinguishable from one that never left. Lengths, never content.
-        log.info("AI call starting: model={}, prompt chars system/user={}/{}",
+        //
+        // DEBUG rather than INFO: a caller that runs many calls in a loop with its own
+        // ProgressTicker (e.g. the friendly-title backfill) has this line fire once per record,
+        // which interleaves with the bar's raw stdout writes and shreds it. The failure path
+        // below stays at its current level - only these two success-path lines move, and the
+        // information is still available by raising this package's log level when actually
+        // diagnosing a stall.
+        log.debug("AI call starting: model={}, prompt chars system/user={}/{}",
                 configuredModel,
                 systemPrompt == null ? 0 : systemPrompt.length(),
                 userPrompt.length());
@@ -101,7 +108,7 @@ public class AiService {
             if (result == null) {
                 throw new AiGenerationException("AI provider returned an empty response.");
             }
-            log.info("AI call ok: model={}, {}ms", configuredModel, elapsedMs);
+            log.debug("AI call ok: model={}, {}ms", configuredModel, elapsedMs);
             return result;
 
         } catch (AiGenerationException e) {

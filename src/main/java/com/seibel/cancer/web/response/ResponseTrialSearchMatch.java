@@ -17,6 +17,9 @@ public class ResponseTrialSearchMatch {
     private String trialExtid;
     private String nctId;
     private String briefTitle;
+
+    /** A plain-language rewrite of {@link #briefTitle}, or null when not yet generated. */
+    private String friendlyTitle;
     private String overallStatus;
 
     /** Best similarity score among this trial's matched chunks. */

@@ -35,6 +35,7 @@ class TrialMapperTest {
         assertEquals(db.getNctId(), domain.getNctId());
         assertEquals(db.getBriefTitle(), domain.getBriefTitle());
         assertEquals(db.getOfficialTitle(), domain.getOfficialTitle());
+        assertEquals(db.getFriendlyTitle(), domain.getFriendlyTitle());
         assertEquals(db.getOverallStatus(), domain.getOverallStatus());
         assertEquals(db.getStudyType(), domain.getStudyType());
         assertEquals(db.getBriefSummary(), domain.getBriefSummary());
@@ -73,6 +74,7 @@ class TrialMapperTest {
         assertEquals(domain.getNctId(), db.getNctId());
         assertEquals(domain.getBriefTitle(), db.getBriefTitle());
         assertEquals(domain.getOfficialTitle(), db.getOfficialTitle());
+        assertEquals(domain.getFriendlyTitle(), db.getFriendlyTitle());
         assertEquals(domain.getOverallStatus(), db.getOverallStatus());
         assertEquals(domain.getStudyType(), db.getStudyType());
         assertEquals(domain.getBriefSummary(), db.getBriefSummary());

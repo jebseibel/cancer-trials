@@ -26,6 +26,13 @@ public class TrialDb extends BaseDb {
     @Column(name = "official_title", length = 1000)
     private String officialTitle;
 
+    /**
+     * A plain-language, non-technical version of {@link #briefTitle} for readers who are not
+     * clinicians. ClinicalTrials.gov titles are written for a scientific audience.
+     */
+    @Column(name = "friendly_title", length = 500)
+    private String friendlyTitle;
+
     @Column(name = "overall_status", length = 32)
     private String overallStatus;
 

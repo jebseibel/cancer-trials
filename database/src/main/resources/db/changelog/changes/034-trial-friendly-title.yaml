@@ -1,0 +1,22 @@
+databaseChangeLog:
+  - changeSet:
+      id: 034-trial-friendly-title
+      author: jeb
+      changes:
+        # A plain-language, non-technical version of the trial title. ClinicalTrials.gov titles
+        # are written for clinicians ("A Phase 3 Randomized, Open-Label Study of..."), which is
+        # not accessible to a patient or family member reading a list of trials.
+        #
+        # Nullable. Existing rows have no value; how it gets populated (manual entry, an AI
+        # rewrite of briefTitle, etc.) is separate, later work - this changeset is the column
+        # only.
+        #
+        # A new changeset rather than an edit to 005-trial.yaml: editing an applied changeset
+        # breaks its checksum, and `drop-first` is false here, so an edit would force a database
+        # rebuild and destroy the indexed corpus to add a column.
+        - addColumn:
+            tableName: trial
+            columns:
+              - column:
+                  name: friendly_title
+                  type: varchar(500)

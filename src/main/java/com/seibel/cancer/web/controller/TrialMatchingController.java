@@ -13,11 +13,13 @@ import com.seibel.cancer.service.matching.CriteriaSignalEvaluator;
 import com.seibel.cancer.database.db.service.AiTrialAssessmentDbService;
 import com.seibel.cancer.service.ai.AiService;
 import com.seibel.cancer.service.ai.TrialDiagnosisMatchService;
+import com.seibel.cancer.service.ai.TrialFriendlyTitleBackfillService;
 import com.seibel.cancer.service.ai.TrialMatchAssessment;
 import com.seibel.cancer.service.matching.TrialClassificationBackfillService;
 import com.seibel.cancer.service.matching.TrialMatchingService;
 import com.seibel.cancer.web.response.ResponseAiTrialCheck;
 import com.seibel.cancer.web.response.ResponseEligibilitySignal;
+import com.seibel.cancer.web.response.ResponseFriendlyTitleBackfill;
 import com.seibel.cancer.web.response.ResponseTreatmentGoalBackfill;
 import com.seibel.cancer.web.response.ResponseTrialAssessment;
 import io.swagger.v3.oas.annotations.Operation;
@@ -61,6 +63,7 @@ public class TrialMatchingController {
     private final AiService aiService;
     private final AiTrialAssessmentDbService assessmentDbService;
     private final TrialClassificationBackfillService trialClassificationBackfillService;
+    private final TrialFriendlyTitleBackfillService friendlyTitleBackfillService;
     private final TrialService trialService;
     private final CurrentUserService currentUserService;
     private final TrialMatchingConverter converter;
@@ -136,6 +139,27 @@ public class TrialMatchingController {
                 .trialsRead(result.trialsRead())
                 .updated(result.updated())
                 .unchanged(result.unchanged())
+                .errors(result.errors())
+                .build();
+    }
+
+    /**
+     * Generates {@code friendly_title} for every trial that does not have one yet.
+     *
+     * <p>Unlike {@link #backfillTreatmentGoals}, this is not free — it is a paid AI call per
+     * trial missing a title, so it skips trials that already have one rather than checking
+     * whether the value would change. ADMIN-only for the same reason: a corpus-wide run against
+     * ~2,500 trials is a cost decision, not something a reader of a trial page should trigger.
+     */
+    @PostMapping("/backfill-friendly-titles")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Generate friendly titles for every trial that does not have one")
+    public ResponseFriendlyTitleBackfill backfillFriendlyTitles() {
+        var result = friendlyTitleBackfillService.backfillAll();
+        return ResponseFriendlyTitleBackfill.builder()
+                .trialsRead(result.trialsRead())
+                .generated(result.generated())
+                .alreadyPresent(result.alreadyPresent())
                 .errors(result.errors())
                 .build();
     }
@@ -341,6 +365,7 @@ class TrialMatchingConverter {
                 .trialExtid(assessment.trialExtid())
                 .nctId(assessment.nctId())
                 .briefTitle(trial == null ? null : trial.getBriefTitle())
+                .friendlyTitle(trial == null ? null : trial.getFriendlyTitle())
                 .overallStatus(trial == null ? null : trial.getOverallStatus())
                 .signals(assessment.signals().stream().map(this::toResponse).toList())
                 .concernCount(assessment.concernCount())

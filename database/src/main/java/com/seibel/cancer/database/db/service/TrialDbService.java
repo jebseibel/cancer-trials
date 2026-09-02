@@ -60,6 +60,7 @@ public class TrialDbService extends BaseDbService {
             if (item.getNctId() != null) record.setNctId(item.getNctId());
             if (item.getBriefTitle() != null) record.setBriefTitle(item.getBriefTitle());
             if (item.getOfficialTitle() != null) record.setOfficialTitle(item.getOfficialTitle());
+            if (item.getFriendlyTitle() != null) record.setFriendlyTitle(item.getFriendlyTitle());
             if (item.getOverallStatus() != null) record.setOverallStatus(item.getOverallStatus());
             if (item.getStudyType() != null) record.setStudyType(item.getStudyType());
             if (item.getTreatmentGoal() != null) record.setTreatmentGoal(item.getTreatmentGoal());
