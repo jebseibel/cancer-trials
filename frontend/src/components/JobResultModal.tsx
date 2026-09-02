@@ -49,20 +49,20 @@ export default function JobResultModal({
             role="presentation"
         >
             <div
-                className="w-full max-w-md rounded-lg bg-white shadow-xl"
+                className="w-full max-w-md rounded-lg bg-brand-beige-card shadow-xl"
                 // Stop backdrop clicks from closing when the click is inside the dialog.
                 onClick={(e) => e.stopPropagation()}
                 role="dialog"
                 aria-modal="true"
                 aria-label={content.title}
             >
-                <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-                    <h2 className="text-lg font-medium text-gray-900">{content.title}</h2>
+                <div className="flex items-center justify-between border-b border-stone-200 px-6 py-4">
+                    <h2 className="text-lg font-medium text-stone-900">{content.title}</h2>
                     <button
                         type="button"
                         onClick={onClose}
                         aria-label="Close"
-                        className="text-gray-400 hover:text-gray-600"
+                        className="text-stone-400 hover:text-stone-600"
                     >
                         <X className="h-5 w-5" />
                     </button>
@@ -86,13 +86,13 @@ export default function JobResultModal({
                                     <dt
                                         className={
                                             isHeading
-                                                ? 'font-medium text-gray-900'
-                                                : 'text-gray-600'
+                                                ? 'font-medium text-stone-900'
+                                                : 'text-stone-600'
                                         }
                                     >
                                         {line.label.trim()}
                                     </dt>
-                                    <dd className="font-medium text-gray-900">{line.value}</dd>
+                                    <dd className="font-medium text-stone-900">{line.value}</dd>
                                 </div>
                             );
                         })}
@@ -100,10 +100,10 @@ export default function JobResultModal({
 
                     {errors.length > 0 ? (
                         <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
-                            <p className="text-sm font-medium text-amber-800">
+                            <p className="text-base font-medium text-amber-800">
                                 {errors.length} error{errors.length === 1 ? '' : 's'}
                             </p>
-                            <ul className="mt-1 space-y-1 text-xs text-amber-700">
+                            <ul className="mt-1 space-y-1 text-base leading-normal text-amber-700">
                                 {errors.slice(0, MAX_ERRORS_SHOWN).map((e, i) => (
                                     <li key={i} className="break-words">
                                         {e}
@@ -111,22 +111,22 @@ export default function JobResultModal({
                                 ))}
                             </ul>
                             {hiddenErrorCount > 0 && (
-                                <p className="mt-1 text-xs text-amber-700">
+                                <p className="mt-1 text-sm text-amber-700">
                                     +{hiddenErrorCount} more &mdash; see the backend log for the
                                     full list.
                                 </p>
                             )}
                         </div>
                     ) : (
-                        <p className="mt-4 text-sm text-green-700">No errors.</p>
+                        <p className="mt-4 text-sm text-brand-green-hover">No errors.</p>
                     )}
                 </div>
 
-                <div className="flex justify-end border-t border-gray-200 px-6 py-3">
+                <div className="flex justify-end border-t border-stone-200 px-6 py-3">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+                        className="rounded-md bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-200"
                     >
                         Close
                     </button>

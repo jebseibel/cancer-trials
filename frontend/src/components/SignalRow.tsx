@@ -12,7 +12,7 @@ const STYLES: Record<string, string> = {
     CONCERN: 'border-amber-300 bg-amber-50 text-amber-900',
     UNKNOWN: 'border-sky-300 bg-sky-50 text-sky-900',
     PASS: 'border-green-200 bg-green-50 text-green-900',
-    NOT_APPLICABLE: 'border-gray-200 bg-gray-50 text-gray-600',
+    NOT_APPLICABLE: 'border-stone-200 bg-stone-50 text-stone-600',
 };
 
 function SignalIcon({ outcome }: { outcome: string }) {
@@ -34,7 +34,7 @@ export default function SignalRow({ signal }: { signal: EligibilitySignal }) {
     const style = STYLES[signal.outcome] ?? STYLES.UNKNOWN;
 
     return (
-        <li className={`rounded border px-3 py-2 text-sm ${style}`}>
+        <li className={`rounded border px-3 py-2 text-base leading-normal ${style}`}>
             <div className="flex items-start gap-2">
                 <SignalIcon outcome={signal.outcome} />
                 <div className="min-w-0 flex-1">

@@ -5,6 +5,7 @@ import { patientApi, patientDiagnosisApi } from '../services/api';
 import { BooleanSelect, Field, Section, Select, inputClass } from '../components/FormControls';
 import { useCurrentPatient } from '../lib/PatientContext';
 import { ageFromDateOfBirth, deriveReceptorSubtype } from '../lib/receptorSubtype';
+import { takePendingDiagnosisDraft } from '../lib/diagnosisIntakeDraft';
 import {
     ECOG_VALUES,
     MENOPAUSAL_STATUS_VALUES,
@@ -123,6 +124,35 @@ export default function Diagnosis() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [existing?.extid]);
 
+    // Picks up a completed document-intake draft, but only into a blank/new record - it must
+    // never silently overwrite an already-saved diagnosis.
+    useEffect(() => {
+        if (existing) return;
+        const draft = takePendingDiagnosisDraft();
+        if (!draft) return;
+        setForm((f) => ({
+            ...f,
+            cancerType: draft.cancerType ?? f.cancerType,
+            stage: draft.stage ?? f.stage,
+            stageSystem: draft.stageSystem ?? f.stageSystem,
+            isMetastatic: draft.isMetastatic !== undefined ? String(draft.isMetastatic) : f.isMetastatic,
+            metastasisSites: draft.metastasisSites ?? f.metastasisSites,
+            erStatus: draft.erStatus ?? f.erStatus,
+            prStatus: draft.prStatus ?? f.prStatus,
+            her2Status: draft.her2Status ?? f.her2Status,
+            biomarkers: draft.biomarkers ?? f.biomarkers,
+            ecogStatus: draft.ecogStatus !== undefined ? String(draft.ecogStatus) : f.ecogStatus,
+            priorChemoRegimens:
+                draft.priorChemoRegimens !== undefined ? String(draft.priorChemoRegimens) : f.priorChemoRegimens,
+            lastChemoEndDate: draft.lastChemoEndDate ?? f.lastChemoEndDate,
+            priorTreatments: draft.priorTreatments ?? f.priorTreatments,
+            hasMeasurableDisease:
+                draft.hasMeasurableDisease !== undefined ? String(draft.hasMeasurableDisease) : f.hasMeasurableDisease,
+            menopausalStatus: draft.menopausalStatus ?? f.menopausalStatus,
+            diagnosisDate: draft.diagnosisDate ?? f.diagnosisDate,
+        }));
+    }, [existing]);
+
     // Date of birth and sex describe the person, not the diagnosis, so they live on `patient`
     // and are loaded and saved separately - the two Save buttons on this page write to two
     // different tables, which is why they are not merged into one request.
@@ -171,17 +201,18 @@ export default function Diagnosis() {
     const saveError = saveMutation.error as { response?: { data?: { message?: string } } } | null;
 
     if (patientLoading || isLoading) {
-        return <p className="px-4 py-6 text-gray-500">Loading diagnosis...</p>;
+        return <p className="px-4 py-6 text-stone-500">Loading diagnosis...</p>;
     }
 
     if (!patient) {
         return (
             <div>
-                <div className="bg-white shadow rounded-lg p-6">
-                    <p className="text-sm text-gray-700">
-                        No patient record yet. Create one to start recording a diagnosis.
+                <div className="bg-brand-beige-card shadow rounded-lg p-6">
+                    <p className="text-base text-stone-700 leading-normal">
+                        You don't have a patient record yet — create one and you can start
+                        recording a diagnosis whenever you're ready.
                     </p>
-                    <p className="mt-2 text-xs text-gray-500">
+                    <p className="mt-2 text-base text-stone-500 leading-normal">
                         A record can be for you or for someone you are helping.
                     </p>
                 </div>
@@ -191,7 +222,7 @@ export default function Diagnosis() {
 
     return (
         <div>
-            <p className="text-sm text-gray-500 mb-6">
+            <p className="text-base text-stone-500 leading-normal mb-6">
                 Used to match against trial eligibility criteria. Everything here is optional
                 except cancer type — record what you know, leave the rest blank.
             </p>
@@ -278,13 +309,13 @@ export default function Diagnosis() {
                         hint="Derived from the three receptors above, so the two can never disagree."
                         className="sm:col-span-3"
                     >
-                        <div className="px-3 py-2 rounded-md bg-gray-50 border border-gray-200 text-sm">
+                        <div className="px-3 py-2 rounded-md bg-stone-50 border border-stone-200 text-base leading-normal">
                             {derivedSubtype ? (
-                                <span className="font-medium text-gray-900">
+                                <span className="font-medium text-stone-900">
                                     {derivedSubtype.replaceAll('_', ' ')}
                                 </span>
                             ) : (
-                                <span className="text-gray-500">
+                                <span className="text-stone-500">
                                     Set ER, PR, and HER2 to positive or negative to derive this.
                                 </span>
                             )}
@@ -386,7 +417,7 @@ export default function Diagnosis() {
                 </Section>
 
                 {saveMutation.isError && (
-                    <div className="mb-4 rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-700">
+                    <div className="mb-4 rounded-md bg-red-50 border border-red-200 p-4 text-base leading-normal text-red-700">
                         {saveError?.response?.data?.message ?? 'Could not save the diagnosis.'}
                     </div>
                 )}
@@ -395,7 +426,7 @@ export default function Diagnosis() {
                     <button
                         type="submit"
                         disabled={saveMutation.isPending}
-                        className="inline-flex items-center px-4 py-2 rounded-md bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                        className="inline-flex items-center px-4 py-2 rounded-md bg-brand-green text-white text-sm font-medium hover:bg-brand-green-hover disabled:opacity-50"
                     >
                         {saveMutation.isPending ? (
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -405,7 +436,7 @@ export default function Diagnosis() {
                         {saveMutation.isPending ? 'Saving...' : existing ? 'Save changes' : 'Save diagnosis'}
                     </button>
                     {saved && !saveMutation.isPending && (
-                        <span className="text-sm text-green-700">Saved.</span>
+                        <span className="text-sm text-brand-green-hover">Saved.</span>
                     )}
                 </div>
             </form>

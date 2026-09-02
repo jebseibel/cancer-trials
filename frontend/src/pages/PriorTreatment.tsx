@@ -4,6 +4,7 @@ import { Save, Loader2 } from 'lucide-react';
 import { patientPriorTreatmentApi } from '../services/api';
 import { BooleanSelect, Field, Section, Select, inputClass } from '../components/FormControls';
 import { useCurrentPatient } from '../lib/PatientContext';
+import { takePendingPriorTreatmentDraft } from '../lib/diagnosisIntakeDraft';
 import { TREATMENT_STATUS_LABELS, TREATMENT_STATUS_VALUES } from '../types/api';
 import type { PatientPriorTreatment, PatientPriorTreatmentRequest } from '../types/api';
 
@@ -128,6 +129,44 @@ export default function PriorTreatment() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [existing?.extid]);
 
+    // Picks up a completed document-intake draft, but only into a blank/new record - it must
+    // never silently overwrite already-saved treatment history.
+    useEffect(() => {
+        if (existing) return;
+        const draft = takePendingPriorTreatmentDraft();
+        if (!draft) return;
+        setForm((f) => ({
+            ...f,
+            cdk46Status: draft.cdk46Status ?? f.cdk46Status,
+            endocrineStatus: draft.endocrineStatus ?? f.endocrineStatus,
+            serdStatus: draft.serdStatus ?? f.serdStatus,
+            chemoStatus: draft.chemoStatus ?? f.chemoStatus,
+            her2TherapyStatus: draft.her2TherapyStatus ?? f.her2TherapyStatus,
+            her2AdcStatus: draft.her2AdcStatus ?? f.her2AdcStatus,
+            trop2AdcStatus: draft.trop2AdcStatus ?? f.trop2AdcStatus,
+            parpStatus: draft.parpStatus ?? f.parpStatus,
+            pi3kAktMtorStatus: draft.pi3kAktMtorStatus ?? f.pi3kAktMtorStatus,
+            immunotherapyStatus: draft.immunotherapyStatus ?? f.immunotherapyStatus,
+            taxaneStatus: draft.taxaneStatus ?? f.taxaneStatus,
+            anthracyclineStatus: draft.anthracyclineStatus ?? f.anthracyclineStatus,
+            platinumStatus: draft.platinumStatus ?? f.platinumStatus,
+            currentDrugNames: draft.currentDrugNames ?? f.currentDrugNames,
+            priorDrugNames: draft.priorDrugNames ?? f.priorDrugNames,
+            linesOfTherapyMetastatic:
+                draft.linesOfTherapyMetastatic !== undefined
+                    ? String(draft.linesOfTherapyMetastatic)
+                    : f.linesOfTherapyMetastatic,
+            hadNeoadjuvant: draft.hadNeoadjuvant !== undefined ? String(draft.hadNeoadjuvant) : f.hadNeoadjuvant,
+            hadAdjuvant: draft.hadAdjuvant !== undefined ? String(draft.hadAdjuvant) : f.hadAdjuvant,
+            hadRadiation: draft.hadRadiation !== undefined ? String(draft.hadRadiation) : f.hadRadiation,
+            hadSurgery: draft.hadSurgery !== undefined ? String(draft.hadSurgery) : f.hadSurgery,
+            lastTreatmentEndDate: draft.lastTreatmentEndDate ?? f.lastTreatmentEndDate,
+            currentlyOnTreatment:
+                draft.currentlyOnTreatment !== undefined ? String(draft.currentlyOnTreatment) : f.currentlyOnTreatment,
+            otherTreatments: draft.otherTreatments ?? f.otherTreatments,
+        }));
+    }, [existing]);
+
     const saveMutation = useMutation({
         mutationFn: async () => {
             const request = toRequest(form, patient?.extid);
@@ -151,17 +190,18 @@ export default function PriorTreatment() {
     const saveError = saveMutation.error as { response?: { data?: { message?: string } } } | null;
 
     if (patientLoading || isLoading) {
-        return <p className="px-4 py-6 text-gray-500">Loading prior treatment...</p>;
+        return <p className="px-4 py-6 text-stone-500">Loading prior treatment...</p>;
     }
 
     if (!patient) {
         return (
             <div>
-                <div className="bg-white shadow rounded-lg p-6">
-                    <p className="text-sm text-gray-700">
-                        No patient record yet. Create one to start recording past treatments.
+                <div className="bg-brand-beige-card shadow rounded-lg p-6">
+                    <p className="text-base text-stone-700 leading-normal">
+                        You don't have a patient record yet — create one and you can start
+                        recording past treatments whenever you're ready.
                     </p>
-                    <p className="mt-2 text-xs text-gray-500">
+                    <p className="mt-2 text-base text-stone-500 leading-normal">
                         A record can be for you or for someone you are helping.
                     </p>
                 </div>
@@ -182,7 +222,7 @@ export default function PriorTreatment() {
 
     return (
         <div>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-base text-stone-500 leading-normal mb-4">
                 Used to match against trial eligibility criteria. Everything here is optional —
                 record what you know, leave the rest blank.
             </p>
@@ -190,7 +230,7 @@ export default function PriorTreatment() {
             {/* Why these are dropdowns and not checkboxes. This is the distinction that decides
                 which half of the corpus a patient is eligible for. */}
             <div className="mb-6 rounded-md border border-amber-300 bg-amber-50 px-4 py-3">
-                <p className="text-sm text-amber-900">
+                <p className="text-base leading-normal text-amber-900">
                     <strong>How a drug was stopped matters as much as whether it was
                     taken.</strong>{' '}
                     Many trials split into two groups: people who have <em>never</em> had a drug
@@ -353,7 +393,7 @@ export default function PriorTreatment() {
                 </Section>
 
                 {saveMutation.isError && (
-                    <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-base leading-normal text-red-700">
                         {saveError?.response?.data?.message ??
                             'Could not save the treatment history.'}
                     </div>
@@ -363,7 +403,7 @@ export default function PriorTreatment() {
                     <button
                         type="submit"
                         disabled={saveMutation.isPending}
-                        className="inline-flex items-center px-4 py-2 rounded-md bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                        className="inline-flex items-center px-4 py-2 rounded-md bg-brand-green text-white text-sm font-medium hover:bg-brand-green-hover disabled:opacity-50"
                     >
                         {saveMutation.isPending ? (
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -377,7 +417,7 @@ export default function PriorTreatment() {
                               : 'Save treatment history'}
                     </button>
                     {saved && !saveMutation.isPending && (
-                        <span className="text-sm text-green-700">Saved.</span>
+                        <span className="text-sm text-brand-green-hover">Saved.</span>
                     )}
                 </div>
             </form>

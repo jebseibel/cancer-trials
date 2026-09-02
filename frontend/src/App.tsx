@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { PatientProvider } from './lib/PatientContext';
+import { AudienceProvider } from './lib/AudienceContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import TrialSearch from './pages/TrialSearch';
@@ -32,9 +33,11 @@ function App() {
                         path="/"
                         element={
                             <ProtectedRoute>
-                                <PatientProvider>
-                                    <Layout />
-                                </PatientProvider>
+                                <AudienceProvider>
+                                    <PatientProvider>
+                                        <Layout />
+                                    </PatientProvider>
+                                </AudienceProvider>
                             </ProtectedRoute>
                         }
                     >

@@ -39,21 +39,21 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center px-4">
+        <div className="min-h-screen bg-brand-beige flex items-center justify-center px-4">
             <div className="max-w-md w-full space-y-8">
                 <div>
-                    <h2 className="text-center text-3xl font-extrabold text-gray-900 mb-2">
+                    <h2 className="font-heading text-center text-3xl font-extrabold text-stone-900 mb-2">
                         Breast Cancer Trial Finder
                     </h2>
-                    <p className="mt-2 text-center text-sm text-gray-600">
+                    <p className="mt-2 text-center text-base text-stone-600">
                         {isLogin ? 'Sign in to your account' : 'Create a new account'}
                     </p>
                 </div>
 
-                <div className="bg-white rounded-lg shadow-xl p-8">
+                <div className="bg-brand-beige-card rounded-lg shadow-xl p-8">
                     <form className="space-y-6" onSubmit={handleSubmit}>
                         <div>
-                            <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+                            <label htmlFor="username" className="block text-sm font-medium text-stone-700">
                                 Username
                             </label>
                             <input
@@ -63,13 +63,13 @@ export default function Login() {
                                 required
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
-                                className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                                className="mt-1 appearance-none block w-full px-3 py-2 border border-stone-300 rounded-md shadow-sm placeholder-stone-400 focus:outline-none focus:ring-brand-green focus:border-brand-green"
                             />
                         </div>
 
                         {!isLogin && (
                             <div>
-                                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                                <label htmlFor="email" className="block text-sm font-medium text-stone-700">
                                     Email (optional)
                                 </label>
                                 <input
@@ -78,13 +78,13 @@ export default function Login() {
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                                    className="mt-1 appearance-none block w-full px-3 py-2 border border-stone-300 rounded-md shadow-sm placeholder-stone-400 focus:outline-none focus:ring-brand-green focus:border-brand-green"
                                 />
                             </div>
                         )}
 
                         <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                            <label htmlFor="password" className="block text-sm font-medium text-stone-700">
                                 Password
                             </label>
                             <input
@@ -94,7 +94,7 @@ export default function Login() {
                                 required
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                                className="mt-1 appearance-none block w-full px-3 py-2 border border-stone-300 rounded-md shadow-sm placeholder-stone-400 focus:outline-none focus:ring-brand-green focus:border-brand-green"
                             />
                         </div>
 
@@ -108,7 +108,7 @@ export default function Login() {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-brand-green hover:bg-brand-green-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-green disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {loading ? (
                                     'Processing...'
@@ -134,10 +134,10 @@ export default function Login() {
                     <div className="mt-6">
                         <div className="relative">
                             <div className="absolute inset-0 flex items-center">
-                                <div className="w-full border-t border-gray-300" />
+                                <div className="w-full border-t border-stone-300" />
                             </div>
                             <div className="relative flex justify-center text-sm">
-                                <span className="px-2 bg-white text-gray-500">
+                                <span className="px-2 bg-brand-beige-card text-stone-500">
                                     {isLogin ? "Don't have an account?" : 'Already have an account?'}
                                 </span>
                             </div>
@@ -153,7 +153,7 @@ export default function Login() {
                                     setPassword('');
                                     setEmail('');
                                 }}
-                                className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                className="w-full flex justify-center py-2 px-4 border border-stone-300 rounded-md shadow-sm text-sm font-medium text-stone-700 bg-brand-beige-card hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-green"
                             >
                                 {isLogin ? 'Create an account' : 'Sign in instead'}
                             </button>
@@ -167,12 +167,12 @@ export default function Login() {
                   access" - this instance holds one person's medical record, and the offer is
                   help with the tool, not an invitation to browse the data.
                 */}
-                <p className="text-center text-sm text-gray-600">
+                <p className="text-center text-base text-stone-600 leading-normal">
                     This tool was built for one patient and her family. If that is not you and
                     you would like to know how to use it, email{' '}
                     <a
                         href="mailto:jeb.seibel@yahoo.com"
-                        className="font-medium text-green-700 hover:text-green-800 underline"
+                        className="font-medium text-brand-green-hover hover:text-brand-green-hover underline"
                     >
                         jeb.seibel@yahoo.com
                     </a>
