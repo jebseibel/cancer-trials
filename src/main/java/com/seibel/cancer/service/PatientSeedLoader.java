@@ -35,7 +35,7 @@ import java.util.Optional;
  * API rather than by Liquibase, so a database rebuild silently deletes them - twice now,
  * costing a manual re-entry of a real medical record each time. They are not committed as
  * Liquibase seed data because the diagnosis is real patient data and changesets go to git.
- * The source CSVs live gitignored under {@code .claude/patient-data/}.
+ * The source CSVs live gitignored under {@code .claude/_archive/patient-data/}.
  *
  * <p><b>Seed if absent, never sync.</b> An existing row is left completely alone. Re-reading
  * the file over a row edited through the UI would silently revert those edits on every

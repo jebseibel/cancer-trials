@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Database, Download, Loader2, PlayCircle, AlertTriangle } from 'lucide-react';
-import { ingestionApi, ragApi } from '../services/api';
+import { Database, Download, Loader2, PlayCircle, AlertTriangle, Target, Wand2 } from 'lucide-react';
+import { ingestionApi, ragApi, matchingApi } from '../services/api';
 import { OVERALL_STATUS_OPTIONS } from '../types/api';
 import JobResultModal from '../components/JobResultModal';
 import type { JobResultContent } from '../components/JobResultModal';
@@ -22,16 +22,25 @@ export default function Ingestion() {
 
     const ingestMutation = useMutation({
         mutationFn: async () => {
-            const response = await ingestionApi.runClinicalTrials({
-                condition: condition.trim() || undefined,
-                term: term.trim() || undefined,
-                location: location.trim() || undefined,
-                overallStatus,
-                maxStudies,
-            });
-            return response.data;
+            const ingest = (
+                await ingestionApi.runClinicalTrials({
+                    condition: condition.trim() || undefined,
+                    term: term.trim() || undefined,
+                    location: location.trim() || undefined,
+                    overallStatus,
+                    maxStudies,
+                })
+            ).data;
+
+            // Every newly-saved trial has no friendly_title yet, and the pull side never
+            // generates one itself - :datafetcher cannot call this AI service without creating
+            // the same root->datafetcher cycle the rest of ingestion avoids. Running the
+            // backfill here is what makes "Pull Trials" alone leave the corpus fully titled,
+            // matching what "Pull Trials and Prepare for Search" now also does.
+            const friendlyTitles = (await matchingApi.backfillFriendlyTitles()).data;
+            return { ingest, friendlyTitles };
         },
-        onSuccess: (data) => {
+        onSuccess: ({ ingest: data, friendlyTitles }) => {
             setModalContent({
                 title: 'Trials Pulled',
                 lines: [
@@ -45,8 +54,12 @@ export default function Ingestion() {
                     { label: 'Saved to the database', value: '' },
                     { label: '  Trials processed', value: data.pendingRowsProcessed },
                     { label: '  Trials saved', value: data.trialsNormalized },
+                    { label: '', value: '' },
+                    { label: 'Friendly titles', value: '' },
+                    { label: '  Titles generated', value: friendlyTitles.generated },
+                    { label: '  Already had a title', value: friendlyTitles.alreadyPresent },
                 ],
-                errors: [...data.ingestErrors, ...data.normalizationErrors],
+                errors: [...data.ingestErrors, ...data.normalizationErrors, ...friendlyTitles.errors],
             });
             // Trial lists are stale until this runs - without it you have to navigate away and
             // back to see newly ingested trials.
@@ -73,9 +86,48 @@ export default function Ingestion() {
         },
     });
 
-    // Both steps in one press, using the form values above. Runs them in sequence rather than
-    // calling the two mutations - a failed pull must not be followed by a backfill, which would
-    // index a half-loaded corpus and report success.
+    // Re-derives what each trial appears to be trying to achieve. Separate from the two steps
+    // above because it reads nothing new - it re-reads text already in the database with the
+    // current patterns. Needed because pulling skips trials whose ClinicalTrials.gov payload is
+    // unchanged, so a re-pull cannot pick up a change to the code that reads that payload.
+    const treatmentGoalMutation = useMutation({
+        mutationFn: async () => (await matchingApi.backfillTreatmentGoals()).data,
+        onSuccess: (data) => {
+            setModalContent({
+                title: 'Treatment Goals Updated',
+                lines: [
+                    { label: 'Trials examined', value: data.trialsRead },
+                    { label: 'Trials updated', value: data.updated },
+                    { label: 'Already correct', value: data.unchanged },
+                ],
+                errors: data.errors,
+            });
+        },
+    });
+
+    // Generates trial.friendly_title for every trial that does not have one yet. Unlike the
+    // treatment-goal backfill above, each trial here is a paid AI call, so the backend skips
+    // trials that already have a title rather than re-checking whether it would change.
+    const friendlyTitleMutation = useMutation({
+        mutationFn: async () => (await matchingApi.backfillFriendlyTitles()).data,
+        onSuccess: (data) => {
+            setModalContent({
+                title: 'Friendly Titles Generated',
+                lines: [
+                    { label: 'Trials examined', value: data.trialsRead },
+                    { label: 'Titles generated', value: data.generated },
+                    { label: 'Already had a title', value: data.alreadyPresent },
+                ],
+                errors: data.errors,
+            });
+            queryClient.invalidateQueries({ queryKey: ['trials'] });
+        },
+    });
+
+    // All three steps in one press, using the form values above. Runs them in sequence rather
+    // than calling the mutations independently - a failed pull must not be followed by a
+    // backfill or friendly-title generation, which would index (or pay to caption) a
+    // half-loaded corpus and report success.
     const processAllMutation = useMutation({
         mutationFn: async () => {
             const ingest = (
@@ -89,9 +141,10 @@ export default function Ingestion() {
             ).data;
 
             const backfill = (await ragApi.backfill()).data;
-            return { ingest, backfill };
+            const friendlyTitles = (await matchingApi.backfillFriendlyTitles()).data;
+            return { ingest, backfill, friendlyTitles };
         },
-        onSuccess: ({ ingest, backfill }) => {
+        onSuccess: ({ ingest, backfill, friendlyTitles }) => {
             setModalContent({
                 title: 'All Steps Complete',
                 lines: [
@@ -109,11 +162,16 @@ export default function Ingestion() {
                     { label: '  Trials made searchable', value: backfill.trialsIndexed },
                     { label: '  Sections of text prepared', value: backfill.chunksWritten },
                     { label: '  Already searchable', value: backfill.trialsAlreadyIndexed },
+                    { label: '', value: '' },
+                    { label: 'Friendly titles', value: '' },
+                    { label: '  Titles generated', value: friendlyTitles.generated },
+                    { label: '  Already had a title', value: friendlyTitles.alreadyPresent },
                 ],
                 errors: [
                     ...ingest.ingestErrors,
                     ...ingest.normalizationErrors,
                     ...backfill.errors,
+                    ...friendlyTitles.errors,
                 ],
             });
             queryClient.invalidateQueries({ queryKey: ['trials'] });
@@ -131,48 +189,48 @@ export default function Ingestion() {
 
     return (
         <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Process Trials</h1>
-            <p className="text-gray-600 mb-6">
+            <h1 className="font-heading text-3xl font-bold text-stone-900 mb-2">Process Trials</h1>
+            <p className="text-stone-600 mb-6">
                 Download trials from ClinicalTrials.gov and prepare them so search can find them.
             </p>
 
-            <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6 mb-6 space-y-4">
+            <form onSubmit={handleSubmit} className="bg-brand-beige-card shadow rounded-lg p-6 mb-6 space-y-4">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Condition</label>
+                    <label className="block text-sm font-medium text-stone-700 mb-1">Condition</label>
                     <input
                         type="text"
                         value={condition}
                         onChange={(e) => setCondition(e.target.value)}
                         placeholder="e.g. breast cancer"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                        className="w-full px-3 py-2 border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-green focus:border-brand-green"
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Term (optional)</label>
+                    <label className="block text-sm font-medium text-stone-700 mb-1">Term (optional)</label>
                     <input
                         type="text"
                         value={term}
                         onChange={(e) => setTerm(e.target.value)}
                         placeholder="free-text search term"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                        className="w-full px-3 py-2 border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-green focus:border-brand-green"
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Location (optional)</label>
+                    <label className="block text-sm font-medium text-stone-700 mb-1">Location (optional)</label>
                     <input
                         type="text"
                         value={location}
                         onChange={(e) => setLocation(e.target.value)}
                         placeholder="e.g. Denver, CO"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                        className="w-full px-3 py-2 border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-green focus:border-brand-green"
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <label className="block text-sm font-medium text-stone-700 mb-1">Status</label>
                     <select
                         value={overallStatus}
                         onChange={(e) => setOverallStatus(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                        className="w-full px-3 py-2 border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-green focus:border-brand-green"
                     >
                         {OVERALL_STATUS_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>
@@ -180,23 +238,23 @@ export default function Ingestion() {
                             </option>
                         ))}
                     </select>
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-base text-stone-500 leading-normal">
                         Recruiting is the only part of the corpus a patient can actually join
                         &mdash; about 15% of trials.
                     </p>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Max studies</label>
+                    <label className="block text-sm font-medium text-stone-700 mb-1">Max studies</label>
                     <input
                         type="number"
                         min={1}
                         max={50000}
                         value={maxStudies}
                         onChange={(e) => setMaxStudies(Number(e.target.value))}
-                        className="w-full sm:w-32 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                        className="w-full sm:w-32 px-3 py-2 border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-green focus:border-brand-green"
                     />
                     {maxStudies > 2000 && (
-                        <p className="mt-1 text-xs text-amber-700">
+                        <p className="mt-1 text-base text-amber-700 leading-normal">
                             Large pulls take a while and this page stays open until it finishes.
                             Downloading is quick; preparing for search is the slow part &mdash;
                             for a pull this size, consider running the two steps separately.
@@ -212,7 +270,7 @@ export default function Ingestion() {
                         type="button"
                         onClick={() => setConfirmOpen(true)}
                         disabled={busy}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md shadow-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-brand-green text-white rounded-md shadow-sm hover:bg-brand-green-hover disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {processAllMutation.isPending ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -227,7 +285,7 @@ export default function Ingestion() {
                     <button
                         type="submit"
                         disabled={busy}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-brand-beige-card text-stone-700 border border-stone-300 rounded-md shadow-sm hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {ingestMutation.isPending ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -241,7 +299,7 @@ export default function Ingestion() {
                         type="button"
                         onClick={() => backfillMutation.mutate()}
                         disabled={busy}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-brand-beige-card text-stone-700 border border-stone-300 rounded-md shadow-sm hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {backfillMutation.isPending ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -252,22 +310,88 @@ export default function Ingestion() {
                     </button>
 
                     {busy && (
-                        <span className="text-center text-sm text-gray-500 tabular-nums sm:text-left">
+                        <span className="text-center text-sm text-stone-500 tabular-nums sm:text-left">
                             {elapsed}s elapsed
                         </span>
                     )}
                 </div>
 
-                {/* These are two steps on purpose. Saying so here is what prevents the
+                {/* These are separate steps on purpose. Saying so here is what prevents the
                     "I ingested but search finds nothing" confusion. */}
-                <p className="text-xs text-gray-500">
+                <p className="text-base text-stone-500 leading-normal">
                     <strong>Pull Trials and Prepare for Search</strong> does everything in one go.
-                    The other two run the same work one step at a time: <strong>Pull Trials</strong>{' '}
-                    loads trials into the database, and <strong>Prepare for Search</strong> makes
-                    them findable. Newly loaded trials will not appear in search until that has
-                    run. Re-running any of these is safe.
+                    The other two run part of the same work: <strong>Pull Trials</strong> loads
+                    trials into the database and writes their friendly titles, and{' '}
+                    <strong>Prepare for Search</strong> makes them findable. Newly loaded trials
+                    will not appear in search until that has run. Re-running any of these is safe.
+                    Pulling always writes friendly titles for whatever it loads, since each one is
+                    a paid AI call and the same cost either way.
                 </p>
             </form>
+
+            {/* Maintenance rather than part of pulling trials, so it sits on its own. It reads
+                no new data - it re-reads text already in the database with the current
+                patterns. */}
+            <div className="bg-brand-beige-card shadow rounded-lg p-6 mb-6">
+                <h2 className="text-lg font-medium text-stone-900 mb-1">Recheck Treatment Goals</h2>
+                <p className="text-base text-stone-500 leading-normal mb-4">
+                    Works out what each trial appears to be trying to achieve &mdash; treating the
+                    individual sites of spread, aiming at long-term remission, or neither
+                    &mdash; from the trial's own description. Run this once after loading trials,
+                    and again if the wording it looks for is changed.
+                </p>
+                <button
+                    type="button"
+                    onClick={() => treatmentGoalMutation.mutate()}
+                    disabled={busy || treatmentGoalMutation.isPending}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-brand-beige-card text-stone-700 border border-stone-300 rounded-md shadow-sm hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {treatmentGoalMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                        <Target className="h-4 w-4" />
+                    )}
+                    {treatmentGoalMutation.isPending ? 'Rechecking...' : 'Recheck Treatment Goals'}
+                </button>
+                <p className="mt-3 text-base text-stone-500 leading-normal">
+                    Safe to re-run, and quick &mdash; it does not download anything or rebuild
+                    search. Trials already carrying the right answer are left alone.
+                </p>
+            </div>
+
+            {/* Unlike Recheck Treatment Goals above, this is not free - each trial missing a
+                title is a paid AI call, so it only fills in what is missing and never
+                regenerates a title that already exists. Both pull buttons above already run
+                this on whatever they load; this button is for catching up a corpus that was
+                pulled before friendly titles existed, or a run that errored on some trials. */}
+            <div className="bg-brand-beige-card shadow rounded-lg p-6 mb-6">
+                <h2 className="text-lg font-medium text-stone-900 mb-1">Generate Friendly Titles</h2>
+                <p className="text-base text-stone-500 leading-normal mb-4">
+                    Writes a plain-language title for every trial that does not have one yet
+                    &mdash; stage, treatment goal, what the trial is trying, and what markers it
+                    needs. Costs money per trial, so trials that already have a title are left
+                    alone rather than regenerated. Both buttons above already run this on newly
+                    pulled trials; use this to catch up trials pulled before or left over from an
+                    earlier error.
+                </p>
+                <button
+                    type="button"
+                    onClick={() => friendlyTitleMutation.mutate()}
+                    disabled={busy || friendlyTitleMutation.isPending}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-brand-beige-card text-stone-700 border border-stone-300 rounded-md shadow-sm hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {friendlyTitleMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                        <Wand2 className="h-4 w-4" />
+                    )}
+                    {friendlyTitleMutation.isPending ? 'Generating...' : 'Generate Friendly Titles'}
+                </button>
+                <p className="mt-3 text-base text-stone-500 leading-normal">
+                    Only fills in trials with no friendly title yet. To change one that already
+                    exists, regenerate it from that trial's own page.
+                </p>
+            </div>
 
             {/* Inline banner rather than alert() - viro uses alert() for this, but a banner is
                 less disruptive and keeps the failure visible while you fix it. */}
@@ -284,6 +408,13 @@ export default function Ingestion() {
                 </div>
             )}
 
+            {treatmentGoalMutation.isError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-6">
+                    Could not recheck treatment goals. This needs an administrator account. The
+                    trials themselves are unaffected &mdash; only the labelling did not update.
+                </div>
+            )}
+
             {processAllMutation.isError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-6">
                     Something went wrong partway through. Any trials already downloaded are safely
@@ -296,38 +427,39 @@ export default function Ingestion() {
                 presses without knowing it is a multi-minute run. */}
             {confirmOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                    <div className="bg-brand-beige-card rounded-lg shadow-xl max-w-md w-full p-6">
                         <div className="flex items-center gap-2 mb-4">
                             <AlertTriangle className="h-5 w-5 text-amber-500" />
-                            <h2 className="text-lg font-semibold text-gray-900">
+                            <h2 className="text-lg font-semibold text-stone-900">
                                 This takes a few minutes
                             </h2>
                         </div>
 
-                        <p className="text-sm text-gray-600 mb-3">This will do two things:</p>
-                        <ol className="text-sm text-gray-700 mb-4 space-y-1 list-decimal list-inside">
+                        <p className="text-base text-stone-600 mb-3">This will do three things:</p>
+                        <ol className="text-base text-stone-700 leading-normal mb-4 space-y-1 list-decimal list-inside">
                             <li>Download matching trials from ClinicalTrials.gov and save them</li>
                             <li>Prepare them so search can find them</li>
+                            <li>Write a plain-language title for any newly saved trial</li>
                         </ol>
 
-                        <div className="rounded-md bg-gray-50 border border-gray-200 p-3 mb-4 text-sm">
+                        <div className="rounded-md bg-stone-50 border border-stone-200 p-3 mb-4 text-sm">
                             <div className="flex justify-between py-0.5">
-                                <span className="text-gray-500">Condition</span>
-                                <span className="font-medium text-gray-900">
+                                <span className="text-stone-500">Condition</span>
+                                <span className="font-medium text-stone-900">
                                     {condition.trim() || 'all cancer types'}
                                 </span>
                             </div>
                             <div className="flex justify-between py-0.5">
-                                <span className="text-gray-500">Status</span>
-                                <span className="font-medium text-gray-900">{overallStatus}</span>
+                                <span className="text-stone-500">Status</span>
+                                <span className="font-medium text-stone-900">{overallStatus}</span>
                             </div>
                             <div className="flex justify-between py-0.5">
-                                <span className="text-gray-500">Max trials</span>
-                                <span className="font-medium text-gray-900">{maxStudies}</span>
+                                <span className="text-stone-500">Max trials</span>
+                                <span className="font-medium text-stone-900">{maxStudies}</span>
                             </div>
                         </div>
 
-                        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-5">
+                        <p className="text-base text-amber-800 leading-normal bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-5">
                             Leave this tab open until it finishes. Nothing is lost if you close
                             it, but the job will not complete.
                         </p>
@@ -336,7 +468,7 @@ export default function Ingestion() {
                             <button
                                 type="button"
                                 onClick={() => setConfirmOpen(false)}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                                className="px-4 py-2 text-sm font-medium text-stone-700 bg-brand-beige-card border border-stone-300 rounded-md hover:bg-stone-50"
                             >
                                 Cancel
                             </button>
@@ -346,7 +478,7 @@ export default function Ingestion() {
                                     setConfirmOpen(false);
                                     processAllMutation.mutate();
                                 }}
-                                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+                                className="px-4 py-2 text-sm font-medium text-white bg-brand-green rounded-md hover:bg-brand-green-hover"
                             >
                                 Start
                             </button>

@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * <p>These files hold a real medical record, so they are gitignored rather than committed as
  * Liquibase seed data - which is the whole reason this loader exists instead of another
- * changeset. See {@code .claude/patient-data/}.
+ * changeset. See {@code .claude/_archive/patient-data/}.
  */
 @Data
 @ConfigurationProperties(prefix = "cancer.seed.patient")
@@ -18,7 +18,7 @@ public class PatientSeedProperties {
     private boolean enabled = true;
 
     /** Directory holding the three CSVs. Relative paths resolve against the working directory. */
-    private String directory = ".claude/patient-data";
+    private String directory = ".claude/_archive/patient-data";
 
     private String diagnosisFile = "patient-diagnosis.csv";
     private String variantFile = "patient-variant.csv";

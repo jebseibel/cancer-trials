@@ -5,8 +5,8 @@ You also work on this project's React/TypeScript front end when asked.
 You are very careful and dont want to make large file changes without guidance.
 
 ## Project Overview
-- Backend: Java Spring Boot + Gradle (REST API on AWS Elastic Beanstalk)
-- Database: AWS RDS MySQL
+- Backend: Java Spring Boot + Gradle (REST API, deployed on a Hostinger KVM behind Nginx)
+- Database: MySQL. The `RDS_*` env-var names are a leftover from an earlier AWS deployment and are deliberate - do not rename them.
 - Frontend: Vite + React + TypeScript + Tailwind, in `frontend/`
 - Multi-module Gradle project: root plus 4 included modules, and 1 shelved
 
@@ -49,7 +49,14 @@ Vector retrieval over trial text
 - Indexing, retrieval, and backfill services
 - Startup check against the vector store
 
-### :ai-provider (shelved)
+### service/ai (root module) — the live AI path
+- `AiService` (Spring AI, Anthropic), `TrialDiagnosisMatchService`, `TrialMatchAssessment`
+- Reads one trial's criteria against the patient record and reports what it finds
+- ⚠️ The only place clinical text leaves the machine. De-identified by an explicit allowlist
+- Disabled rather than broken when `ANTHROPIC_API_KEY` is unset: the button is hidden and the
+  backend boots normally
+
+### :ai-provider (shelved, and NOT what the AI feature uses)
 AI provider functionality and integrations
 - Java library module
 - Commented out of `settings.gradle` until AI keys/config are ready, so it does
@@ -64,6 +71,14 @@ AI provider functionality and integrations
 
 ## Development Status
 This project is NOT in production. Database schema changes can be made directly in the original Liquibase files without creating new changelog entries.
+
+⚠️ CLINICAL TEXT AND THE NETWORK
+Embeddings run locally in ONNX so trial and patient text never leaves the machine. The AI trial
+check is the ONE deliberate exception, and it sends a de-identified subset built by an explicit
+allowlist in TrialDiagnosisMatchService: no name, no date of birth, no free-text notes from any
+table, dates coarsened to a year, no testing lab. Tests assert each of those. If you add a field
+to a patient table it is NOT sent unless someone adds it to that allowlist on purpose - keep it
+that way round.
 
 Note: never commit credentials to Git!
 Note: NEVER commit anything to Git.

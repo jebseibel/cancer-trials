@@ -4,10 +4,14 @@ import { useQuery } from '@tanstack/react-query';
 import { Bookmark, FlaskConical } from 'lucide-react';
 import { trialApi, trialStatusApi } from '../services/api';
 import { useCurrentPatient } from '../lib/PatientContext';
+import { useAudience } from '../lib/AudienceContext';
+import { displayTitle } from '../lib/displayTitle';
 import { TRIAL_STATUS_VALUES } from '../types/api';
+import breastCancerRibbonImage from '../assets/images/breastcancer-ribbon.png';
 
 export default function SavedTrials() {
     const { patient } = useCurrentPatient();
+    const { mode } = useAudience();
     const [statusFilter, setStatusFilter] = useState('');
 
     const { data: myStatuses, isLoading: statusesLoading } = useQuery({
@@ -34,20 +38,34 @@ export default function SavedTrials() {
 
     return (
         <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Saved Trials</h1>
-            <p className="text-gray-600 mb-6">Trials you're tracking, by personal status.</p>
+            {/* Free stock photography with no person in frame (a ribbon), so it needs no
+                identifiable-person check - see UI_DESIGN.md §2. A genuine half-page split
+                (flex-1 on both sides) rather than a small image beside a wide text column -
+                the image is meant to take real, equal space here, not sit as a corner accent. */}
+            <div className="mb-6 flex flex-col items-center gap-6 sm:flex-row sm:items-center">
+                <div className="flex-1">
+                    <h1 className="font-heading text-3xl font-bold text-stone-900 mb-2">Saved Trials</h1>
+                    <p className="text-base text-stone-600 leading-normal">Trials you're tracking, by personal status.</p>
+                </div>
+                <img
+                    src={breastCancerRibbonImage}
+                    alt=""
+                    className="hidden sm:block flex-1 h-32 rounded-lg object-cover shadow-md"
+                />
+            </div>
 
             {!patient ? (
-                <p className="text-gray-500">
-                    No patient record yet. Create one to start tracking trials.
+                <p className="text-base text-stone-500 leading-normal">
+                    You don't have a patient record yet. Create one and you'll be able to save
+                    trials here as you come across them.
                 </p>
             ) : (
                 <>
-                    <div className="bg-white shadow rounded-lg p-4 mb-6 flex gap-4">
+                    <div className="bg-brand-beige-card shadow rounded-lg p-4 mb-6 flex gap-4">
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                            className="px-3 py-2 border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-green focus:border-brand-green"
                         >
                             <option value="">All statuses</option>
                             {TRIAL_STATUS_VALUES.map((s) => (
@@ -58,9 +76,12 @@ export default function SavedTrials() {
                         </select>
                     </div>
 
-                    {isLoading && <p className="text-gray-500">Loading...</p>}
+                    {isLoading && <p className="text-base text-stone-500">Loading...</p>}
                     {!isLoading && rows.length === 0 && (
-                        <p className="text-gray-500">No tracked trials match this filter.</p>
+                        <p className="text-base text-stone-500 leading-normal">
+                            Nothing saved with this status yet — when you find a trial worth a
+                            second look, save it and it'll show up here.
+                        </p>
                     )}
 
                     <div className="space-y-3">
@@ -68,19 +89,24 @@ export default function SavedTrials() {
                             <Link
                                 key={status.extid}
                                 to={`/trials/${trial!.extid}`}
-                                className="block bg-white shadow rounded-lg p-5 hover:shadow-md transition-shadow"
+                                className="block bg-brand-beige-card shadow rounded-lg p-5 hover:shadow-md transition-shadow"
                             >
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <FlaskConical className="h-4 w-4 text-green-600 flex-shrink-0" />
-                                            <span className="text-xs font-mono text-gray-500">
+                                            <FlaskConical className="h-4 w-4 text-brand-green flex-shrink-0" />
+                                            <span className="text-xs font-mono text-stone-500">
                                                 {trial!.nctId ?? 'No NCT ID'}
                                             </span>
                                         </div>
-                                        <h2 className="text-lg font-medium text-gray-900 truncate">{trial!.briefTitle}</h2>
+                                        <h2 className="text-lg font-medium text-stone-900 truncate">
+                                            {displayTitle(trial!, mode)}
+                                        </h2>
+                                        {mode === 'patient' && trial!.friendlyTitle && (
+                                            <p className="text-xs text-stone-500 truncate">{trial!.briefTitle}</p>
+                                        )}
                                         {status.notes && (
-                                            <p className="text-sm text-gray-600 mt-1 line-clamp-2">{status.notes}</p>
+                                            <p className="text-sm text-stone-600 mt-1 line-clamp-2">{status.notes}</p>
                                         )}
                                     </div>
                                     <span className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">

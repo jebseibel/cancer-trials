@@ -22,8 +22,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * assertion here is a phrasing that appeared in real criteria text or a real pathology report,
  * not an invented string.
  *
- * <p>The patient this was measured against has a real, de-identified clinical profile, HER2 IHC
- * <p>The patient this was measured against has a real, de-identified clinical profile —
+ * <p>The patient this was measured against has a real, de-identified clinical profile — so the
+ * "must not flag" cases matter as much as the "must flag" ones.
  */
 class CriteriaSignalEvaluatorTest {
 
@@ -108,8 +108,8 @@ class CriteriaSignalEvaluatorTest {
         }
 
         /**
-         * A HER2-low patient (IHC 1+, not amplified) is still HER2-negative. A trial requiring HER2-positive
-         * disease is a genuine mismatch worth raising.
+         * A HER2-low patient (IHC 1+, not amplified) is still HER2-negative for eligibility
+         * purposes. A trial requiring HER2-positive disease is a genuine mismatch worth raising.
          */
         @Test
         void flagsATrialRequiringHer2PositiveDisease() {
@@ -134,8 +134,8 @@ class CriteriaSignalEvaluatorTest {
     class TripleNegative {
 
         /**
-         * The 2026-08-08 mis-ranking, as a test. NCT06685796 scored highest for a hormone-positive patient on
-         * "HR-negative, HER2-negative" — a different disease subtype.
+         * The 2026-08-08 mis-ranking, as a test. NCT06685796 scored highest for a
+         * hormone-positive patient on "HR-negative, HER2-negative" — a different disease subtype.
          */
         @ParameterizedTest
         @ValueSource(strings = {
@@ -266,8 +266,8 @@ class CriteriaSignalEvaluatorTest {
     }
 
     /**
-     * Treatment-line polarity, against the profile this suite is measured against: on a CDK4/6 inhibitor now, no progression on
-     * it, and no cytotoxic chemotherapy ever.
+     * Treatment-line polarity, against the profile this suite is measured against: on a CDK4/6
+     * inhibitor now, no progression on it, and no cytotoxic chemotherapy ever.
      */
     @Nested
     @DisplayName("treatment history in context")
@@ -506,6 +506,186 @@ class CriteriaSignalEvaluatorTest {
         void everyConcernCarriesTheCriteriaPhraseThatProducedIt() {
             assertThat(assess("Inclusion: triple-negative breast cancer").evidence()).isNotBlank();
             assertThat(assess("Must have HER2-positive disease").evidence()).isNotBlank();
+        }
+    }
+
+    /**
+     * Treatment goal and disease stage — the two signals about what a trial is trying to do.
+     *
+     * <p>Cases are drawn from the corpus measurement of 2026-08-21 rather than invented, because
+     * the phrasings that broke the first pattern set were ones nobody would have guessed:
+     * "1-5 metastases" rather than "metastatic", and cure words appearing inside their own
+     * denial. See matching/CURATIVE_STEP1_MEASUREMENT.md.
+     */
+    @Nested
+    @DisplayName("treatment goal and disease stage")
+    class CurativeIntent {
+
+        private Trial trial(String summary) {
+            Trial t = new Trial();
+            t.setBriefTitle("A Study");
+            t.setBriefSummary(summary);
+            return t;
+        }
+
+        private PatientDiagnosis metastatic() {
+            PatientDiagnosis d = new PatientDiagnosis();
+            d.setStage("Stage IV");
+            return d;
+        }
+
+        /** Real trials from the corpus. Each is a genuine metastasis-directed study. */
+        @ParameterizedTest
+        @ValueSource(strings = {
+                // NCT03808337 - the pattern bug that dropped this said "metastatic" only
+                "SBRT delivered to all sites of disease in participants with 1-5 metastases",
+                // NCT04563507 - a regimen matching this test's patient
+                "Patients receiving letrozole+palbociclib are randomly assigned to also receive "
+                        + "Stereotactic Body Radiation Therapy to each metastatic lesion",
+                // NCT04158843
+                "Radical local treatment versus palliative treatment for breast cancer patients "
+                        + "with primary ipsilateral humerus or sternum oligometastasis",
+                // NCT06246968
+                "Participants with metastatic breast cancer receive pembrolizumab in combination "
+                        + "with cryoablation",
+                // NCT06055881
+                "This study assesses if metastasis-directed radiation therapy can delay a change "
+                        + "in systemic therapy"
+        })
+        void ablativeStrategyPasses(String summary) {
+            assertThat(evaluator.treatmentGoalSignal(trial(summary)).outcome())
+                    .isEqualTo(SignalOutcome.PASS);
+        }
+
+        /**
+         * Every family-1 false positive in the corpus was a negation - the word appears while
+         * being denied. One token separates "curative intent" from "not curative", which is the
+         * same reason embeddings cannot read receptor polarity.
+         */
+        @ParameterizedTest
+        @ValueSource(strings = {
+                // NCT06682793
+                "adults with recurrent unresectable, locally advanced, or metastatic "
+                        + "(considered non-curative) solid tumors",
+                // NCT07062965
+                "Advanced cancer is a term often used to describe cancer that is unlikely to be cured",
+                // NCT05601440
+                "First line endocrine therapy improve clinical outcomes, but are not curative, "
+                        + "and acquired resistance develops"
+        })
+        void negatedCureLanguageDoesNotFire(String summary) {
+            assertThat(evaluator.treatmentGoalSignal(trial(summary)).outcome())
+                    .isNotEqualTo(SignalOutcome.PASS);
+            assertThat(evaluator.treatmentGoalSignal(trial(summary)).outcome())
+                    .isNotEqualTo(SignalOutcome.UNKNOWN);
+        }
+
+        /**
+         * A summary that says the disease is hard to cure and then states a curative aim must be
+         * judged on the aim, not the background sentence that happens to come first.
+         */
+        @Test
+        @DisplayName("a later unnegated cure word is found past an earlier negated one")
+        void scansPastNegatedOccurrence() {
+            String summary = "Metastatic breast cancer remains difficult to cure in most cases. "
+                    + "This study treats with curative intent.";
+            assertThat(evaluator.treatmentGoalSignal(trial(summary)).outcome())
+                    .isEqualTo(SignalOutcome.UNKNOWN);
+        }
+
+        /** Cure language alone is a question, not an answer, so it must not report PASS. */
+        @Test
+        @DisplayName("cure language without ablative strategy reports unknown, never pass")
+        void cureLanguageAloneIsUnknown() {
+            var signal = evaluator.treatmentGoalSignal(trial(
+                    "Local therapy with curative intent should be considered for selected "
+                            + "patients with bone-only metastatic disease"));
+            assertThat(signal.outcome()).isEqualTo(SignalOutcome.UNKNOWN);
+            assertThat(signal.evidence()).isNotBlank();
+        }
+
+        /**
+         * Response-endpoint vocabulary was measured and excluded: 232 trials say it and 5 of 5
+         * hand-checked were describing how outcomes are measured, not what the trial aims at.
+         */
+        @ParameterizedTest
+        @ValueSource(strings = {
+                "Secondary endpoints are clinical benefit rate (complete response + partial "
+                        + "response + stable disease)",
+                "Primary end point 3-years invasive disease free survival",
+                "patients achieving pathological complete response after neoadjuvant chemotherapy"
+        })
+        void responseEndpointVocabularyDoesNotFire(String summary) {
+            assertThat(evaluator.treatmentGoalSignal(trial(summary)).outcome())
+                    .isEqualTo(SignalOutcome.NOT_APPLICABLE);
+        }
+
+        @Test
+        @DisplayName("a silent trial is not-applicable, never a concern")
+        void silenceIsNotAConcern() {
+            assertThat(evaluator.treatmentGoalSignal(trial(
+                    "A study of drug X versus placebo in advanced solid tumours")).outcome())
+                    .isEqualTo(SignalOutcome.NOT_APPLICABLE);
+        }
+
+        @Test
+        @DisplayName("metastatic trials pass the stage check")
+        void metastaticPasses() {
+            assertThat(evaluator.diseaseStageSignal(
+                    trial("A study in metastatic breast cancer"), metastatic()).outcome())
+                    .isEqualTo(SignalOutcome.PASS);
+        }
+
+        @Test
+        @DisplayName("adjuvant trials are a concern for a metastatic patient")
+        void adjuvantIsAConcern() {
+            assertThat(evaluator.diseaseStageSignal(
+                    trial("Postoperative adjuvant therapy with T-DM1 for one year"),
+                    metastatic()).outcome())
+                    .isEqualTo(SignalOutcome.CONCERN);
+        }
+
+        /**
+         * Without \\b these match inside "unresectable" and "inoperable", which mean the
+         * opposite. A trial reading "recurrent unresectable ... metastatic" was vetoed as
+         * early-stage on that substring during the corpus measurement.
+         */
+        @ParameterizedTest
+        @ValueSource(strings = {
+                "recurrent unresectable metastatic disease",
+                "inoperable metastatic breast cancer"
+        })
+        void negativePrefixesDoNotReadAsEarlyStage(String summary) {
+            assertThat(evaluator.diseaseStageSignal(trial(summary), metastatic()).outcome())
+                    .isEqualTo(SignalOutcome.PASS);
+        }
+
+        @Test
+        @DisplayName("a trial naming both stages is unknown rather than judged")
+        void bothStagesIsUnknown() {
+            assertThat(evaluator.diseaseStageSignal(
+                    trial("adjuvant therapy in early-stage and metastatic breast cancer"),
+                    metastatic()).outcome())
+                    .isEqualTo(SignalOutcome.UNKNOWN);
+        }
+
+        @Test
+        @DisplayName("stage is not compared when the record does not say the cancer has spread")
+        void notApplicableWithoutMetastaticRecord() {
+            PatientDiagnosis early = new PatientDiagnosis();
+            early.setStage("Stage II");
+            assertThat(evaluator.diseaseStageSignal(
+                    trial("A study in metastatic breast cancer"), early).outcome())
+                    .isEqualTo(SignalOutcome.NOT_APPLICABLE);
+        }
+
+        @Test
+        @DisplayName("every flag carries the text that produced it")
+        void flagsCarryEvidence() {
+            assertThat(evaluator.treatmentGoalSignal(trial(
+                    "SBRT to all sites of disease in 1-5 metastases")).evidence()).isNotBlank();
+            assertThat(evaluator.diseaseStageSignal(
+                    trial("Postoperative adjuvant therapy"), metastatic()).evidence()).isNotBlank();
         }
     }
 }

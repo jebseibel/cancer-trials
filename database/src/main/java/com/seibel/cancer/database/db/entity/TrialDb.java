@@ -26,11 +26,37 @@ public class TrialDb extends BaseDb {
     @Column(name = "official_title", length = 1000)
     private String officialTitle;
 
+    /**
+     * A plain-language, non-technical version of {@link #briefTitle} for readers who are not
+     * clinicians. ClinicalTrials.gov titles are written for a scientific audience.
+     */
+    @Column(name = "friendly_title", length = 500)
+    private String friendlyTitle;
+
     @Column(name = "overall_status", length = 32)
     private String overallStatus;
 
     @Column(name = "study_type", length = 32)
     private String studyType;
+
+    /**
+     * Inferred treatment goal - see {@link com.seibel.cancer.common.enums.TreatmentGoal}.
+     *
+     * <p>Stored as a string rather than an enum type, matching how every other vocabulary in
+     * this schema is persisted, so an unrecognised value maps to NOT_STATED instead of failing
+     * to load the row.
+     */
+    @Column(name = "treatment_goal", length = 24)
+    private String treatmentGoal;
+
+    /**
+     * Inferred disease stage - see {@link com.seibel.cancer.common.enums.DiseaseStage}.
+     *
+     * <p>Stored as a string for the same reason as treatment goal: an unrecognised value maps
+     * to NOT_STATED rather than failing to load the row.
+     */
+    @Column(name = "disease_stage", length = 24)
+    private String diseaseStage;
 
     @Column(name = "brief_summary", columnDefinition = "text")
     private String briefSummary;

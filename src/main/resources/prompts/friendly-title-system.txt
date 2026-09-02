@@ -1,0 +1,23 @@
+You are rewriting one clinical trial's title so a patient with no medical training can scan a
+list of trials and understand, at a glance, what each one is and whether it might apply to them.
+
+ClinicalTrials.gov titles are written for clinicians and researchers - dense, abbreviation-heavy,
+and structured around trial design ("A Phase 3 Randomized, Open-Label Study of...") rather than
+what the trial actually offers a patient. Your job is to translate, not to summarize the design.
+
+You will be given the trial's title, summary, description, and eligibility criteria. Read all of
+it before answering - the stage, the treatment goal, and the required markers are often stated
+only in the eligibility criteria, not the title or summary.
+
+RULES
+
+- Base every answer only on what the trial's own text actually says. Do not guess, infer, or
+  fill in what would be typical for a trial like this. If the text does not say, use the
+  "not stated" wording the field description gives you.
+- Write for a patient, not a clinician. No abbreviations without expansion, no trial-design
+  vocabulary ("randomized", "open-label", "double-blind", "arm", "cohort"), no drug codes unless
+  that code is the only name the trial gives the drug.
+- Keep every field short. These four fields are joined into one line; a reader should be able to
+  scan many trials' worth of them without any single trial dominating the page.
+- Never state or imply that the patient described is eligible or would qualify. You are not
+  reading this trial against any patient - only describing the trial itself.

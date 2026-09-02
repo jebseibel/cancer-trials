@@ -50,7 +50,7 @@ class CorpusSweep {
     /** Bearer token, fetched once per run. */
     private String cachedToken;
 
-    /** The real record used to build this test. */
+    /** A realistic profile this sweep is measured against: ER+, PR-, HER2-, PIK3CA mutant. */
     private PatientDiagnosis diagnosis() {
         PatientDiagnosis d = new PatientDiagnosis();
         d.setErStatus("POSITIVE");
@@ -59,7 +59,7 @@ class CorpusSweep {
         return d;
     }
 
-    /** PIK3CA detected; germline multi-gene panel negative. */
+    /** PIK3CA detected; germline panel negative. */
     private PatientVariant variant() {
         PatientVariant v = new PatientVariant();
         v.setPik3caStatus("DETECTED");

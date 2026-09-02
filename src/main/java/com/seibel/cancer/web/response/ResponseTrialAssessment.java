@@ -28,6 +28,13 @@ public class ResponseTrialAssessment {
     private String trialExtid;
     private String nctId;
     private String briefTitle;
+
+    /**
+     * A plain-language rewrite of {@link #briefTitle}, or null when one has not been generated
+     * yet. Read-only, same as on {@code ResponseTrial} - it comes from the AI-generated column,
+     * never from a caller.
+     */
+    private String friendlyTitle;
     private String overallStatus;
 
     /** Every signal, including NOT_APPLICABLE ones, in a stable order. */

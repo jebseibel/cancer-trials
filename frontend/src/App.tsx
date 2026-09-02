@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { PatientProvider } from './lib/PatientContext';
+import { AudienceProvider } from './lib/AudienceContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import TrialSearch from './pages/TrialSearch';
@@ -11,6 +12,7 @@ import TrialDetail from './pages/TrialDetail';
 import SavedTrials from './pages/SavedTrials';
 import Ingestion from './pages/Ingestion';
 import PatientRecord from './pages/PatientRecord';
+import ChangePassword from './pages/ChangePassword';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -32,9 +34,11 @@ function App() {
                         path="/"
                         element={
                             <ProtectedRoute>
-                                <PatientProvider>
-                                    <Layout />
-                                </PatientProvider>
+                                <AudienceProvider>
+                                    <PatientProvider>
+                                        <Layout />
+                                    </PatientProvider>
+                                </AudienceProvider>
                             </ProtectedRoute>
                         }
                     >
@@ -51,6 +55,7 @@ function App() {
                             element={<Navigate to="/diagnosis" replace />}
                         />
                         <Route path="ingestion" element={<Ingestion />} />
+                        <Route path="change-password" element={<ChangePassword />} />
                     </Route>
                 </Routes>
             </Router>

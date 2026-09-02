@@ -1,0 +1,29 @@
+databaseChangeLog:
+  - changeSet:
+      id: 032-trial-disease-stage
+      author: jeb
+      changes:
+        # What stage of disease a trial studies: METASTATIC, EARLY_STAGE, BOTH or NOT_STATED.
+        # See the DiseaseStage enum.
+        #
+        # The other half of the question treatment_goal answers. A trial attempting cure in
+        # early-stage disease is a correct match on ambition and useless to someone already
+        # metastatic, so the two are stored separately and allowed to disagree.
+        #
+        # Worth its own column because a third of the corpus is the wrong stage: 823 of 2,473
+        # trials use adjuvant, neoadjuvant or stage I-III vocabulary, measured 2026-08-21.
+        # Until this existed nothing outside a ranking run could tell them apart.
+        #
+        # Four values, not three. "Mentions both" is common and genuinely ambiguous - a trial
+        # may enrol early-stage patients while discussing metastatic disease in its rationale -
+        # and saying so is more honest than picking a side.
+        #
+        # Derived from the trial's own prose at normalization; CT.gov publishes no stage field.
+        # A cached inference, so re-derive by re-running the backfill rather than trusting an
+        # old value. Nullable, and null reads as NOT_STATED.
+        - addColumn:
+            tableName: trial
+            columns:
+              - column:
+                  name: disease_stage
+                  type: varchar(24)

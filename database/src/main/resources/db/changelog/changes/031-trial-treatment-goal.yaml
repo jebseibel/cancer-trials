@@ -1,0 +1,30 @@
+databaseChangeLog:
+  - changeSet:
+      id: 031-trial-treatment-goal
+      author: jeb
+      changes:
+        # What a trial appears to be trying to achieve, as opposed to who it will enrol:
+        # ABLATIVE, CURE_LANGUAGE or NOT_STATED. See the TreatmentGoal enum.
+        #
+        # Stored rather than computed on demand so curative-intent trials can be queried
+        # directly instead of only surfacing inside a ranking run. They are ~1.5% of the corpus
+        # - 38 of 2,473 when measured on 2026-08-21 - and finding them is the point of the tool.
+        #
+        # Derived from the trial's own title, summary and description at normalization, because
+        # ClinicalTrials.gov publishes no treatment-intent field to read. That makes it a cached
+        # inference rather than source data: change the patterns and every stored value is
+        # stale, so re-derive by re-normalizing rather than trusting an old one.
+        #
+        # Nullable, and null reads as NOT_STATED. Rows normalized before this column existed
+        # have no value, and absence of evidence must not read as evidence of absence.
+        #
+        # A new changeset rather than an edit to 005-trial.yaml: editing an applied changeset
+        # breaks its checksum, and `drop-first` is false here - so an edit would have forced a
+        # database rebuild, destroying a 2,473-trial corpus and its vector index to add a
+        # column.
+        - addColumn:
+            tableName: trial
+            columns:
+              - column:
+                  name: treatment_goal
+                  type: varchar(24)

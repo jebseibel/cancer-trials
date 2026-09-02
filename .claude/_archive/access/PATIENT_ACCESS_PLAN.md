@@ -44,7 +44,7 @@ built by the patient's husband; he enters the data, runs the ranks, reads the cr
 or may not ever log in.
 
 Today `PatientSeedLoader` creates an `app_user` keyed on username `jeb`, and every clinical row —
-*her* diagnosis, *her* PIK3CA mutation, *her* prior treatment — hangs off it. **The row labelled
+*her* diagnosis, *her* biomarker findings, *her* prior treatment — hangs off it. **The row labelled
 `jeb` holds his wife's medical record.** There is no field anywhere recording whose body the data
 describes.
 

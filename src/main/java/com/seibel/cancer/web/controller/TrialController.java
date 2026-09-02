@@ -1,6 +1,10 @@
 package com.seibel.cancer.web.controller;
 
 import com.seibel.cancer.common.domain.Trial;
+import com.seibel.cancer.service.ai.TrialFriendlyTitleService;
+import com.seibel.cancer.service.matching.CriteriaSignalEvaluator;
+import com.seibel.cancer.database.db.service.LocationDbService;
+import com.seibel.cancer.common.domain.Location;
 import com.seibel.cancer.common.enums.ActiveEnum;
 import com.seibel.cancer.common.exceptions.ValidationException;
 import com.seibel.cancer.service.TrialService;
@@ -21,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/trial")
@@ -30,6 +35,9 @@ import java.util.List;
 public class TrialController {
 
     private final TrialService trialService;
+    private final LocationDbService locationDbService;
+    private final CriteriaSignalEvaluator evaluator;
+    private final TrialFriendlyTitleService friendlyTitleService;
     private final TrialConverter converter = new TrialConverter();
 
     @GetMapping
@@ -38,7 +46,40 @@ public class TrialController {
             @ParameterObject @PageableDefault(size = 20, sort = "briefTitle") Pageable pageable,
             @RequestParam(required = false) ActiveEnum active
     ) {
-        return trialService.findAll(pageable, active).map(converter::toResponse);
+        Page<Trial> page = trialService.findAll(pageable, active);
+
+        // One query for the whole page rather than one per trial. Fetching locations per row is
+        // the same N+1 shape that made a ranking call take 43 seconds before it was batched, and
+        // this page is routinely read 200 rows at a time.
+        List<Long> trialIds = page.getContent().stream()
+                .map(Trial::getId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        Map<Long, List<Location>> byTrial = trialIds.isEmpty()
+                ? Map.of()
+                : locationDbService.findByTrialIds(trialIds);
+
+        return page.map(trial -> withSites(converter.toResponse(trial),
+                byTrial.getOrDefault(trial.getId(), List.of())));
+    }
+
+    /**
+     * Adds where a trial runs to its response.
+     *
+     * <p>Travel is often what decides whether a trial is possible at all, so the cities belong
+     * beside the trial rather than a click away. Reuses the evaluator's own site labelling so
+     * this list and the one in the location signal cannot disagree.
+     */
+    private ResponseTrial withSites(ResponseTrial response, List<Location> locations) {
+        List<String> usSites = evaluator.siteLabels(locations, true);
+        boolean hasUs = !usSites.isEmpty();
+
+        response.setSiteCount(locations.size());
+        response.setHasUnitedStatesSite(hasUs);
+        // US sites as "City, State"; otherwise the countries, so an international-only trial
+        // says where it is rather than appearing to have no locations at all.
+        response.setSiteLabels(hasUs ? usSites : evaluator.siteLabels(locations, false));
+        return response;
     }
 
     @GetMapping("/{extid}")
@@ -69,6 +110,22 @@ public class TrialController {
         return update(extid, request);
     }
 
+    /**
+     * Asks a model to rewrite this trial's title into a plain-language, non-technical summary
+     * and stores it, always overwriting whatever was there.
+     *
+     * <p>A deliberate single press, the same contract as the AI trial check's "Check again" — it
+     * costs money per call, so it must not run implicitly on page load or on every list fetch.
+     * Trial-only: no patient data is read or sent, unlike the AI trial check.
+     */
+    @PostMapping("/{extid}/generate-friendly-title")
+    @Operation(summary = "Ask a model to rewrite this trial's title in plain language")
+    public ResponseTrial generateFriendlyTitle(@PathVariable String extid) {
+        Trial trial = trialService.findByExtid(extid);
+        Trial updated = friendlyTitleService.generate(trial);
+        return converter.toResponse(updated);
+    }
+
     @DeleteMapping("/{extid}")
     @Operation(summary = "Delete trial (soft-delete)")
     public ResponseEntity<Void> delete(@PathVariable String extid) {
@@ -88,6 +145,7 @@ class TrialConverter {
                 .nctId(request.getNctId())
                 .briefTitle(request.getBriefTitle())
                 .officialTitle(request.getOfficialTitle())
+                .friendlyTitle(request.getFriendlyTitle())
                 .overallStatus(request.getOverallStatus())
                 .studyType(request.getStudyType())
                 .briefSummary(request.getBriefSummary())
@@ -114,6 +172,7 @@ class TrialConverter {
                 .nctId(request.getNctId())
                 .briefTitle(request.getBriefTitle())
                 .officialTitle(request.getOfficialTitle())
+                .friendlyTitle(request.getFriendlyTitle())
                 .overallStatus(request.getOverallStatus())
                 .studyType(request.getStudyType())
                 .briefSummary(request.getBriefSummary())
@@ -141,8 +200,11 @@ class TrialConverter {
                 .nctId(item.getNctId())
                 .briefTitle(item.getBriefTitle())
                 .officialTitle(item.getOfficialTitle())
+                .friendlyTitle(item.getFriendlyTitle())
                 .overallStatus(item.getOverallStatus())
                 .studyType(item.getStudyType())
+                .treatmentGoal(item.getTreatmentGoal())
+                .diseaseStage(item.getDiseaseStage())
                 .briefSummary(item.getBriefSummary())
                 .detailedDescription(item.getDetailedDescription())
                 .startDate(item.getStartDate())
@@ -170,6 +232,7 @@ class TrialConverter {
         if (request.getNctId() == null &&
                 request.getBriefTitle() == null &&
                 request.getOfficialTitle() == null &&
+                request.getFriendlyTitle() == null &&
                 request.getOverallStatus() == null &&
                 request.getStudyType() == null &&
                 request.getBriefSummary() == null &&

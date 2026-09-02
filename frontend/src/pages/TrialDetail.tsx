@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, MapPin, Target, UserCircle, Layers, Check, X, HelpCircle, Stethoscope } from 'lucide-react';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { ArrowLeft, MapPin, Target, UserCircle, Layers, Check, X, HelpCircle, Stethoscope, ListChecks, Sparkles, AlertTriangle, Loader2, Wand2 } from 'lucide-react';
 import {
     trialApi,
     locationApi,
@@ -10,16 +10,21 @@ import {
     outcomeApi,
     overallOfficialApi,
     trialStatusApi,
+    matchingApi,
 } from '../services/api';
 import { useCurrentPatient } from '../lib/PatientContext';
+import { useAudience } from '../lib/AudienceContext';
 import { runTier1Checks } from '../lib/tier1Matching';
+import SignalRow from '../components/SignalRow';
 import type { CheckOutcome } from '../lib/tier1Matching';
+import type { AiTrialCheck } from '../types/api';
 import { TRIAL_STATUS_VALUES } from '../types/api';
 
 export default function TrialDetail() {
     const { extid } = useParams<{ extid: string }>();
     const queryClient = useQueryClient();
     const { patient } = useCurrentPatient();
+    const { mode } = useAudience();
     const [savingStatus, setSavingStatus] = useState(false);
     const [notesDraft, setNotesDraft] = useState<string | null>(null);
 
@@ -27,6 +32,60 @@ export default function TrialDetail() {
         queryKey: ['trial', extid],
         queryFn: async () => (await trialApi.getByExtid(extid!)).data,
         enabled: !!extid,
+    });
+
+    // The Tier 2 assessment for this one trial. Its own endpoint rather than a slice of the
+    // ranked list, so opening a trial directly - from a link, or a saved trial - still explains
+    // itself. Silent on failure: the assessment is additional context, and a trial's own record
+    // must still render if matching is unavailable.
+    const { data: assessment } = useQuery({
+        queryKey: ['assessment', extid, patient?.extid],
+        queryFn: async () => (await matchingApi.assessTrial(extid!, patient!.extid)).data,
+        enabled: !!extid && !!patient?.extid,
+        retry: false,
+    });
+
+    // Hidden rather than disabled when unconfigured: a button that always fails is worse than
+    // no button, and "not set up" is not something a reader can act on.
+    const { data: aiStatus } = useQuery({
+        queryKey: ['ai-status'],
+        queryFn: async () => (await matchingApi.aiStatus()).data,
+        retry: false,
+        staleTime: Infinity,
+    });
+
+    // What she was told last time, shown on open. A fresh reading costs money and returns a
+    // slightly different answer, so re-running is a deliberate press rather than something that
+    // happens by arriving on the page.
+    const { data: storedAiCheck } = useQuery({
+        queryKey: ['ai-check', extid, patient?.extid],
+        queryFn: async () => {
+            const response = await matchingApi.latestAiCheck(extid!, patient!.extid);
+            // 204 - never checked.
+            return response.data === '' ? null : response.data;
+        },
+        enabled: !!extid && !!patient?.extid,
+        retry: false,
+    });
+
+    const aiCheck = useMutation({
+        mutationFn: async () => (await matchingApi.aiCheck(extid!, patient!.extid)).data,
+        onSuccess: (fresh) => {
+            queryClient.setQueryData(['ai-check', extid, patient?.extid], fresh);
+        },
+    });
+
+    // The fresh reading wins while it is on screen; otherwise whatever was stored.
+    const shownAiCheck = aiCheck.data ?? storedAiCheck ?? null;
+
+    // Trial-only, unlike aiCheck above - no patient record is read or sent, so this needs no
+    // patient guard. Always overwrites on success: a deliberate single press, same contract as
+    // the AI trial check's "Check again".
+    const generateFriendlyTitle = useMutation({
+        mutationFn: async () => (await trialApi.generateFriendlyTitle(extid!)).data,
+        onSuccess: (updated) => {
+            queryClient.setQueryData(['trial', extid], updated);
+        },
     });
 
     const { data: locations } = useQuery({
@@ -112,49 +171,82 @@ export default function TrialDetail() {
         }
     };
 
-    if (isLoading) return <p className="px-4 py-6 text-gray-500">Loading trial...</p>;
+    if (isLoading) return <p className="px-4 py-6 text-stone-500">Loading trial...</p>;
     if (isError || !trial) return <p className="px-4 py-6 text-red-600">Trial not found.</p>;
 
     return (
         <div>
-            <Link to="/trials" className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4">
+            <Link to="/trials" className="inline-flex items-center text-sm text-stone-600 hover:text-stone-900 mb-4">
                 <ArrowLeft className="h-4 w-4 mr-1" />
                 Back to search
             </Link>
 
-            <div className="bg-white shadow rounded-lg p-6 mb-6">
+            <div className="bg-brand-beige-card shadow rounded-lg p-6 mb-6">
                 <div className="flex items-start justify-between gap-4 mb-2">
-                    <span className="text-xs font-mono text-gray-500">{trial.nctId ?? 'No NCT ID'}</span>
+                    <span className="text-xs font-mono text-stone-500">{trial.nctId ?? 'No NCT ID'}</span>
                     {trial.overallStatus && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-brand-green-hover">
                             {trial.overallStatus.replaceAll('_', ' ')}
                         </span>
                     )}
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900 mb-1">{trial.briefTitle}</h1>
-                {trial.officialTitle && trial.officialTitle !== trial.briefTitle && (
-                    <p className="text-sm text-gray-500 mb-4">{trial.officialTitle}</p>
+                {mode === 'patient' && trial.friendlyTitle ? (
+                    <>
+                        <h1 className="font-heading text-2xl font-bold text-stone-900 mb-1">{trial.friendlyTitle}</h1>
+                        <p className="text-sm text-stone-500 mb-1">{trial.briefTitle}</p>
+                    </>
+                ) : (
+                    <h1 className="font-heading text-2xl font-bold text-stone-900 mb-1">{trial.briefTitle}</h1>
                 )}
-                {trial.briefSummary && <p className="text-gray-700 mt-4">{trial.briefSummary}</p>}
+                {trial.officialTitle && trial.officialTitle !== trial.briefTitle && (
+                    <p className="text-sm text-stone-500 mb-4">{trial.officialTitle}</p>
+                )}
+                {trial.briefSummary && <p className="text-stone-700 mt-4">{trial.briefSummary}</p>}
+
+                <div className="mt-4 flex items-center gap-3">
+                    <button
+                        type="button"
+                        onClick={() => generateFriendlyTitle.mutate()}
+                        disabled={generateFriendlyTitle.isPending}
+                        className="inline-flex items-center gap-2 rounded-md bg-brand-beige-card px-3 py-1.5 text-sm text-purple-700 border border-purple-300 hover:bg-purple-50 disabled:opacity-50"
+                    >
+                        {generateFriendlyTitle.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Wand2 className="h-4 w-4" />
+                        )}
+                        {generateFriendlyTitle.isPending
+                            ? 'Rewriting...'
+                            : trial.friendlyTitle
+                              ? 'Regenerate plain-language title'
+                              : 'Generate plain-language title'}
+                    </button>
+                    {generateFriendlyTitle.isError && (
+                        <span className="text-sm text-red-600">
+                            {(generateFriendlyTitle.error as { response?: { data?: { message?: string } } })
+                                ?.response?.data?.message ?? 'Could not generate a title.'}
+                        </span>
+                    )}
+                </div>
 
                 <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 text-sm">
                     <div>
-                        <dt className="text-gray-500">Study type</dt>
-                        <dd className="text-gray-900 font-medium">{trial.studyType ?? '—'}</dd>
+                        <dt className="text-stone-500">Study type</dt>
+                        <dd className="text-stone-900 font-medium">{trial.studyType ?? '—'}</dd>
                     </div>
                     <div>
-                        <dt className="text-gray-500">Sex</dt>
-                        <dd className="text-gray-900 font-medium">{trial.sex ?? '—'}</dd>
+                        <dt className="text-stone-500">Sex</dt>
+                        <dd className="text-stone-900 font-medium">{trial.sex ?? '—'}</dd>
                     </div>
                     <div>
-                        <dt className="text-gray-500">Age range</dt>
-                        <dd className="text-gray-900 font-medium">
+                        <dt className="text-stone-500">Age range</dt>
+                        <dd className="text-stone-900 font-medium">
                             {trial.minimumAge ?? '—'} – {trial.maximumAge ?? '—'}
                         </dd>
                     </div>
                     <div>
-                        <dt className="text-gray-500">Healthy volunteers</dt>
-                        <dd className="text-gray-900 font-medium">
+                        <dt className="text-stone-500">Healthy volunteers</dt>
+                        <dd className="text-stone-900 font-medium">
                             {trial.healthyVolunteers === true ? 'Yes' : trial.healthyVolunteers === false ? 'No' : '—'}
                         </dd>
                     </div>
@@ -162,21 +254,22 @@ export default function TrialDetail() {
             </div>
 
             {/* Personal tracking */}
-            <div className="bg-white shadow rounded-lg p-6 mb-6">
-                <h2 className="text-lg font-medium text-gray-900 mb-4">Your Tracking</h2>
+            <div className="bg-brand-beige-card shadow rounded-lg p-6 mb-6">
+                <h2 className="text-lg font-medium text-stone-900 mb-4">Your Tracking</h2>
                 {!patient ? (
-                    <p className="text-sm text-gray-500">
-                        No patient record yet. Create one to track this trial.
+                    <p className="text-base text-stone-500 leading-normal">
+                        You don't have a patient record yet. Create one and you'll be able to
+                        track your status on this trial.
                     </p>
                 ) : (
                     <div className="space-y-4">
                         <div className="flex items-center gap-3">
-                            <label className="text-sm font-medium text-gray-700">Status</label>
+                            <label className="text-sm font-medium text-stone-700">Status</label>
                             <select
                                 value={myStatus?.status ?? ''}
                                 onChange={(e) => handleStatusChange(e.target.value)}
                                 disabled={savingStatus}
-                                className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 disabled:opacity-50"
+                                className="px-3 py-2 border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-green focus:border-brand-green disabled:opacity-50"
                             >
                                 <option value="" disabled>
                                     Select status...
@@ -189,14 +282,14 @@ export default function TrialDetail() {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                            <label className="block text-sm font-medium text-stone-700 mb-1">Notes</label>
                             <textarea
                                 defaultValue={myStatus?.notes ?? ''}
                                 onChange={(e) => setNotesDraft(e.target.value)}
                                 onBlur={handleNotesBlur}
                                 rows={3}
                                 placeholder="Personal notes about this trial..."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                                className="w-full px-3 py-2 border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-green focus:border-brand-green"
                             />
                         </div>
                     </div>
@@ -205,12 +298,12 @@ export default function TrialDetail() {
 
             {/* Tier 1 matching - deterministic checks only, per DIAGNOSIS_MATCHING_DESIGN.md */}
             {patient && (
-                <div className="bg-white shadow rounded-lg p-6 mb-6">
-                    <h2 className="text-lg font-medium text-gray-900 mb-1 flex items-center gap-2">
-                        <Stethoscope className="h-5 w-5 text-green-600" />
+                <div className="bg-brand-beige-card shadow rounded-lg p-6 mb-6">
+                    <h2 className="text-lg font-medium text-stone-900 mb-1 flex items-center gap-2">
+                        <Stethoscope className="h-5 w-5 text-brand-green" />
                         Basic Eligibility Checks
                     </h2>
-                    <p className="text-sm text-gray-500 mb-4">
+                    <p className="text-base text-stone-500 leading-normal mb-4">
                         Compares your recorded details against this trial's stated age, sex, and
                         recruitment status. These are the only checks that can be made
                         automatically — they are not an eligibility decision.
@@ -220,13 +313,13 @@ export default function TrialDetail() {
                             <li key={check.label} className="flex items-start gap-3">
                                 <OutcomeIcon outcome={check.outcome} />
                                 <div className="text-sm">
-                                    <span className="font-medium text-gray-900">{check.label}</span>
-                                    <p className="text-gray-600">{check.detail}</p>
+                                    <span className="font-medium text-stone-900">{check.label}</span>
+                                    <p className="text-stone-600">{check.detail}</p>
                                 </div>
                             </li>
                         ))}
                     </ul>
-                    <p className="mt-4 text-xs text-gray-500 border-t pt-3">
+                    <p className="mt-4 text-base text-stone-500 leading-normal border-t pt-3">
                         Everything else in the eligibility criteria below is unassessed. A trial
                         that fails a check here may still be worth asking about — confirm with the
                         study team.
@@ -234,23 +327,117 @@ export default function TrialDetail() {
                 </div>
             )}
 
+            {/* Tier 2 - the assessment that drives the ranked list. Shown here so a trial
+                opened directly explains itself the same way it does in that list. */}
+            {assessment && assessment.signals.length > 0 && (
+                <div className="bg-brand-beige-card shadow rounded-lg p-6 mb-6">
+                    <h2 className="text-lg font-medium text-stone-900 mb-1 flex items-center gap-2">
+                        <ListChecks className="h-5 w-5 text-blue-600" />
+                        What We Checked Against Your Record
+                    </h2>
+                    <p className="text-base text-stone-500 leading-normal mb-4">
+                        Compares this trial's own text against your diagnosis, variants and prior
+                        treatment. Anything flagged is something to ask about — none of it decides
+                        whether you qualify.
+                    </p>
+
+                    {/* Counts, never a percentage. A number that looks like a probability
+                        invites reliance this tool must not earn. */}
+                    <p className="text-sm text-stone-600 mb-4">
+                        {[
+                            assessment.concernCount > 0 && `${assessment.concernCount} to check`,
+                            assessment.unknownCount > 0 && `${assessment.unknownCount} to ask about`,
+                            assessment.passCount > 0 && `${assessment.passCount} matched`,
+                        ]
+                            .filter(Boolean)
+                            .join(' · ') || 'Nothing to flag on this trial.'}
+                    </p>
+
+                    {/* Every signal, unlike the ranked list which collapses passes. There is one
+                        trial here and the reader is already looking at it closely. */}
+                    <ul className="space-y-2">
+                        {assessment.signals.map((s) => (
+                            <SignalRow key={s.name} signal={s} />
+                        ))}
+                    </ul>
+
+                    <p className="mt-4 text-base text-stone-500 leading-normal border-t pt-3">
+                        These checks read the trial's own wording, which is often ambiguous. Use
+                        “why?” to see the exact text behind any flag, and confirm anything that
+                        matters with the study team.
+                    </p>
+                </div>
+            )}
+
+            {/* Reads criteria the patterns cannot - a carve-out inside an exclusion, an
+                unusual phrasing, a criterion nobody wrote a rule for. Runs on a press, never
+                on load: it costs money and takes seconds. */}
+            {patient && aiStatus?.available && (
+                <div className="bg-brand-beige-card shadow rounded-lg p-6 mb-6">
+                    <h2 className="text-lg font-medium text-stone-900 mb-1 flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-purple-600" />
+                        Read This Trial Against Your Record
+                    </h2>
+                    <p className="text-base text-stone-500 leading-normal mb-4">
+                        Reads this trial's eligibility criteria line by line against your record and
+                        reports what it finds. It can tell you if something rules you out, and what
+                        it could not judge &mdash; it cannot tell you that you qualify.
+                    </p>
+
+                    <button
+                        type="button"
+                        onClick={() => aiCheck.mutate()}
+                        disabled={aiCheck.isPending}
+                        className="inline-flex items-center gap-2 rounded-md bg-purple-600 px-4 py-2 text-white hover:bg-purple-700 disabled:opacity-50 min-h-[2.5rem]"
+                    >
+                        {aiCheck.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Sparkles className="h-4 w-4" />
+                        )}
+                        {aiCheck.isPending
+                            ? 'Reading the criteria...'
+                            : shownAiCheck
+                              ? 'Check again'
+                              : 'Check this trial'}
+                    </button>
+
+                    {shownAiCheck?.assessedAt && !aiCheck.data && (
+                        <p className="mt-2 text-xs text-stone-500">
+                            Last checked {new Date(shownAiCheck.assessedAt).toLocaleString()}.
+                            Your record may have changed since.
+                        </p>
+                    )}
+
+                    {aiCheck.isError && (
+                        <p className="mt-3 text-sm text-red-600">
+                            {(aiCheck.error as { response?: { data?: { message?: string } } })
+                                ?.response?.data?.message
+                                ?? 'The check could not be run. Nothing about this trial has changed.'}
+                        </p>
+                    )}
+
+                    {shownAiCheck && <AiCheckResult check={shownAiCheck} />}
+                </div>
+            )}
+
             {/* Eligibility */}
             {trial.eligibilityCriteria && (
-                <div className="bg-white shadow rounded-lg p-6 mb-6">
-                    <h2 className="text-lg font-medium text-gray-900 mb-3">Eligibility Criteria</h2>
-                    <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans">{trial.eligibilityCriteria}</pre>
+                <div className="bg-brand-beige-card shadow rounded-lg p-6 mb-6">
+                    <h2 className="text-lg font-medium text-stone-900 mb-3">Eligibility Criteria</h2>
+                    <pre className="whitespace-pre-wrap text-sm text-stone-700 font-sans">{trial.eligibilityCriteria}</pre>
                 </div>
             )}
 
             {/* Interventions */}
             {!!interventions?.length && (
-                <Section title="Interventions" icon={<Target className="h-5 w-5 text-green-600" />}>
+                <Section title="Interventions" icon={<Target className="h-5 w-5 text-brand-green" />}>
                     <ul className="space-y-2">
                         {interventions.map((i) => (
                             <li key={i.extid} className="text-sm">
-                                <span className="font-medium text-gray-900">{i.name}</span>
-                                {i.type && <span className="text-gray-500"> ({i.type})</span>}
-                                {i.description && <p className="text-gray-600 mt-0.5">{i.description}</p>}
+                                <span className="font-medium text-stone-900">{i.name}</span>
+                                {i.type && <span className="text-stone-500"> ({i.type})</span>}
+                                {i.description && <p className="text-stone-600 mt-0.5">{i.description}</p>}
                             </li>
                         ))}
                     </ul>
@@ -259,13 +446,13 @@ export default function TrialDetail() {
 
             {/* Arm Groups */}
             {!!armGroups?.length && (
-                <Section title="Arm Groups" icon={<Layers className="h-5 w-5 text-green-600" />}>
+                <Section title="Arm Groups" icon={<Layers className="h-5 w-5 text-brand-green" />}>
                     <ul className="space-y-2">
                         {armGroups.map((a) => (
                             <li key={a.extid} className="text-sm">
-                                <span className="font-medium text-gray-900">{a.label}</span>
-                                {a.type && <span className="text-gray-500"> ({a.type})</span>}
-                                {a.description && <p className="text-gray-600 mt-0.5">{a.description}</p>}
+                                <span className="font-medium text-stone-900">{a.label}</span>
+                                {a.type && <span className="text-stone-500"> ({a.type})</span>}
+                                {a.description && <p className="text-stone-600 mt-0.5">{a.description}</p>}
                             </li>
                         ))}
                     </ul>
@@ -274,15 +461,15 @@ export default function TrialDetail() {
 
             {/* Outcomes */}
             {!!outcomes?.length && (
-                <Section title="Outcomes" icon={<Target className="h-5 w-5 text-green-600" />}>
+                <Section title="Outcomes" icon={<Target className="h-5 w-5 text-brand-green" />}>
                     <ul className="space-y-3">
                         {outcomes.map((o) => (
                             <li key={o.extid} className="text-sm">
-                                <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 mr-2">
+                                <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-stone-100 text-stone-700 mr-2">
                                     {o.outcomeType}
                                 </span>
-                                <span className="font-medium text-gray-900">{o.measure}</span>
-                                {o.timeFrame && <p className="text-gray-500 mt-0.5">Time frame: {o.timeFrame}</p>}
+                                <span className="font-medium text-stone-900">{o.measure}</span>
+                                {o.timeFrame && <p className="text-stone-500 mt-0.5">Time frame: {o.timeFrame}</p>}
                             </li>
                         ))}
                     </ul>
@@ -291,12 +478,12 @@ export default function TrialDetail() {
 
             {/* Locations */}
             {!!locations?.length && (
-                <Section title="Locations" icon={<MapPin className="h-5 w-5 text-green-600" />}>
+                <Section title="Locations" icon={<MapPin className="h-5 w-5 text-brand-green" />}>
                     <ul className="space-y-2">
                         {locations.map((l) => (
-                            <li key={l.extid} className="text-sm text-gray-700">
+                            <li key={l.extid} className="text-sm text-stone-700">
                                 {[l.facility, l.city, l.state, l.country].filter(Boolean).join(', ') || '—'}
-                                {l.status && <span className="text-gray-500"> — {l.status}</span>}
+                                {l.status && <span className="text-stone-500"> — {l.status}</span>}
                             </li>
                         ))}
                     </ul>
@@ -305,13 +492,13 @@ export default function TrialDetail() {
 
             {/* Contacts */}
             {!!officials?.length && (
-                <Section title="Contacts" icon={<UserCircle className="h-5 w-5 text-green-600" />}>
+                <Section title="Contacts" icon={<UserCircle className="h-5 w-5 text-brand-green" />}>
                     <ul className="space-y-2">
                         {officials.map((o) => (
-                            <li key={o.extid} className="text-sm text-gray-700">
-                                <span className="font-medium text-gray-900">{o.name}</span>
-                                {o.role && <span className="text-gray-500"> — {o.role}</span>}
-                                {o.affiliation && <p className="text-gray-500">{o.affiliation}</p>}
+                            <li key={o.extid} className="text-sm text-stone-700">
+                                <span className="font-medium text-stone-900">{o.name}</span>
+                                {o.role && <span className="text-stone-500"> — {o.role}</span>}
+                                {o.affiliation && <p className="text-stone-500">{o.affiliation}</p>}
                             </li>
                         ))}
                     </ul>
@@ -322,20 +509,104 @@ export default function TrialDetail() {
 }
 
 /** Amber, not red, for a failed check - it is a flag to ask about, never an auto-exclusion. */
+/**
+ * What the model reported.
+ *
+ * <p>An exclusion is stated plainly with its quoted criterion, because that is a checkable
+ * claim. Its absence is rendered as "nothing here rules you out" and never as a match - the
+ * whole point of the response shape is that eligibility is not the model's to declare.
+ */
+function AiCheckResult({ check }: { check: AiTrialCheck }) {
+    const ruledOut = check.rulesPatientOut === true;
+
+    return (
+        <div className="mt-4 space-y-4">
+            <div
+                className={`rounded border px-4 py-3 text-base leading-normal ${
+                    ruledOut
+                        ? 'border-amber-300 bg-amber-50 text-amber-900'
+                        : 'border-stone-200 bg-stone-50 text-stone-700'
+                }`}
+            >
+                <div className="flex items-start gap-2">
+                    {ruledOut ? (
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    ) : (
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-stone-400" />
+                    )}
+                    <div>
+                        <p className="font-medium">
+                            {ruledOut
+                                ? 'Something in this trial would rule you out'
+                                : 'Nothing in these criteria rules you out'}
+                        </p>
+                        {check.summary && <p className="mt-1">{check.summary}</p>}
+                    </div>
+                </div>
+                {ruledOut && check.exclusionCriterion && (
+                    <blockquote className="mt-3 border-l-2 border-amber-400 pl-3 text-base italic leading-normal">
+                        &ldquo;{check.exclusionCriterion}&rdquo;
+                    </blockquote>
+                )}
+            </div>
+
+            {/* Listed before the matches on purpose: these are the reason to run this at all.
+                They are what turns an appointment into specific questions. */}
+            <AiList
+                title="Worth asking your care team"
+                items={check.openQuestions}
+                className="border-sky-200 bg-sky-50 text-sky-900"
+            />
+            <AiList
+                title="Things to be aware of"
+                items={check.concerns}
+                className="border-amber-200 bg-amber-50 text-amber-900"
+            />
+            <AiList
+                title="Criteria your record appears to meet"
+                items={check.criteriaSheAppearsToMeet}
+                className="border-stone-200 bg-stone-50 text-stone-600"
+            />
+
+            <p className="border-t pt-3 text-base text-stone-500 leading-normal">
+                Read by {check.model ?? 'an AI model'}, which can misread a criterion. Nothing here
+                decides whether you qualify &mdash; only the study team can do that. Take the
+                questions above to your care team rather than acting on this.
+            </p>
+        </div>
+    );
+}
+
+function AiList({ title, items, className }: { title: string; items?: string[] | null; className: string }) {
+    if (!items || items.length === 0) {
+        return null;
+    }
+    return (
+        <div className={`rounded border px-4 py-3 text-base leading-normal ${className}`}>
+            <p className="mb-2 font-medium">{title}</p>
+            <ul className="list-disc space-y-1 pl-5">
+                {items.map((item, i) => (
+                    <li key={i}>{item}</li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
 function OutcomeIcon({ outcome }: { outcome: CheckOutcome }) {
     if (outcome === 'pass') {
-        return <Check className="h-5 w-5 text-green-600 shrink-0 mt-0.5" aria-label="matches" />;
+        return <Check className="h-5 w-5 text-brand-green shrink-0 mt-0.5" aria-label="matches" />;
     }
     if (outcome === 'fail') {
         return <X className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" aria-label="does not match" />;
     }
-    return <HelpCircle className="h-5 w-5 text-gray-400 shrink-0 mt-0.5" aria-label="not assessed" />;
+    return <HelpCircle className="h-5 w-5 text-stone-400 shrink-0 mt-0.5" aria-label="not assessed" />;
 }
 
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
     return (
-        <div className="bg-white shadow rounded-lg p-6 mb-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-3 flex items-center gap-2">
+        <div className="bg-brand-beige-card shadow rounded-lg p-6 mb-6">
+            <h2 className="text-lg font-medium text-stone-900 mb-3 flex items-center gap-2">
                 {icon}
                 {title}
             </h2>

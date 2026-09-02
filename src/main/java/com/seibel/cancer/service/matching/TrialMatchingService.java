@@ -140,6 +140,14 @@ public class TrialMatchingService extends BaseService {
         signals.add(evaluator.treatmentLineSignal(trial, record.treatment()));
         signals.add(evaluator.pi3kSignal(trial, record.variant(), record.treatment()));
 
+        // What the trial is trying to achieve, and whether it is for this stage of disease.
+        // Every signal above answers "does she qualify"; these two are the only ones that ask
+        // what a trial would be trying to do for her, which is the question the tool was built
+        // to answer. Measured across 2,473 trials: 38 are metastasis-directed or curative-intent
+        // studies for stage IV disease - see matching/CURATIVE_STEP1_MEASUREMENT.md.
+        signals.add(evaluator.treatmentGoalSignal(trial));
+        signals.add(evaluator.diseaseStageSignal(trial, record.diagnosis()));
+
         // Locations are a separate query and only needed for this signal, so they are fetched
         // here rather than being carried on the Trial domain object. A batch caller supplies
         // them up front; a single-trial caller pays one query.

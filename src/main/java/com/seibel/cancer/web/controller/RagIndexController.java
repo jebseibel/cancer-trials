@@ -81,6 +81,7 @@ public class RagIndexController {
                         .trialExtid(m.trial().getExtid())
                         .nctId(m.trial().getNctId())
                         .briefTitle(m.trial().getBriefTitle())
+                        .friendlyTitle(m.trial().getFriendlyTitle())
                         .overallStatus(m.trial().getOverallStatus())
                         .topScore(m.topScore())
                         .matches(m.matches().stream()

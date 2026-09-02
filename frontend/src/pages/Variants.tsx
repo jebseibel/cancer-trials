@@ -4,6 +4,7 @@ import { Save, Loader2 } from 'lucide-react';
 import { patientVariantApi } from '../services/api';
 import { Field, Section, Select, inputClass } from '../components/FormControls';
 import { useCurrentPatient } from '../lib/PatientContext';
+import { takePendingVariantDraft } from '../lib/diagnosisIntakeDraft';
 import { VARIANT_STATUS_LABELS, VARIANT_STATUS_VALUES } from '../types/api';
 import type { PatientVariant, PatientVariantRequest } from '../types/api';
 
@@ -111,6 +112,35 @@ export default function Variants() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [existing?.extid]);
 
+    // Picks up a completed document-intake draft, but only into a blank/new record - it must
+    // never silently overwrite already-saved variant results.
+    useEffect(() => {
+        if (existing) return;
+        const draft = takePendingVariantDraft();
+        if (!draft) return;
+        setForm((f) => ({
+            ...f,
+            pik3caStatus: draft.pik3caStatus ?? f.pik3caStatus,
+            esr1Status: draft.esr1Status ?? f.esr1Status,
+            tp53Status: draft.tp53Status ?? f.tp53Status,
+            akt1Status: draft.akt1Status ?? f.akt1Status,
+            ptenStatus: draft.ptenStatus ?? f.ptenStatus,
+            erbb2SomaticStatus: draft.erbb2SomaticStatus ?? f.erbb2SomaticStatus,
+            brca1Status: draft.brca1Status ?? f.brca1Status,
+            brca2Status: draft.brca2Status ?? f.brca2Status,
+            palb2Status: draft.palb2Status ?? f.palb2Status,
+            atmStatus: draft.atmStatus ?? f.atmStatus,
+            chek2Status: draft.chek2Status ?? f.chek2Status,
+            hrdStatus: draft.hrdStatus ?? f.hrdStatus,
+            pdl1Status: draft.pdl1Status ?? f.pdl1Status,
+            ki67Percent: draft.ki67Percent !== undefined ? String(draft.ki67Percent) : f.ki67Percent,
+            germlineTestDone: draft.germlineTestDone ?? f.germlineTestDone,
+            somaticTestDone: draft.somaticTestDone ?? f.somaticTestDone,
+            testDate: draft.testDate ?? f.testDate,
+            otherVariants: draft.otherVariants ?? f.otherVariants,
+        }));
+    }, [existing]);
+
     const saveMutation = useMutation({
         mutationFn: async () => {
             const request = toRequest(form, patient?.extid);
@@ -132,17 +162,18 @@ export default function Variants() {
     const saveError = saveMutation.error as { response?: { data?: { message?: string } } } | null;
 
     if (patientLoading || isLoading) {
-        return <p className="px-4 py-6 text-gray-500">Loading variants...</p>;
+        return <p className="px-4 py-6 text-stone-500">Loading variants...</p>;
     }
 
     if (!patient) {
         return (
             <div>
-                <div className="bg-white shadow rounded-lg p-6">
-                    <p className="text-sm text-gray-700">
-                        No patient record yet. Create one to start recording genetic and biomarker results.
+                <div className="bg-brand-beige-card shadow rounded-lg p-6">
+                    <p className="text-base text-stone-700 leading-normal">
+                        You don't have a patient record yet — create one and you can start
+                        recording genetic and biomarker results whenever you're ready.
                     </p>
-                    <p className="mt-2 text-xs text-gray-500">
+                    <p className="mt-2 text-base text-stone-500 leading-normal">
                         A record can be for you or for someone you are helping.
                     </p>
                 </div>
@@ -163,14 +194,14 @@ export default function Variants() {
 
     return (
         <div>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-base text-stone-500 leading-normal mb-4">
                 Used to match against trial eligibility criteria. Everything here is optional —
                 record what you know, leave the rest blank.
             </p>
 
             {/* The single most likely data-entry error, called out before the fields. */}
             <div className="mb-6 rounded-md border border-amber-300 bg-amber-50 px-4 py-3">
-                <p className="text-sm text-amber-900">
+                <p className="text-base leading-normal text-amber-900">
                     <strong>&ldquo;Not tested&rdquo; is not the same as &ldquo;not
                     detected&rdquo;.</strong>{' '}
                     If a gene was never tested for, choose <em>Not tested</em> rather than leaving
@@ -288,7 +319,7 @@ export default function Variants() {
                 </Section>
 
                 {saveMutation.isError && (
-                    <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-base leading-normal text-red-700">
                         {saveError?.response?.data?.message ?? 'Could not save the variants.'}
                     </div>
                 )}
@@ -297,7 +328,7 @@ export default function Variants() {
                     <button
                         type="submit"
                         disabled={saveMutation.isPending}
-                        className="inline-flex items-center px-4 py-2 rounded-md bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                        className="inline-flex items-center px-4 py-2 rounded-md bg-brand-green text-white text-sm font-medium hover:bg-brand-green-hover disabled:opacity-50"
                     >
                         {saveMutation.isPending ? (
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -307,7 +338,7 @@ export default function Variants() {
                         {saveMutation.isPending ? 'Saving...' : existing ? 'Save changes' : 'Save variants'}
                     </button>
                     {saved && !saveMutation.isPending && (
-                        <span className="text-sm text-green-700">Saved.</span>
+                        <span className="text-sm text-brand-green-hover">Saved.</span>
                     )}
                 </div>
             </form>

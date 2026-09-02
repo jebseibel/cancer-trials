@@ -29,6 +29,13 @@ import type {
     PatientPriorTreatmentRequest,
     TrialAssessment,
     TrialSearchMatch,
+    TreatmentGoalBackfillResult,
+    FriendlyTitleBackfillResult,
+    AiTrialCheck,
+    AiStatus,
+    DiagnosisIntakeSession,
+    DiagnosisIntakeStartRequest,
+    DiagnosisIntakeAnswerRequest,
 } from '../types/api';
 
 // API Configuration
@@ -87,6 +94,11 @@ export const trialApi = {
     create: (trial: TrialRequest) => apiClient.post<Trial>('/trial', trial),
     update: (extid: string, trial: Partial<TrialRequest>) => apiClient.put<Trial>(`/trial/${extid}`, trial),
     delete: (extid: string) => apiClient.delete(`/trial/${extid}`),
+    // Asks a model to rewrite this trial's title in plain language and stores it, always
+    // overwriting whatever was there - a deliberate single press, the same contract as the AI
+    // trial check's "Check again". Trial-only: no patient data is read or sent.
+    generateFriendlyTitle: (extid: string) =>
+        apiClient.post<Trial>(`/trial/${extid}/generate-friendly-title`),
 };
 
 // Semantic search over trial text, as opposed to trialApi.getAll's substring filtering.
@@ -116,6 +128,25 @@ export const matchingApi = {
         apiClient.get<TrialAssessment[]>(`/matching/rank/${patientExtid}`, { params }),
     assessTrial: (trialExtid: string, patientExtid: string) =>
         apiClient.get<TrialAssessment>(`/matching/trial/${trialExtid}/for/${patientExtid}`),
+    // Re-derives the treatment-goal column for every trial. Needed because ingestion skips
+    // trials whose ClinicalTrials.gov payload has not changed, so a re-pull cannot pick up a
+    // change to the code that reads that payload. ADMIN-only.
+    // ⚠️ The only call that sends clinical text off the machine. The backend builds a
+    // de-identified payload from an explicit allowlist - no name, no date of birth, no
+    // free-text notes, dates coarsened to a year.
+    aiCheck: (trialExtid: string, patientExtid: string) =>
+        apiClient.post<AiTrialCheck>(`/matching/ai/trial/${trialExtid}/for/${patientExtid}`),
+    // The stored reading, if there is one. 204 when this trial has never been checked.
+    latestAiCheck: (trialExtid: string, patientExtid: string) =>
+        apiClient.get<AiTrialCheck | ''>(`/matching/ai/trial/${trialExtid}/for/${patientExtid}`),
+    aiStatus: () => apiClient.get<AiStatus>('/matching/ai/status'),
+    backfillTreatmentGoals: () =>
+        apiClient.post<TreatmentGoalBackfillResult>('/matching/backfill-treatment-goals'),
+    // Generates a friendly title for every trial that does not have one yet. Unlike the
+    // treatment-goal backfill this is not free - it is a paid AI call per trial missing a
+    // title - so it skips trials that already have one rather than re-checking them. ADMIN-only.
+    backfillFriendlyTitles: () =>
+        apiClient.post<FriendlyTitleBackfillResult>('/matching/backfill-friendly-titles'),
 };
 
 export const trialSourceApi = {
@@ -226,9 +257,29 @@ export const patientPriorTreatmentApi = {
         apiClient.put<PatientPriorTreatment>(`/patientpriortreatment/${extid}`, treatment),
 };
 
+// AI-assisted document intake: paste/upload text, get a draft to review across the three
+// diagnosis-adjacent tables. Nothing here is persisted server-side - the session lives only in
+// backend memory for the life of the conversation.
+export const diagnosisIntakeApi = {
+    start: (request: DiagnosisIntakeStartRequest) =>
+        apiClient.post<DiagnosisIntakeSession>('/diagnosisintake/start', request),
+    answer: (sessionId: string, request: DiagnosisIntakeAnswerRequest) =>
+        apiClient.post<DiagnosisIntakeSession>(`/diagnosisintake/${sessionId}/answer`, request),
+    skip: (sessionId: string) =>
+        apiClient.post<DiagnosisIntakeSession>(`/diagnosisintake/${sessionId}/skip`),
+    cancel: (sessionId: string) => apiClient.delete<void>(`/diagnosisintake/${sessionId}`),
+};
+
 export const authApi = {
     login: (credentials: LoginRequest) => apiClient.post<AuthResponse>('/auth/login', credentials),
     register: (userData: RegisterRequest) => apiClient.post<AuthResponse>('/auth/register', userData),
+};
+
+// The signed-in user's own account. Distinct from authApi: these calls require an existing
+// token rather than producing one.
+export const accountApi = {
+    changePassword: (currentPassword: string, newPassword: string) =>
+        apiClient.post<string>('/auth/change-password', { currentPassword, newPassword }),
 };
 
 // Auth helper functions

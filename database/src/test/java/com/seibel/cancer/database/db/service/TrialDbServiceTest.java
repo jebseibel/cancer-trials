@@ -82,6 +82,7 @@ class TrialDbServiceTest {
 
         Trial changes = Trial.builder()
                 .briefTitle("Updated Title")
+                .friendlyTitle("Updated Friendly Title")
                 .overallStatus("RECRUITING")
                 .build();
 
@@ -104,6 +105,7 @@ class TrialDbServiceTest {
 
         TrialDb captured = captor.getValue();
         assertEquals("Updated Title", captured.getBriefTitle());
+        assertEquals("Updated Friendly Title", captured.getFriendlyTitle());
         assertEquals("RECRUITING", captured.getOverallStatus());
         assertNotNull(captured.getUpdatedAt());
         verify(mapper).toModel(updatedDb);

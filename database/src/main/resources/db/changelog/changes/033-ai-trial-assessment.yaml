@@ -1,0 +1,77 @@
+databaseChangeLog:
+  - changeSet:
+      id: 033-ai-trial-assessment
+      author: jeb
+      changes:
+        # What a model reported after reading one trial's criteria against one patient's record.
+        #
+        # Saved rather than left on the page for three reasons the deterministic signals do not
+        # have. The call costs money, so a reader returning to a trial should see what she was
+        # already told rather than paying again. The answer is non-deterministic, so what she
+        # actually read is not reproducible by re-running. And it is advice she may act on -
+        # take to an appointment, discuss with her team - which makes "what did it say, and
+        # when" a real question.
+        #
+        # Rows accumulate; a re-check inserts rather than replaces. The reading is only as good
+        # as the record it was read against, and both the record and the prompt change - so the
+        # history is what lets an answer be understood later rather than just trusted.
+        #
+        # ⚠️ THIS TABLE HOLDS CLINICAL PROSE ABOUT A REAL PATIENT. It is derived from her record
+        # and quotes trial criteria back. Treat it with the same care as patient_diagnosis - it
+        # is not cache, and it must not be shipped anywhere the diagnosis would not go.
+        - createTable:
+            tableName: ai_trial_assessment
+            columns:
+              - column: { name: id, type: bigint, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: extid, type: varchar(36), constraints: { nullable: false, unique: true }, defaultValueComputed: "(UUID())" }
+              - column: { name: trial_id, type: bigint, constraints: { nullable: false } }
+              - column: { name: patient_id, type: bigint, constraints: { nullable: false } }
+
+              # The only assertion the model is allowed to make. Null means it was not answered;
+              # false means nothing ruled her out, which is NOT the same as qualifying. There is
+              # deliberately no eligibility column here, for the same reason there is no such
+              # field on the response type - see TrialMatchAssessment.
+              - column: { name: rules_patient_out, type: boolean }
+              # Quoted verbatim from the trial, so a reader can check the claim against the
+              # criteria text rather than trusting it.
+              - column: { name: exclusion_criterion, type: text }
+              - column: { name: summary, type: text }
+              # JSON arrays rather than child tables. These are prose for a human to read, never
+              # queried or joined on, and three child tables would be three joins to render one
+              # panel. If they ever need filtering, that is the moment to normalize them.
+              - column: { name: open_questions, type: text }
+              - column: { name: concerns, type: text }
+              - column: { name: criteria_met, type: text }
+
+              # Which model produced this. Two runs months apart may differ because the model
+              # changed rather than because anything clinical did, and without this there is no
+              # way to tell those apart.
+              - column: { name: model, type: varchar(64) }
+              # A hash of the system prompt. Same reasoning: a changed answer after a prompt
+              # edit is not new information about the trial. Cheaper than storing the prompt on
+              # every row, and enough to group runs that used the same instructions.
+              - column: { name: prompt_hash, type: varchar(64) }
+
+              # A snapshot of the record this was read against, mirroring what SavedTrialMatch
+              # does. An assessment is only true of the record at the time: receptor status can
+              # be re-tested and treatment history moves, so a stored answer with no idea what
+              # it was reading is worse than no answer.
+              - column: { name: snapshot_stage, type: varchar(64) }
+              - column: { name: snapshot_er_status, type: varchar(32) }
+              - column: { name: snapshot_pr_status, type: varchar(32) }
+              - column: { name: snapshot_her2_status, type: varchar(32) }
+
+              - column: { name: assessed_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: created_at, type: datetime, constraints: { nullable: false }, defaultValueComputed: CURRENT_TIMESTAMP }
+              - column: { name: updated_at, type: datetime }
+              - column: { name: deleted_at, type: datetime }
+              - column: { name: active, type: int, defaultValueNumeric: 1 }
+
+        # The page asks "what is the latest assessment for this trial and this patient" on every
+        # trial open, so that pair is the access path worth indexing.
+        - createIndex:
+            tableName: ai_trial_assessment
+            indexName: idx_ai_trial_assessment_trial_patient
+            columns:
+              - column: { name: trial_id }
+              - column: { name: patient_id }

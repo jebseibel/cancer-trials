@@ -30,8 +30,24 @@ export interface Trial {
     nctId?: string;
     briefTitle: string;
     officialTitle?: string;
+    // A plain-language rewrite of briefTitle: "Stage IV - Disease Control - Adding a CDK4/6
+    // inhibitor - Requires ER-positive disease". Absent until generated - ClinicalTrials.gov
+    // titles are written for clinicians, and there is no default value to fall back to.
+    friendlyTitle?: string | null;
     overallStatus?: string;
     studyType?: string;
+    // What the trial appears to be trying to achieve, derived from its own description:
+    // ABLATIVE (treats the sites of spread directly), CURE_LANGUAGE (talks about cure or
+    // long-term remission), or NOT_STATED. Absent on trials loaded before this existed.
+    treatmentGoal?: 'ABLATIVE' | 'CURE_LANGUAGE' | 'NOT_STATED';
+    // What stage of disease the trial studies. EARLY_STAGE is a mismatch for a metastatic
+    // patient and is a third of the corpus. Absent on trials loaded before this existed.
+    diseaseStage?: 'METASTATIC' | 'EARLY_STAGE' | 'BOTH' | 'NOT_STATED';
+    // Where the trial runs. Populated on the list endpoint only - the single-trial endpoint has
+    // a full locations section instead. "City, State" for US sites, country names otherwise.
+    siteLabels?: string[];
+    siteCount?: number;
+    hasUnitedStatesSite?: boolean;
     briefSummary?: string;
     detailedDescription?: string;
     startDate?: string;
@@ -434,6 +450,8 @@ export interface TrialAssessment {
     trialExtid: string;
     nctId: string;
     briefTitle?: string | null;
+    // A plain-language rewrite of briefTitle, or null when not yet generated. See displayTitle().
+    friendlyTitle?: string | null;
     overallStatus?: string | null;
     signals: EligibilitySignal[];
     concernCount: number;
@@ -455,6 +473,8 @@ export interface TrialSearchMatch {
     trialExtid: string;
     nctId?: string | null;
     briefTitle?: string | null;
+    // A plain-language rewrite of briefTitle, or null when not yet generated. See displayTitle().
+    friendlyTitle?: string | null;
     overallStatus?: string | null;
     // Best similarity among this trial's matched chunks, 0..1.
     topScore: number;
@@ -471,4 +491,150 @@ export interface TrialSearchChunkMatch {
     // A high score on an exclusion suggests the patient may be disqualified - the opposite
     // of a fit. Shown as a caution, never counted as evidence of eligibility.
     isExclusion: boolean;
+}
+
+// One treatment-goal backfill run. `unchanged` is separate from `updated` on purpose: most runs
+// follow a pattern change that moves a handful of trials, so an edit that did nothing would
+// otherwise look like an edit that worked.
+export interface TreatmentGoalBackfillResult {
+    trialsRead: number;
+    updated: number;
+    unchanged: number;
+    errors: string[];
+}
+
+// One friendly-title backfill run. `alreadyPresent` is separate from `generated` because each
+// generation is a paid AI call, unlike the free treatment-goal backfill - a run that generated
+// nothing because a prior run already covered the corpus is a very different outcome from a run
+// that had nothing to read.
+export interface FriendlyTitleBackfillResult {
+    trialsRead: number;
+    generated: number;
+    alreadyPresent: number;
+    errors: string[];
+}
+
+// A model's reading of one trial's criteria against the patient record.
+//
+// There is deliberately no eligibility field and no score. `rulesPatientOut` is the only
+// assertion the model may make and it must carry a quoted criterion; its absence means nothing
+// ruled her out, NOT that she qualifies.
+export interface AiTrialCheck {
+    rulesPatientOut?: boolean | null;
+    exclusionCriterion?: string | null;
+    summary?: string | null;
+    criteriaSheAppearsToMeet?: string[] | null;
+    openQuestions?: string[] | null;
+    concerns?: string[] | null;
+    model?: string | null;
+    // When this reading was made. Absent on a fresh one - it is being made now.
+    assessedAt?: string | null;
+}
+
+export interface AiStatus {
+    available: boolean;
+    model: string;
+}
+
+// ---- Diagnosis document intake (upload a document, get a prefilled draft) ----
+//
+// Nothing here is persisted server-side - the session lives in backend memory only, for the
+// life of the conversation. See DiagnosisIntakeSession on the backend.
+
+export interface DiagnosisIntakeStartRequest {
+    patientExtid: string;
+    documentText: string;
+}
+
+export interface DiagnosisIntakeAnswerRequest {
+    answerText: string;
+}
+
+// Same field groups as PatientDiagnosis/PatientVariant/PatientPriorTreatment, minus notes,
+// testLab, and receptorSubtype - see the backend's DiagnosisIntakeExtraction for why those are
+// never drafted by this feature.
+export interface DiagnosisIntakeDraftDiagnosis {
+    cancerType?: string;
+    stage?: string;
+    stageSystem?: string;
+    isMetastatic?: boolean;
+    metastasisSites?: string;
+    erStatus?: string;
+    prStatus?: string;
+    her2Status?: string;
+    biomarkers?: string;
+    ecogStatus?: number;
+    priorChemoRegimens?: number;
+    lastChemoEndDate?: string;
+    priorTreatments?: string;
+    hasMeasurableDisease?: boolean;
+    menopausalStatus?: string;
+    diagnosisDate?: string;
+}
+
+export interface DiagnosisIntakeDraftVariant {
+    pik3caStatus?: string;
+    esr1Status?: string;
+    tp53Status?: string;
+    akt1Status?: string;
+    ptenStatus?: string;
+    erbb2SomaticStatus?: string;
+    brca1Status?: string;
+    brca2Status?: string;
+    palb2Status?: string;
+    atmStatus?: string;
+    chek2Status?: string;
+    hrdStatus?: string;
+    pdl1Status?: string;
+    ki67Percent?: number;
+    germlineTestDone?: string;
+    somaticTestDone?: string;
+    testDate?: string;
+    otherVariants?: string;
+}
+
+export interface DiagnosisIntakeDraftPriorTreatment {
+    cdk46Status?: string;
+    endocrineStatus?: string;
+    serdStatus?: string;
+    chemoStatus?: string;
+    her2TherapyStatus?: string;
+    her2AdcStatus?: string;
+    trop2AdcStatus?: string;
+    parpStatus?: string;
+    pi3kAktMtorStatus?: string;
+    immunotherapyStatus?: string;
+    taxaneStatus?: string;
+    anthracyclineStatus?: string;
+    platinumStatus?: string;
+    currentDrugNames?: string;
+    priorDrugNames?: string;
+    linesOfTherapyMetastatic?: number;
+    hadNeoadjuvant?: boolean;
+    hadAdjuvant?: boolean;
+    hadRadiation?: boolean;
+    hadSurgery?: boolean;
+    lastTreatmentEndDate?: string;
+    currentlyOnTreatment?: boolean;
+    otherTreatments?: string;
+}
+
+export const DIAGNOSIS_INTAKE_STATUS_VALUES = [
+    'ACTIVE',
+    'AWAITING_ANSWER',
+    'COMPLETE',
+    'ABANDONED',
+    'EXPIRED',
+] as const;
+export type DiagnosisIntakeStatus = (typeof DIAGNOSIS_INTAKE_STATUS_VALUES)[number];
+
+export interface DiagnosisIntakeSession {
+    sessionId: string;
+    status: DiagnosisIntakeStatus;
+    draftDiagnosis: DiagnosisIntakeDraftDiagnosis;
+    draftVariant: DiagnosisIntakeDraftVariant;
+    draftPriorTreatment: DiagnosisIntakeDraftPriorTreatment;
+    missingRequiredFields: string[];
+    nextQuestion?: string | null;
+    turnCount: number;
 }

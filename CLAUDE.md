@@ -26,12 +26,12 @@ Database:
 
 ## Architecture
 
-Gradle multi-module project (root project name: `cancer`). `settings.gradle` includes four modules alongside the root: `:common`, `:database`, `:datafetcher`, `:rag`. A fifth module, `:ai-provider`, exists on disk with source in it but is commented out of `settings.gradle` ("shelved until AI keys/config are ready") — it does not build as part of the project. A top-level `playwright/` directory holds scraping work and is not a Gradle module.
+Gradle multi-module project (root project name: `cancer`). `settings.gradle` includes four modules alongside the root: `:common`, `:database`, `:datafetcher`, `:rag`. A fifth module, `:ai-provider`, exists on disk with source in it but is commented out of `settings.gradle` ("shelved until AI keys/config are ready") — it does not build as part of the project, and **it is not what the app's AI feature uses**. That module carries eleven `ChatClient` beans across four providers, no tests, and prompt templates for energy-certificate workflows from the project it was lifted from. The live AI path is `service/ai/` in the root module: Spring AI's Anthropic starter, one `ChatClient`, one env var (`ANTHROPIC_API_KEY`). A top-level `playwright/` directory holds scraping work and is not a Gradle module.
 
 Base Java package: `com.seibel.cancer` (main and test source sets). Main class is `CancerApplication`.
 
 - **Root module** (`src/main/java/com/seibel/cancer/`) — the Spring Boot app itself: `web/` (controllers, request/response DTOs, `GlobalExceptionHandler`), `service/` (business logic, extends `BaseService`, plus `service/matching/` for trial-matching logic), `security/` (`JwtUtil`, `JwtAuthenticationFilter`, `CustomUserDetailsService`), `config/` (`SecurityConfig`, `WebConfig`).
-- **`:common`** — shared, framework-light code with no Spring dependency: domain objects (extending `BaseDomain` / `BaseUniqueDomain`), enums, custom exceptions, `CodeGenerator` util.
+- **`:common`** — shared, framework-light code with no Spring dependency: domain objects (extending `BaseDomain` / `BaseUniqueDomain`), enums, custom exceptions, `CodeGenerator` util, and `TrialTextClassifier` — clinical classification logic that lives here rather than in root because `:datafetcher` stamps its values at normalization and cannot see root.
 - **`:database`** — JPA layer: entities (`db/entity`, all extend `BaseDb`), repositories (`db/repository`, Spring Data `JpaRepository`), mappers (`db/mapper`, entity ↔ domain conversion), db services (`db/service`, extend `BaseDbService`), plus Liquibase changelogs under `database/src/main/resources/db/changelog/`. Depends on `:common` (`api project(':common')`); it declares the Spring Boot plugin but does not apply it, since it's a library, not the bootable app.
 - **`:datafetcher`** — external ingestion: a ClinicalTrials.gov client/parser/ingest job, and the UCHealth Epic FHIR side (OAuth client with PKCE, FHIR client, ingest job) plus normalization services that turn raw staged payloads into domain rows.
 - **`:rag`** — vector-retrieval layer over trial text: chunking (trial and eligibility-criteria chunkers), indexing, retrieval, a backfill service, and a startup check against the vector store.
@@ -44,15 +44,17 @@ The app is a clinical-trial finder/matcher. The domain splits into three broad g
 
 - **Trial side** — `Trial` and its satellites: `ArmGroup`, `Condition`, `EligibilityRule`, `Intervention`, `Keyword`, `Location`, `Outcome`, `OverallOfficial`, `Sponsor`, `TrialSource`, `TrialStatus`.
 - **Patient side** — `Patient`, `PatientDiagnosis`, `PatientVariant`, `PatientMedication`, `PatientPriorTreatment`, `LabResult`, `LabResultComponent`, `Medication`, and `UserPatient` (which links a `User` to the patient records they own).
-- **Matching + ingestion** — `SavedTrialMatch` and `SavedTrialMatchCriterion` for persisted results; `matching/` domain types (`TrialAssessment`, `EligibilitySignal`, `SignalOutcome`) for evaluation output; `StagingRawTrial` and `StagingRawFhirResource` as landing tables for raw ingested payloads; `UcHealthOAuthToken` for Epic auth.
+- **Matching + ingestion** — `SavedTrialMatch` and `SavedTrialMatchCriterion` for persisted results; `AiTrialAssessment` for stored AI readings of a trial against a record (changeset `033`) — ⚠️ **clinical prose about a real patient, not a cache**; `matching/` domain types (`TrialAssessment`, `EligibilitySignal`, `SignalOutcome`) for evaluation output; `StagingRawTrial` and `StagingRawFhirResource` as landing tables for raw ingested payloads; `UcHealthOAuthToken` for Epic auth.
 
 ## Liquibase
 
-Changelog entrypoint is `database/src/main/resources/db/changelog/db.changelog-master.yaml`, which does `includeAll` on `db/changelog/changes/`. Individual changesets are numbered, currently running `001` through `030` plus `100-load-init-data.yaml`.
+Changelog entrypoint is `database/src/main/resources/db/changelog/db.changelog-master.yaml`, which does `includeAll` on `db/changelog/changes/`. Individual changesets are numbered, currently running `001` through `033` plus `100-load-init-data.yaml`.
 
 Known issue: two number collisions exist — `011-trial-source.yaml` / `011-trial-status.yaml`, and `014-eligibility-rule.yaml` / `014-outcome.yaml`. `includeAll` resolves them by alphabetical filename so they do load deterministically, but the duplicate prefixes are unintentional and should be renumbered when convenient. Don't renumber them as a side effect of unrelated work.
 
-`application.yml` enables Liquibase with `drop-first: true` (non-production setting) and resolves the changelog off the combined classpath (contributed by `:database`), not from the root module's own `resources/`. This project is not in production, so schema changes can be made directly in the existing changelog files rather than adding new changesets.
+`application.yml` enables Liquibase with **`drop-first: false`**, so a stored UCHealth OAuth token survives a restart. The changelog resolves off the combined classpath (contributed by `:database`), not from the root module's own `resources/`.
+
+⚠️ **Editing an already-applied changeset breaks its checksum and fails startup.** Because `drop-first` is false, an edit does not simply re-run — Liquibase refuses to start with `Validation Failed: 1 changesets check sum`, and the only fixes are a full database rebuild (the n8n `clear-db` webhook, which destroys the corpus and orphans the vector store) or clearing checksums. **Add a new numbered changeset instead.** `031` and `032` were added this way with no rebuild.
 
 ## Configuration
 
@@ -63,7 +65,7 @@ Datasource config in `application.yml` reads `RDS_HOSTNAME` / `RDS_PORT` / `RDS_
 `frontend/` is a separate Vite + React 19 + TypeScript + Tailwind app with routing, auth, and an API client in place. It is built independently (`npm run dev`) and, for deployment, copied into `src/main/resources/static` by the root `build.gradle`'s frontend tasks.
 
 - **Pages** — `Login`, `Dashboard`, `PatientRecord`, `Diagnosis`, `Variants`, `PriorTreatment`, `TrialSearch`, `TrialDetail`, `RankedTrials`, `SavedTrials`, `Ingestion`.
-- **Shared** — `components/` (`Layout`, `ProtectedRoute`, `FormControls`, `JobResultModal`), `services/api.ts` (the API client), `types/api.ts`, and `lib/` helpers including `PatientContext` (current-patient state), `accessLevel`, `receptorSubtype`, and `tier1Matching`.
+- **Shared** — `components/` (`Layout`, `ProtectedRoute`, `FormControls`, `JobResultModal`, `SignalRow`), `services/api.ts` (the API client), `types/api.ts`, and `lib/` helpers including `PatientContext` (current-patient state), `accessLevel`, `receptorSubtype`, and `tier1Matching`.
 
 ## Naming leftovers
 
