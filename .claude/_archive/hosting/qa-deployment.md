@@ -16,6 +16,22 @@ Assumes `cancer` is a working `~/.ssh/config` host alias (confirmed working this
 
 ---
 
+**Cheat sheet** — the routine deploy, in order. Each step is explained in full further down;
+this is for someone who has already read this file once.
+
+1. Bump `version` in `build.gradle` if this is a release, not a rebuild.
+2. `./gradlew clean buildDeployment`
+3. `ssh cancer` in one terminal, `tail -f <app log path>` (TODO: confirm the real path)
+4. `ssh cancer sudo systemctl stop cancer` (TODO: confirm the real unit name)
+5. `scp -O build/libs/<jar-name>.jar cancer:<confirmed-deploy-path>` (TODO: confirm path/name)
+6. Archive the uploaded jar to a `releases/` dir on the box, for rollback
+7. `ssh cancer sudo systemctl start cancer`
+8. If Liquibase refuses to start on a checksum error: see "Checksum failures" below — do not
+   guess a fix from an old doc, the schema name is `cancer`, not `jobhunting`
+9. Verify: load the site, log in, open a page that reads from the database
+
+---
+
 ## Confirmed this session (2026-09-02)
 
 - **SSH alias**: `cancer` — `ssh cancer` connects.
