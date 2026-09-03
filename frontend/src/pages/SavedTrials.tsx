@@ -38,21 +38,17 @@ export default function SavedTrials() {
 
     return (
         <div>
+            <h1 className="font-heading text-3xl font-bold text-stone-900 mb-2">Saved Trials</h1>
+            <p className="text-base text-stone-600 leading-normal mb-4">Trials you're tracking, by personal status.</p>
+
             {/* Free stock photography with no person in frame (a ribbon), so it needs no
-                identifiable-person check - see UI_DESIGN.md §2. A genuine half-page split
-                (flex-1 on both sides) rather than a small image beside a wide text column -
-                the image is meant to take real, equal space here, not sit as a corner accent. */}
-            <div className="mb-6 flex flex-col items-center gap-6 sm:flex-row sm:items-center">
-                <div className="flex-1">
-                    <h1 className="font-heading text-3xl font-bold text-stone-900 mb-2">Saved Trials</h1>
-                    <p className="text-base text-stone-600 leading-normal">Trials you're tracking, by personal status.</p>
-                </div>
-                <img
-                    src={breastCancerRibbonImage}
-                    alt=""
-                    className="hidden sm:block flex-1 h-32 rounded-lg object-cover shadow-md"
-                />
-            </div>
+                identifiable-person check - see UI_DESIGN.md §2. Full-width banner below the
+                heading, same placement as the Diagnosis page banner. */}
+            <img
+                src={breastCancerRibbonImage}
+                alt=""
+                className="mb-6 w-full max-w-4xl h-32 sm:h-40 rounded-lg object-cover shadow-md"
+            />
 
             {!patient ? (
                 <p className="text-base text-stone-500 leading-normal">

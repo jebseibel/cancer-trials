@@ -38,11 +38,15 @@ export default function TrialSearch() {
                 rather than beside the title: this crop is a single wide row (~6.9:1), and a
                 beside-title box could never get wide enough to keep the words readable without
                 shrinking the title column away. Same banner treatment as Trials for You and
-                Saved Trials. */}
+                Saved Trials.
+                Sized by width with auto height (not a fixed h-20/h-28 + object-cover): a fixed
+                height on a ~6.9:1 strip forces the browser to scale it wider than a phone
+                viewport, and object-cover then crops the overflow off both edges - that clipped
+                the leading "B" and trailing "R" of BREAST CANCER on mobile. */}
             <img
                 src={breastCancerScrabbleImage}
                 alt=""
-                className="mb-4 w-full max-w-4xl h-20 sm:h-28 rounded-lg object-cover shadow-md"
+                className="mb-4 w-3/4 sm:w-full max-w-4xl rounded-lg shadow-md"
             />
 
             <div className="mb-6 inline-flex rounded-md border border-stone-300 bg-brand-beige-card p-1">
