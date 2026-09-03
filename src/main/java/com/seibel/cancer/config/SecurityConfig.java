@@ -78,10 +78,13 @@ public class SecurityConfig {
                         .permitAll()
 
                         // Login must be public: the browser cannot present a token before it
-                        // has one. Registration must NOT be - it was anonymous, and a stranger
-                        // could mint an account and read everything. Belt and braces with the
-                        // @PreAuthorize on the method itself.
-                        .requestMatchers("/api/auth/register").hasRole("ADMIN")
+                        // has one. Registration is reachable here too, but it is NOT open to
+                        // anyone - AuthController.register() checks the caller's username
+                        // against security.registration.allowed-usernames before creating
+                        // anything, and refuses (fails closed) when that list is unset. The gate
+                        // moved from a role check at this layer to an allowlist check inside the
+                        // method because self-registration means the caller has no JWT yet, so
+                        // there is no role to check here.
                         .requestMatchers("/api/auth/**").permitAll()
 
                         // Epic's OAuth redirect lands here from the patient's browser and

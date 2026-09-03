@@ -4,6 +4,7 @@ import com.seibel.cancer.common.enums.ActiveEnum;
 import com.seibel.cancer.database.db.entity.UserDb;
 import com.seibel.cancer.database.db.repository.UserRepository;
 import com.seibel.cancer.security.JwtUtil;
+import com.seibel.cancer.security.RegistrationPolicyService;
 import com.seibel.cancer.web.request.RequestChangePassword;
 import com.seibel.cancer.web.request.RequestLogin;
 import com.seibel.cancer.web.request.RequestRegister;
@@ -15,7 +16,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -43,6 +43,7 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RegistrationPolicyService registrationPolicyService;
 
     @PostMapping("/login")
     @Operation(summary = "Login with username and password")
@@ -72,7 +73,7 @@ public class AuthController {
     }
 
     /**
-     * Creates a user. <b>Requires an existing ADMIN.</b>
+     * Creates a user. <b>Only for usernames on {@code security.registration.allowed-usernames}.</b>
      *
      * <p>This was anonymous, and that was the most serious hole in the application: a stranger
      * could POST here, receive a valid JWT, and read everything — because no endpoint checks
@@ -80,13 +81,29 @@ public class AuthController {
      * Authentication was restored on 2026-08-11 and bought nothing while anyone could mint
      * themselves an account. Verified by creating one against the running app.
      *
-     * <p>This is a single-patient tool. Open registration is a liability with no upside, so the
-     * endpoint is kept for creating accounts deliberately rather than deleted outright.
+     * <p>This is a single-patient tool. Open registration is a liability with no upside, so this
+     * was ADMIN-only for a while — every account had to be created by someone already holding an
+     * admin session, on the new user's behalf. That does not scale to "a small, named group of
+     * people may create their own account", so the gate is now a per-username allowlist instead,
+     * decided by {@link RegistrationPolicyService}: anyone can reach this endpoint, but only a
+     * username on that service's list gets an account. See its Javadoc for why an unset list
+     * means nobody rather than everybody - the opposite of the login allowlist's default.
+     *
+     * <p>A rejected attempt returns the same generic failure as any other, deliberately. Telling
+     * a caller "you are not on the allowlist" confirms the allowlist exists and invites probing
+     * it; this mirrors {@code CustomUserDetailsService}'s stated rule that a blocked account must
+     * be indistinguishable from one that does not exist.
      */
     @PostMapping("/register")
-    @Operation(summary = "Register a new user (ADMIN only)")
-    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Register a new user (allowlisted usernames only)")
     public ResponseEntity<?> register(@Valid @RequestBody RequestRegister request) {
+        if (!registrationPolicyService.isRegistrationAllowed(request.getUsername())) {
+            // Same status and a message just as generic as a bad login - never "not allowed" or
+            // "not on the list". A 401 here also means a flood of these participates in
+            // LoginRateLimitFilter's counter, same as a wrong password does.
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Registration failed");
+        }
+
         if (userRepository.existsByUsername(request.getUsername())) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Username already exists");
         }

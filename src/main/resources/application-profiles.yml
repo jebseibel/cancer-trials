@@ -1,0 +1,64 @@
+# Per-profile overrides for the two registration/login allowlists, in one multi-document file
+# rather than three near-identical application-{profile}.yml files - qa and prod are structurally
+# identical (both just require the two env vars below to be set), so one file with `---` sections
+# is easier to scan than three files whose differences are two words apart.
+#
+# Not auto-discovered by Spring Boot's application-{profile}.yml naming convention - pulled in
+# explicitly via spring.config.import in application.yml. Activate a section with
+# SPRING_PROFILES_ACTIVE=dev|qa|prod (see DEPLOY_RUNBOOK.md's .env block for prod).
+#
+# security.registration.allowed-usernames has the OPPOSITE default from
+# security.login.allowed-usernames - see application.yml's own comments on both keys.
+# A blank/unset login list means unrestricted; a blank/unset registration list means nobody.
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+# Wide open on purpose: the point of a dev profile is removing friction while working locally,
+# not modelling prod's restrictions. Login was already unrestricted when blank; registration
+# needs the explicit "*" below since its own default is fail-closed. See
+# RegistrationPolicyService's ALLOW_ANY constant.
+security:
+  login:
+    allowed-usernames:
+  registration:
+    allowed-usernames: "*"
+
+---
+spring:
+  config:
+    activate:
+      on-profile: qa
+
+# No QA deployment exists yet - this section is ready for when one does, so activating the
+# profile is enough without a code change at that point.
+#
+# Does not hardcode a value, unlike dev. A tester roster changes without a redeploy, so both
+# allowlists keep resolving from the environment exactly as they do today outside of profiles -
+# this section's role is only to make explicit that QA requires both to be set, rather than
+# silently landing on application.yml's own defaults (unrestricted login, closed registration)
+# if nobody configured them.
+security:
+  login:
+    allowed-usernames: ${LOGIN_ALLOWED_USERNAMES:}
+  registration:
+    allowed-usernames: ${REGISTRATION_ALLOWED_USERNAMES:}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+# Same shape as qa above: the actual names still come from /opt/cancer/.env, unchanged from
+# before profiles existed. What this section adds is that prod is now an explicit, named policy
+# asserting "this environment has a real allowlist" - not an implicit default that only happens
+# to be locked down if .env is configured correctly.
+security:
+  login:
+    allowed-usernames: ${LOGIN_ALLOWED_USERNAMES:}
+  registration:
+    allowed-usernames: ${REGISTRATION_ALLOWED_USERNAMES:}
