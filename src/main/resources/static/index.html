@@ -7,9 +7,20 @@
     <!-- Belt and braces with public/robots.txt. A crawler that ignores robots.txt may still
          honour this, and it costs nothing. This tool is for one family, not the public. -->
     <meta name="robots" content="noindex, nofollow" />
+    <!-- Lora (headings, incl. italic) + Inter (body). Chosen specifically for a reader who may
+         be dealing with vision changes from cancer treatment or age, not only for warmth/tone -
+         see .claude/frontend/UI_DESIGN.md §5. Weights below enforce a 400 floor on body text;
+         no light/thin weights are loaded at all, so a light weight cannot be used by mistake.
+         preconnect first so the actual font request does not pay the DNS/TLS cost twice. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <title>Breast Cancer Trial Finder</title>
-    <script type="module" crossorigin src="/assets/index-DdZ5LStF.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-QZfbFRA7.css">
+    <script type="module" crossorigin src="/assets/index-E_UAnOUc.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DPOl_P-2.css">
   </head>
   <body>
     <div id="root"></div>
