@@ -72,13 +72,36 @@ public class PhiHeuristicScanner {
             "(?i)\\b(patient name|name|pt\\.?|mr\\.?|mrs\\.?|ms\\.?|dr\\.?)\\b\\s*[:#]\\s*"
                     + "\\p{Lu}[\\p{Ll}'-]+(\\s+\\p{Lu}[\\p{Ll}'-]+){0,2}");
     private static final Pattern LABELED_NAME_PAIR = Pattern.compile(
-            "[A-Za-z ]+:\\s*\\p{Lu}[\\p{Ll}'-]+\\s+\\p{Lu}[\\p{Ll}'-]+");
+            "([A-Za-z ]+):\\s*\\p{Lu}[\\p{Ll}'-]+\\s+\\p{Lu}[\\p{Ll}'-]+");
+    /** Words that make a label's <em>value</em> almost always an institution, not a person -
+     * "Testing lab: Ambry Genetics", "Referring lab: Quest Diagnostics", "Germline test: Ambry
+     * Genetics". Found live: this app's own patient-record export writes exactly this shape for
+     * a genetic-testing lab name, and it read as identically-shaped to "Referring provider: Jane
+     * Doe" - two capitalized words after a label, which {@link #LABELED_NAME_PAIR} cannot tell
+     * apart from a real name by pattern alone.
+     *
+     * <p>Deliberately narrow rather than a general institution-name list (hospitals, testing
+     * companies by name, "Performed by:") - that list has no natural end, and this project's own
+     * documents are specifically genetic/lab test results, so "lab"/"test"/"panel" covers the
+     * real, recurring case without pretending to solve institution-name detection in general.
+     * Other institution names are an accepted over-flag risk, same as before this fix - a false
+     * positive costs a rewrite, which is the scanner's stated trade-off throughout. */
+    private static final List<String> LAB_LABEL_WORDS =
+            List.of("lab", "laboratory", "test", "testing", "panel");
     /** Catches "Patient Jane Doe ..." in prose, with no colon and no "Name" label - only
      * "Patient Name:" trips {@link #NAME_HEADER_LABEL}. Requires the word directly followed by
      * two capitalized tokens so it can't fire on "Patient presented with ..." (lower-case) or a
-     * single capitalized word (a lone surname, or a sentence-initial capital by itself). */
+     * single capitalized word (a lone surname, or a sentence-initial capital by itself).
+     *
+     * <p>The gap between tokens is {@code [ \t]+}, not {@code \s+}, so a match cannot cross a
+     * line break. Found live: this app's own "Download my record" export starts with the two
+     * lines "...Patient Record" / "Generated &lt;date&gt;", and {@code \s+} let "Patient" pick up
+     * "Record" and "Generated" from the next line as if they were a same-sentence name - flagging
+     * this app's own generated header as if it contained a real one. A genuine unlabeled name
+     * always appears within one sentence, never spanning a line break, so this loses no real
+     * detection. */
     private static final Pattern UNLABELED_PATIENT_NAME = Pattern.compile(
-            "\\b(Patient|Pt\\.?)\\s+\\p{Lu}[\\p{Ll}'-]+\\s+\\p{Lu}[\\p{Ll}'-]+\\b");
+            "\\b(Patient|Pt\\.?)[ \\t]+\\p{Lu}[\\p{Ll}'-]+[ \\t]+\\p{Lu}[\\p{Ll}'-]+\\b");
     /** Catches a title used conversationally with no colon/"#" after it, e.g. "Ms Jane Doe was
      * evaluated..." - {@link #NAME_HEADER_LABEL} requires punctuation right after the title, and
      * {@link #UNLABELED_PATIENT_NAME} only recognizes "Patient"/"Pt". Deliberately excludes
@@ -182,8 +205,22 @@ public class PhiHeuristicScanner {
             return true;
         }
         int window = Math.max(Math.min(text.length(), MIN_NAME_PAIR_WINDOW), text.length() / 3);
-        Matcher pair = LABELED_NAME_PAIR.matcher(text.substring(0, window));
-        return pair.find();
+        return matchesLabeledNamePair(text.substring(0, window));
+    }
+
+    /** {@link #LABELED_NAME_PAIR}, skipping a match whose own label names a lab/test rather than
+     * a person - see that constant's Javadoc and {@link #LAB_LABEL_WORDS}. A label containing a
+     * lab word never counts, even if a different labeled pair later in the same text would. */
+    private boolean matchesLabeledNamePair(String text) {
+        Matcher pair = LABELED_NAME_PAIR.matcher(text);
+        while (pair.find()) {
+            String label = pair.group(1).toLowerCase();
+            boolean isLabLabel = LAB_LABEL_WORDS.stream().anyMatch(label::contains);
+            if (!isLabLabel) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Two or more demographic labels co-occurring within a short window is close to

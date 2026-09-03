@@ -329,4 +329,67 @@ class PhiHeuristicScannerTest {
         PhiScanResult result = scanner.scan("Ms. Doe called to reschedule.");
         assertThat(result.flagged()).isTrue();
     }
+
+    // ---------------------------------------------------------------------------------------
+    // Two false positives found live against this app's own "Download my record" export:
+    // its title header crossing a line break, and a genetic-testing lab name reading as a
+    // labeled person's name.
+    // ---------------------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("this app's own record-export header does not flag as an unlabeled patient name")
+    void ownExportHeaderDoesNotFlagAsPatientName() {
+        // "...Patient Record" followed by "Generated <date>" on the next line used to read as
+        // "Patient" + two capitalized tokens spanning the line break - patientRecordExport.ts's
+        // own generated header, not any real content.
+        PhiScanResult result = scanner.scan(
+                "Breast Cancer Trial Finder — Patient Record\nGenerated September 3, 2026");
+        assertThat(result.flagged()).isFalse();
+    }
+
+    @Test
+    @DisplayName("a same-sentence unlabeled patient name across a line break still flags")
+    void unlabeledPatientNameStillFlagsAcrossWrappedText() {
+        // The line-break fix must not stop recognizing a real name should a document happen to
+        // wrap mid-sentence - it specifically targets "Patient" immediately followed by the next
+        // line's first words, not any name that occurs near a newline.
+        PhiScanResult result = scanner.scan("Patient Jane Doe presents with a new diagnosis.");
+        assertThat(result.flagged()).isTrue();
+        assertThat(result.reasons()).contains("NAME_NEAR_HEADER");
+    }
+
+    @Test
+    @DisplayName("a testing-lab name does not flag as a labeled person name")
+    void testingLabNameDoesNotFlagAsPersonName() {
+        PhiScanResult result = scanner.scan("Testing lab: Ambry Genetics (85-gene panel)");
+        assertThat(result.flagged()).isFalse();
+    }
+
+    @Test
+    @DisplayName("other lab-labeled shapes also do not flag")
+    void otherLabLabelShapesDoNotFlag() {
+        assertThat(scanner.scan("Referring lab: Quest Diagnostics").flagged()).isFalse();
+        assertThat(scanner.scan("Germline test: Ambry Genetics").flagged()).isFalse();
+    }
+
+    @Test
+    @DisplayName("a labeled name pair still flags when the label is not about a lab or test")
+    void labeledNamePairStillFlagsForNonLabLabels() {
+        // The lab-word exclusion must not become a general escape hatch - a real name after an
+        // unrelated label is still exactly the case LABELED_NAME_PAIR exists to catch.
+        assertThat(scanner.scan("Referring provider: Jane Doe").flagged()).isTrue();
+        assertThat(scanner.scan("Patient Name: Jane Doe").flagged()).isTrue();
+        assertThat(scanner.scan("Physician: John Smith").flagged()).isTrue();
+    }
+
+    @Test
+    @DisplayName("a lab-labeled pair earlier in the text does not hide a real name later on")
+    void labLabelDoesNotMaskALaterRealName() {
+        // matchesLabeledNamePair skips a lab-labeled match and keeps looking - it must not
+        // short-circuit to "not flagged" on the first (lab) match it sees.
+        PhiScanResult result = scanner.scan(
+                "Testing lab: Ambry Genetics\nReferring provider: Jane Doe");
+        assertThat(result.flagged()).isTrue();
+        assertThat(result.reasons()).contains("NAME_NEAR_HEADER");
+    }
 }
