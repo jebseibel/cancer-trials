@@ -5,7 +5,6 @@ import { patientApi, patientDiagnosisApi } from '../services/api';
 import { BooleanSelect, Field, Section, Select, inputClass } from '../components/FormControls';
 import { useCurrentPatient } from '../lib/PatientContext';
 import { ageFromDateOfBirth, deriveReceptorSubtype } from '../lib/receptorSubtype';
-import { takePendingDiagnosisDraft } from '../lib/diagnosisIntakeDraft';
 import {
     ECOG_VALUES,
     MENOPAUSAL_STATUS_VALUES,
@@ -107,12 +106,15 @@ export default function Diagnosis() {
     const [form, setForm] = useState<FormState>(EMPTY_FORM);
     const [saved, setSaved] = useState(false);
 
+    // The queryFn returns the raw array so this cache entry stays shape-compatible with the
+    // same-keyed query PatientRecord.tsx runs for the summary line and the record download -
+    // `select` derives this page's single-row view rather than the queryFn itself returning a
+    // different shape, which previously let whichever query ran last silently overwrite the
+    // other's cached shape (an object here, an array there) with no error, just a wrong read.
     const { data: existing, isLoading } = useQuery({
         queryKey: ['patientDiagnosis', patient?.extid],
-        queryFn: async () => {
-            const rows = (await patientDiagnosisApi.getByPatientExtid(patient!.extid)).data;
-            return rows[0] ?? null;
-        },
+        queryFn: async () => (await patientDiagnosisApi.getByPatientExtid(patient!.extid)).data,
+        select: (rows) => rows[0] ?? null,
         enabled: !!patient?.extid,
     });
 
@@ -123,35 +125,6 @@ export default function Diagnosis() {
         if (existing) setForm(toForm(existing));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [existing?.extid]);
-
-    // Picks up a completed document-intake draft, but only into a blank/new record - it must
-    // never silently overwrite an already-saved diagnosis.
-    useEffect(() => {
-        if (existing) return;
-        const draft = takePendingDiagnosisDraft();
-        if (!draft) return;
-        setForm((f) => ({
-            ...f,
-            cancerType: draft.cancerType ?? f.cancerType,
-            stage: draft.stage ?? f.stage,
-            stageSystem: draft.stageSystem ?? f.stageSystem,
-            isMetastatic: draft.isMetastatic !== undefined ? String(draft.isMetastatic) : f.isMetastatic,
-            metastasisSites: draft.metastasisSites ?? f.metastasisSites,
-            erStatus: draft.erStatus ?? f.erStatus,
-            prStatus: draft.prStatus ?? f.prStatus,
-            her2Status: draft.her2Status ?? f.her2Status,
-            biomarkers: draft.biomarkers ?? f.biomarkers,
-            ecogStatus: draft.ecogStatus !== undefined ? String(draft.ecogStatus) : f.ecogStatus,
-            priorChemoRegimens:
-                draft.priorChemoRegimens !== undefined ? String(draft.priorChemoRegimens) : f.priorChemoRegimens,
-            lastChemoEndDate: draft.lastChemoEndDate ?? f.lastChemoEndDate,
-            priorTreatments: draft.priorTreatments ?? f.priorTreatments,
-            hasMeasurableDisease:
-                draft.hasMeasurableDisease !== undefined ? String(draft.hasMeasurableDisease) : f.hasMeasurableDisease,
-            menopausalStatus: draft.menopausalStatus ?? f.menopausalStatus,
-            diagnosisDate: draft.diagnosisDate ?? f.diagnosisDate,
-        }));
-    }, [existing]);
 
     // Date of birth and sex describe the person, not the diagnosis, so they live on `patient`
     // and are loaded and saved separately - the two Save buttons on this page write to two

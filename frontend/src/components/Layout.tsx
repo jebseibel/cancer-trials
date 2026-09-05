@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
-import { Home, Search, Bookmark, LogOut, FlaskConical, Download, Stethoscope, ListChecks, Menu, X, Heart, Microscope, KeyRound } from 'lucide-react';
+import { Home, Search, Bookmark, LogOut, Download, Stethoscope, ListChecks, Menu, X, Heart, Microscope, KeyRound } from 'lucide-react';
 import { authHelpers } from '../services/api';
 import { useAudience } from '../lib/AudienceContext';
 import type { AudienceMode } from '../lib/AudienceContext';
+import titleImage from '../assets/images/title-image.png';
 
 // One list, rendered twice - as the desktop row and as the mobile panel. They cannot drift
 // apart, which is what went wrong before: the desktop nav was hidden below `sm` with nothing
@@ -46,25 +47,41 @@ export default function Layout() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16">
                         <div className="flex min-w-0">
-                            <Link to="/" className="flex items-center px-2 text-white min-w-0">
-                                <FlaskConical className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 text-white" />
-                                {/* Shrunk rather than truncated below `sm`. The full name is
-                                    reassuring on a page someone opens while anxious, so it keeps
-                                    all its words and gives up type size instead. */}
-                                <span className="font-heading ml-2 truncate text-base sm:text-xl font-bold">
-                                    Breast Cancer Trial Finder
-                                </span>
+                            <Link to="/" className="flex items-center px-2 min-w-0">
+                                {/* The wordmark image carries the app name itself, so there is no
+                                    text label alongside it - see the alt text below for what a
+                                    screen reader announces instead. Fixed height with width auto
+                                    (not a fixed box with object-cover) so the image's own aspect
+                                    ratio is kept in full rather than cropped to fit a square. */}
+                                <img
+                                    src={titleImage}
+                                    alt="Breast Cancer Trial Finder"
+                                    className="h-12 w-auto sm:h-14 shrink-0 object-contain"
+                                />
                             </Link>
                             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
                                 {visibleNavItems.map(({ to, label, icon: Icon }) => (
-                                    <Link
+                                    // `end` on "/" only - without it, the Dashboard link would
+                                    // match every route as a prefix and stay highlighted
+                                    // everywhere. The active state reuses the exact classes
+                                    // :hover already applied, so "current page" reads as the
+                                    // same visual state as "about to click this", not a second
+                                    // highlight style to keep in sync with the first.
+                                    <NavLink
                                         key={to}
                                         to={to}
-                                        className="inline-flex items-center px-1 pt-1 text-sm font-normal text-green-50 border-b-2 border-transparent hover:border-white hover:text-white transition-colors"
+                                        end={to === '/'}
+                                        className={({ isActive }) =>
+                                            `inline-flex items-center px-1 pt-1 text-sm font-normal border-b-2 transition-colors ${
+                                                isActive
+                                                    ? 'border-white text-white'
+                                                    : 'border-transparent text-green-50 hover:border-white hover:text-white'
+                                            }`
+                                        }
                                     >
                                         <Icon className="h-4 w-4 mr-2" />
                                         {label}
-                                    </Link>
+                                    </NavLink>
                                 ))}
                             </div>
                         </div>
@@ -121,16 +138,27 @@ export default function Layout() {
                             <AudienceSwitch mode={mode} onChange={setMode} className="w-full" />
                         </div>
                         <div className="space-y-1 px-2 py-2">
+                            {/* Same "current page looks like hover" rule as the desktop row,
+                                in this panel's own idiom - a filled row rather than a bottom
+                                border, since these are full-width stacked rows, not inline
+                                items with room for an underline. */}
                             {visibleNavItems.map(({ to, label, icon: Icon }) => (
-                                <Link
+                                <NavLink
                                     key={to}
                                     to={to}
+                                    end={to === '/'}
                                     onClick={() => setMenuOpen(false)}
-                                    className="flex min-h-11 items-center rounded-md px-3 py-2 text-base font-normal text-green-50 hover:bg-brand-green-hover hover:text-white"
+                                    className={({ isActive }) =>
+                                        `flex min-h-11 items-center rounded-md px-3 py-2 text-base font-normal transition-colors ${
+                                            isActive
+                                                ? 'bg-brand-green-hover text-white'
+                                                : 'text-green-50 hover:bg-brand-green-hover hover:text-white'
+                                        }`
+                                    }
                                 >
                                     <Icon className="mr-3 h-5 w-5 shrink-0 text-green-100" />
                                     {label}
-                                </Link>
+                                </NavLink>
                             ))}
                             <Link
                                 to="/change-password"

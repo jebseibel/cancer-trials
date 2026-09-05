@@ -27,6 +27,20 @@ public class ResponseDiagnosisIntakeSession {
     private String nextQuestion;
     private int turnCount;
 
+    /** Only ever populated by {@code /start} - a clarifying answer never goes through the PHI
+     * line scan, so there is nothing to report on later turns. Empty, never null, when nothing
+     * was cut. Reasons are category labels only, same rule the scan itself follows - never the
+     * excluded text. */
+    @Builder.Default
+    private List<ExcludedLine> excludedLines = List.of();
+
+    @Data
+    @Builder
+    public static class ExcludedLine {
+        private int lineNumber;
+        private List<String> reasons;
+    }
+
     @Data
     @Builder
     public static class DraftDiagnosis {

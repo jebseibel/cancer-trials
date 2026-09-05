@@ -4,7 +4,6 @@ import { Save, Loader2 } from 'lucide-react';
 import { patientVariantApi } from '../services/api';
 import { Field, Section, Select, inputClass } from '../components/FormControls';
 import { useCurrentPatient } from '../lib/PatientContext';
-import { takePendingVariantDraft } from '../lib/diagnosisIntakeDraft';
 import { VARIANT_STATUS_LABELS, VARIANT_STATUS_VALUES } from '../types/api';
 import type { PatientVariant, PatientVariantRequest } from '../types/api';
 
@@ -96,12 +95,13 @@ export default function Variants() {
     const [form, setForm] = useState<FormState>(EMPTY_FORM);
     const [saved, setSaved] = useState(false);
 
+    // The queryFn returns the raw array so this cache entry stays shape-compatible with the
+    // same-keyed query PatientRecord.tsx runs for the record download - see Diagnosis.tsx's
+    // identical comment for why.
     const { data: existing, isLoading } = useQuery({
         queryKey: ['patientVariant', patient?.extid],
-        queryFn: async () => {
-            const rows = (await patientVariantApi.getByPatientExtid(patient!.extid)).data;
-            return rows[0] ?? null;
-        },
+        queryFn: async () => (await patientVariantApi.getByPatientExtid(patient!.extid)).data,
+        select: (rows) => rows[0] ?? null,
         enabled: !!patient?.extid,
     });
 
@@ -111,35 +111,6 @@ export default function Variants() {
         if (existing) setForm(toForm(existing));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [existing?.extid]);
-
-    // Picks up a completed document-intake draft, but only into a blank/new record - it must
-    // never silently overwrite already-saved variant results.
-    useEffect(() => {
-        if (existing) return;
-        const draft = takePendingVariantDraft();
-        if (!draft) return;
-        setForm((f) => ({
-            ...f,
-            pik3caStatus: draft.pik3caStatus ?? f.pik3caStatus,
-            esr1Status: draft.esr1Status ?? f.esr1Status,
-            tp53Status: draft.tp53Status ?? f.tp53Status,
-            akt1Status: draft.akt1Status ?? f.akt1Status,
-            ptenStatus: draft.ptenStatus ?? f.ptenStatus,
-            erbb2SomaticStatus: draft.erbb2SomaticStatus ?? f.erbb2SomaticStatus,
-            brca1Status: draft.brca1Status ?? f.brca1Status,
-            brca2Status: draft.brca2Status ?? f.brca2Status,
-            palb2Status: draft.palb2Status ?? f.palb2Status,
-            atmStatus: draft.atmStatus ?? f.atmStatus,
-            chek2Status: draft.chek2Status ?? f.chek2Status,
-            hrdStatus: draft.hrdStatus ?? f.hrdStatus,
-            pdl1Status: draft.pdl1Status ?? f.pdl1Status,
-            ki67Percent: draft.ki67Percent !== undefined ? String(draft.ki67Percent) : f.ki67Percent,
-            germlineTestDone: draft.germlineTestDone ?? f.germlineTestDone,
-            somaticTestDone: draft.somaticTestDone ?? f.somaticTestDone,
-            testDate: draft.testDate ?? f.testDate,
-            otherVariants: draft.otherVariants ?? f.otherVariants,
-        }));
-    }, [existing]);
 
     const saveMutation = useMutation({
         mutationFn: async () => {

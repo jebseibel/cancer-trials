@@ -21,9 +21,9 @@ this is for someone who has already read this file once.
 
 1. Bump `version` in `build.gradle` if this is a release, not a rebuild.
 2. `./gradlew clean buildDeployment`
-3. `ssh cancer` in one terminal, `tail -f <app log path>` (TODO: confirm the real path)
-4. `systemctl stop cancer` (TODO: confirm the real unit name)
-5. `scp -O build/libs/cancer-1.0.3-SNAPSHOT.jar cancer:/opt/cancer/cancer.jar`
+3. `tail -f /var/log/cancer/app.log`
+4. `systemctl stop cancer`
+5. `scp -O build/libs/cancer-1.0.4-SNAPSHOT.jar cancer:/opt/cancer/cancer.jar`
 6. Archive the uploaded jar to a `releases/` dir on the box, for rollback
 7. `systemctl start cancer`
 8. If Liquibase refuses to start on a checksum error: see "Checksum failures" below — do not

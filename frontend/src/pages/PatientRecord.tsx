@@ -153,7 +153,12 @@ export default function PatientRecord() {
 
     // Read here rather than inside a tab: the tabs mount only while selected, and the summary
     // draws on two of the three tables. Shared query keys with the tabs, so saving in a tab
-    // refreshes the line above it rather than leaving it stale.
+    // refreshes the line above it rather than leaving it stale. The three tab pages read the
+    // same cache entries through a `select` that narrows to the first row - the queryFn here
+    // and there must keep returning the identical raw-array shape, or whichever query runs last
+    // silently overwrites the cache with a shape the other side doesn't expect (this was a real
+    // bug: the Diagnosis section vanished from "Download my record" with no error, because
+    // Diagnosis.tsx's queryFn used to cache a single object under this same key).
     const { data: diagnoses, isLoading: diagnosesLoading } = useQuery({
         queryKey: ['patientDiagnosis', patient?.extid],
         queryFn: async () => (await patientDiagnosisApi.getByPatientExtid(patient!.extid)).data,

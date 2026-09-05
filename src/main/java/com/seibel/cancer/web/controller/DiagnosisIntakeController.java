@@ -3,11 +3,13 @@ package com.seibel.cancer.web.controller;
 import com.seibel.cancer.common.enums.AccessLevel;
 import com.seibel.cancer.common.exceptions.ResourceNotFoundException;
 import com.seibel.cancer.service.CurrentUserService;
+import com.seibel.cancer.service.ai.PhiLineScanResult;
 import com.seibel.cancer.service.ai.intake.DiagnosisIntakeClarification;
 import com.seibel.cancer.service.ai.intake.DiagnosisIntakeExtraction;
 import com.seibel.cancer.service.ai.intake.DiagnosisIntakeExtractionService;
 import com.seibel.cancer.service.ai.intake.DiagnosisIntakeSession;
 import com.seibel.cancer.service.ai.intake.DiagnosisIntakeSessionStore;
+import com.seibel.cancer.service.ai.intake.DiagnosisIntakeUpload;
 import com.seibel.cancer.web.request.RequestDiagnosisIntakeAnswer;
 import com.seibel.cancer.web.request.RequestDiagnosisIntakeStart;
 import com.seibel.cancer.web.response.ResponseDiagnosisIntakeSession;
@@ -53,13 +55,14 @@ public class DiagnosisIntakeController {
         currentUserService.requireAccessId(request.getPatientExtid(), AccessLevel.EDIT_RECORD);
         Long userId = currentUserService.requireCurrentUser().getId();
 
-        DiagnosisIntakeExtraction draft = extractionService.extract(request.getDocumentText());
-        List<String> missing = extractionService.missingRequired(draft);
+        DiagnosisIntakeUpload upload = extractionService.extract(request.getDocumentText());
+        List<String> missing = extractionService.missingRequired(upload.draft());
 
         DiagnosisIntakeSession session = sessionStore.create(
-                userId, request.getPatientExtid(), draft, missing);
+                userId, request.getPatientExtid(), upload.draft(), missing);
 
-        return ResponseEntity.ok(toResponse(session, firstQuestionFor(missing)));
+        return ResponseEntity.ok(
+                toResponse(session, firstQuestionFor(missing), upload.excludedLines()));
     }
 
     @PostMapping("/{sessionId}/answer")
@@ -131,7 +134,15 @@ public class DiagnosisIntakeController {
         };
     }
 
+    /** Used by {@code /answer} and {@code /skip} - neither turn goes through the PHI line scan,
+     * so there is never anything to report and the excluded-lines list stays at its empty
+     * default. */
     private ResponseDiagnosisIntakeSession toResponse(DiagnosisIntakeSession session, String nextQuestion) {
+        return toResponse(session, nextQuestion, List.of());
+    }
+
+    private ResponseDiagnosisIntakeSession toResponse(DiagnosisIntakeSession session,
+            String nextQuestion, List<PhiLineScanResult.ExcludedLine> excludedLines) {
         DiagnosisIntakeExtraction d = session.getDraft();
         return ResponseDiagnosisIntakeSession.builder()
                 .sessionId(session.getSessionId())
@@ -202,6 +213,12 @@ public class DiagnosisIntakeController {
                 .missingRequiredFields(session.getMissingRequiredFields())
                 .nextQuestion(nextQuestion)
                 .turnCount(session.getTurnCount())
+                .excludedLines(excludedLines.stream()
+                        .map(l -> ResponseDiagnosisIntakeSession.ExcludedLine.builder()
+                                .lineNumber(l.lineNumber())
+                                .reasons(l.reasons())
+                                .build())
+                        .toList())
                 .build();
     }
 }
