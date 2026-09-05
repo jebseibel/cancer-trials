@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { patientApi, authHelpers } from '../services/api';
 import type { AccessLevel, PatientAccess } from '../types/api';
 import { covers } from './accessLevel';
-import { clearPendingIntakeDraft } from './diagnosisIntakeDraft';
 
 /**
  * Which patient the app is currently showing, and what the signed-in user may do with it.
@@ -78,10 +77,6 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
             canEdit: covers(accessLevel, 'EDIT_RECORD'),
             isOwner: accessLevel === 'OWNER',
             selectPatient: (extid: string) => {
-                // A draft from a document-intake session belongs to whichever record was
-                // selected when it was built - it must not bleed into a different patient's
-                // forms after switching.
-                clearPendingIntakeDraft();
                 setSelectedExtid(extid);
                 localStorage.setItem(STORAGE_KEY, extid);
             },

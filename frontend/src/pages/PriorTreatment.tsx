@@ -4,7 +4,6 @@ import { Save, Loader2 } from 'lucide-react';
 import { patientPriorTreatmentApi } from '../services/api';
 import { BooleanSelect, Field, Section, Select, inputClass } from '../components/FormControls';
 import { useCurrentPatient } from '../lib/PatientContext';
-import { takePendingPriorTreatmentDraft } from '../lib/diagnosisIntakeDraft';
 import { TREATMENT_STATUS_LABELS, TREATMENT_STATUS_VALUES } from '../types/api';
 import type { PatientPriorTreatment, PatientPriorTreatmentRequest } from '../types/api';
 
@@ -113,12 +112,13 @@ export default function PriorTreatment() {
     const [form, setForm] = useState<FormState>(EMPTY_FORM);
     const [saved, setSaved] = useState(false);
 
+    // The queryFn returns the raw array so this cache entry stays shape-compatible with the
+    // same-keyed query PatientRecord.tsx runs for the record download - see Diagnosis.tsx's
+    // identical comment for why.
     const { data: existing, isLoading } = useQuery({
         queryKey: ['patientPriorTreatment', patient?.extid],
-        queryFn: async () => {
-            const rows = (await patientPriorTreatmentApi.getByPatientExtid(patient!.extid)).data;
-            return rows[0] ?? null;
-        },
+        queryFn: async () => (await patientPriorTreatmentApi.getByPatientExtid(patient!.extid)).data,
+        select: (rows) => rows[0] ?? null,
         enabled: !!patient?.extid,
     });
 
@@ -128,44 +128,6 @@ export default function PriorTreatment() {
         if (existing) setForm(toForm(existing));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [existing?.extid]);
-
-    // Picks up a completed document-intake draft, but only into a blank/new record - it must
-    // never silently overwrite already-saved treatment history.
-    useEffect(() => {
-        if (existing) return;
-        const draft = takePendingPriorTreatmentDraft();
-        if (!draft) return;
-        setForm((f) => ({
-            ...f,
-            cdk46Status: draft.cdk46Status ?? f.cdk46Status,
-            endocrineStatus: draft.endocrineStatus ?? f.endocrineStatus,
-            serdStatus: draft.serdStatus ?? f.serdStatus,
-            chemoStatus: draft.chemoStatus ?? f.chemoStatus,
-            her2TherapyStatus: draft.her2TherapyStatus ?? f.her2TherapyStatus,
-            her2AdcStatus: draft.her2AdcStatus ?? f.her2AdcStatus,
-            trop2AdcStatus: draft.trop2AdcStatus ?? f.trop2AdcStatus,
-            parpStatus: draft.parpStatus ?? f.parpStatus,
-            pi3kAktMtorStatus: draft.pi3kAktMtorStatus ?? f.pi3kAktMtorStatus,
-            immunotherapyStatus: draft.immunotherapyStatus ?? f.immunotherapyStatus,
-            taxaneStatus: draft.taxaneStatus ?? f.taxaneStatus,
-            anthracyclineStatus: draft.anthracyclineStatus ?? f.anthracyclineStatus,
-            platinumStatus: draft.platinumStatus ?? f.platinumStatus,
-            currentDrugNames: draft.currentDrugNames ?? f.currentDrugNames,
-            priorDrugNames: draft.priorDrugNames ?? f.priorDrugNames,
-            linesOfTherapyMetastatic:
-                draft.linesOfTherapyMetastatic !== undefined
-                    ? String(draft.linesOfTherapyMetastatic)
-                    : f.linesOfTherapyMetastatic,
-            hadNeoadjuvant: draft.hadNeoadjuvant !== undefined ? String(draft.hadNeoadjuvant) : f.hadNeoadjuvant,
-            hadAdjuvant: draft.hadAdjuvant !== undefined ? String(draft.hadAdjuvant) : f.hadAdjuvant,
-            hadRadiation: draft.hadRadiation !== undefined ? String(draft.hadRadiation) : f.hadRadiation,
-            hadSurgery: draft.hadSurgery !== undefined ? String(draft.hadSurgery) : f.hadSurgery,
-            lastTreatmentEndDate: draft.lastTreatmentEndDate ?? f.lastTreatmentEndDate,
-            currentlyOnTreatment:
-                draft.currentlyOnTreatment !== undefined ? String(draft.currentlyOnTreatment) : f.currentlyOnTreatment,
-            otherTreatments: draft.otherTreatments ?? f.otherTreatments,
-        }));
-    }, [existing]);
 
     const saveMutation = useMutation({
         mutationFn: async () => {

@@ -628,6 +628,13 @@ export const DIAGNOSIS_INTAKE_STATUS_VALUES = [
 ] as const;
 export type DiagnosisIntakeStatus = (typeof DIAGNOSIS_INTAKE_STATUS_VALUES)[number];
 
+// A line the PHI scanner cut before the document reached AI - reasons are category labels only,
+// same rule the backend scan follows throughout: the excluded text itself is never sent here.
+export interface DiagnosisIntakeExcludedLine {
+    lineNumber: number;
+    reasons: string[];
+}
+
 export interface DiagnosisIntakeSession {
     sessionId: string;
     status: DiagnosisIntakeStatus;
@@ -637,4 +644,7 @@ export interface DiagnosisIntakeSession {
     missingRequiredFields: string[];
     nextQuestion?: string | null;
     turnCount: number;
+    // Only ever populated on the response from /start - a clarifying answer never goes through
+    // the PHI line scan, so later turns report nothing here.
+    excludedLines: DiagnosisIntakeExcludedLine[];
 }

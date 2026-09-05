@@ -329,4 +329,269 @@ class PhiHeuristicScannerTest {
         PhiScanResult result = scanner.scan("Ms. Doe called to reschedule.");
         assertThat(result.flagged()).isTrue();
     }
+
+    // ---------------------------------------------------------------------------------------
+    // Two false positives found live against this app's own "Download my record" export:
+    // its title header crossing a line break, and a genetic-testing lab name reading as a
+    // labeled person's name.
+    // ---------------------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("this app's own record-export header does not flag as an unlabeled patient name")
+    void ownExportHeaderDoesNotFlagAsPatientName() {
+        // "...Patient Record" followed by "Generated <date>" on the next line used to read as
+        // "Patient" + two capitalized tokens spanning the line break - patientRecordExport.ts's
+        // own generated header, not any real content.
+        PhiScanResult result = scanner.scan(
+                "Breast Cancer Trial Finder — Patient Record\nGenerated September 3, 2026");
+        assertThat(result.flagged()).isFalse();
+    }
+
+    @Test
+    @DisplayName("a same-sentence unlabeled patient name across a line break still flags")
+    void unlabeledPatientNameStillFlagsAcrossWrappedText() {
+        // The line-break fix must not stop recognizing a real name should a document happen to
+        // wrap mid-sentence - it specifically targets "Patient" immediately followed by the next
+        // line's first words, not any name that occurs near a newline.
+        PhiScanResult result = scanner.scan("Patient Jane Doe presents with a new diagnosis.");
+        assertThat(result.flagged()).isTrue();
+        assertThat(result.reasons()).contains("NAME_NEAR_HEADER");
+    }
+
+    @Test
+    @DisplayName("a testing-lab name does not flag as a labeled person name")
+    void testingLabNameDoesNotFlagAsPersonName() {
+        PhiScanResult result = scanner.scan("Testing lab: Ambry Genetics (85-gene panel)");
+        assertThat(result.flagged()).isFalse();
+    }
+
+    @Test
+    @DisplayName("other lab-labeled shapes also do not flag")
+    void otherLabLabelShapesDoNotFlag() {
+        assertThat(scanner.scan("Referring lab: Quest Diagnostics").flagged()).isFalse();
+        assertThat(scanner.scan("Germline test: Ambry Genetics").flagged()).isFalse();
+    }
+
+    @Test
+    @DisplayName("a labeled name pair still flags when the label is not about a lab or test")
+    void labeledNamePairStillFlagsForNonLabLabels() {
+        // The lab-word exclusion must not become a general escape hatch - a real name after an
+        // unrelated label is still exactly the case LABELED_NAME_PAIR exists to catch.
+        assertThat(scanner.scan("Referring provider: Jane Doe").flagged()).isTrue();
+        assertThat(scanner.scan("Patient Name: Jane Doe").flagged()).isTrue();
+        assertThat(scanner.scan("Physician: John Smith").flagged()).isTrue();
+    }
+
+    @Test
+    @DisplayName("a lab-labeled pair earlier in the text does not hide a real name later on")
+    void labLabelDoesNotMaskALaterRealName() {
+        // matchesLabeledNamePair skips a lab-labeled match and keeps looking - it must not
+        // short-circuit to "not flagged" on the first (lab) match it sees.
+        PhiScanResult result = scanner.scan(
+                "Testing lab: Ambry Genetics\nReferring provider: Jane Doe");
+        assertThat(result.flagged()).isTrue();
+        assertThat(result.reasons()).contains("NAME_NEAR_HEADER");
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // NAME_NEAR_HEADER sub-reasons: the umbrella category covers five distinct patterns, and a
+    // log line built from reasons() alone could not tell them apart - added so
+    // DiagnosisIntakeExtractionService's rejection log names which one fired, without ever
+    // logging the matched text itself. Each case below pins one specific sub-reason so a future
+    // change that silently swaps which pattern wins is caught here, not just as a generic flag.
+    // ---------------------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("a labeled header name reports the NAME_HEADER_LABEL sub-reason")
+    void labeledHeaderNameReportsItsSubReason() {
+        PhiScanResult result = scanner.scan("Patient Name: Jane Doe\nDiagnosis: ...");
+        assertThat(result.reasons()).contains("NAME_NEAR_HEADER", "NAME_HEADER_LABEL");
+    }
+
+    @Test
+    @DisplayName("an unlabeled patient name in prose reports the UNLABELED_PATIENT_NAME sub-reason")
+    void unlabeledPatientNameReportsItsSubReason() {
+        PhiScanResult result = scanner.scan(
+                "Patient Jane Doe presents with a new diagnosis of invasive ductal carcinoma.");
+        assertThat(result.reasons()).contains("NAME_NEAR_HEADER", "UNLABELED_PATIENT_NAME");
+    }
+
+    @Test
+    @DisplayName("an unpunctuated title name reports the UNPUNCTUATED_TITLE_NAME sub-reason")
+    void unpunctuatedTitleNameReportsItsSubReason() {
+        PhiScanResult result = scanner.scan("Ms Jane Doe was evaluated in clinic today.");
+        assertThat(result.reasons()).contains("NAME_NEAR_HEADER", "UNPUNCTUATED_TITLE_NAME");
+    }
+
+    @Test
+    @DisplayName("a comma-apposition name reports the APPOSITION_NAME sub-reason")
+    void appositionNameReportsItsSubReason() {
+        PhiScanResult result = scanner.scan("The patient, Jane Doe, was evaluated today.");
+        assertThat(result.reasons()).contains("NAME_NEAR_HEADER", "APPOSITION_NAME");
+    }
+
+    @Test
+    @DisplayName("a labeled name pair with no other pattern matching reports LABELED_NAME_PAIR")
+    void labeledNamePairReportsItsSubReason() {
+        PhiScanResult result = scanner.scan("Referring provider: Jane Doe");
+        assertThat(result.reasons()).contains("NAME_NEAR_HEADER", "LABELED_NAME_PAIR");
+    }
+
+    @Test
+    @DisplayName("a lab-labeled pair adds no NAME_NEAR_HEADER reason at all")
+    void labLabeledPairAddsNoNameNearHeaderReason() {
+        PhiScanResult result = scanner.scan("Testing lab: Ambry Genetics (85-gene panel)");
+        assertThat(result.reasons()).doesNotContain("NAME_NEAR_HEADER");
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // LABELED_NAME_PAIR crossing a line break - found live against this app's own record
+    // export. "Metastatic: Yes" followed by "Metastasis sites:" on the next line read as label
+    // "Metastatic:" plus value tokens "Yes" + "Metastasis", once \s let the value side span the
+    // newline between them. Same bug class as UNLABELED_PATIENT_NAME's line-break fix, this
+    // time for the labeled-pair pattern.
+    // ---------------------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("a boolean field label followed by a capitalized next-line label does not flag")
+    void booleanFieldLabelDoesNotFlagAcrossLineBreak() {
+        PhiScanResult result = scanner.scan(
+                "Metastatic: Yes\nMetastasis sites: Bone, liver");
+        assertThat(result.flagged()).isFalse();
+    }
+
+    @Test
+    @DisplayName("another boolean field label followed by a next-line label does not flag")
+    void anotherBooleanFieldLabelDoesNotFlagAcrossLineBreak() {
+        PhiScanResult result = scanner.scan(
+                "Measurable disease: Yes\nPrior treatments: Letrozole started 2026-03-19");
+        assertThat(result.flagged()).isFalse();
+    }
+
+    @Test
+    @DisplayName("a same-line labeled name pair across a line-break fix still flags")
+    void labeledNamePairStillFlagsOnASingleLine() {
+        // The line-break fix must not stop recognizing a real same-line labeled name.
+        PhiScanResult result = scanner.scan("Referring provider: Jane Doe");
+        assertThat(result.flagged()).isTrue();
+        assertThat(result.reasons()).contains("NAME_NEAR_HEADER", "LABELED_NAME_PAIR");
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // scanLines: per-line scrubbing, not whole-document accept/reject. A flagged line is cut
+    // from the document, not a reason to reject the rest of it - see
+    // DiagnosisIntakeExtractionService's Javadoc for why this superseded the original
+    // all-or-nothing design.
+    // ---------------------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("scanLines keeps every line of a fully clean document unchanged")
+    void scanLinesKeepsCleanDocumentUnchanged() {
+        String text = "Diagnosis: invasive ductal carcinoma, Stage II.\nER positive, HER2 negative.";
+        PhiLineScanResult result = scanner.scanLines(text);
+        assertThat(result.cleanedText()).isEqualTo(text);
+        assertThat(result.excludedLines()).isEmpty();
+        assertThat(result.anyExcluded()).isFalse();
+    }
+
+    @Test
+    @DisplayName("scanLines removes only the flagged line, keeping clean lines around it")
+    void scanLinesRemovesOnlyTheFlaggedLine() {
+        String text = "Diagnosis: invasive ductal carcinoma.\n"
+                + "Patient Name: Jane Doe\n"
+                + "Stage: IV";
+
+        PhiLineScanResult result = scanner.scanLines(text);
+
+        assertThat(result.cleanedText())
+                .isEqualTo("Diagnosis: invasive ductal carcinoma.\nStage: IV");
+        assertThat(result.excludedLines()).hasSize(1);
+        assertThat(result.excludedLines().get(0).lineNumber()).isEqualTo(2);
+        assertThat(result.excludedLines().get(0).reasons()).contains("NAME_NEAR_HEADER");
+    }
+
+    @Test
+    @DisplayName("scanLines reports 1-indexed line numbers matching how a person counts lines")
+    void scanLinesReportsOneIndexedLineNumbers() {
+        String text = "Line one is clean.\nLine two is clean.\nDOB: 03/14/1965";
+        PhiLineScanResult result = scanner.scanLines(text);
+        assertThat(result.excludedLines().get(0).lineNumber()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("scanLines can exclude several separate lines from the same document")
+    void scanLinesExcludesMultipleFlaggedLines() {
+        String text = "DOB: 03/14/1965\n"
+                + "Diagnosis: invasive ductal carcinoma.\n"
+                + "MRN: 00482913\n"
+                + "Stage: IV";
+
+        PhiLineScanResult result = scanner.scanLines(text);
+
+        assertThat(result.cleanedText())
+                .isEqualTo("Diagnosis: invasive ductal carcinoma.\nStage: IV");
+        assertThat(result.excludedLines()).hasSize(2);
+        assertThat(result.excludedLines().stream().map(PhiLineScanResult.ExcludedLine::lineNumber))
+                .containsExactly(1, 3);
+    }
+
+    @Test
+    @DisplayName("scanLines excludes every line of a document that is entirely flagged")
+    void scanLinesExcludesEveryLineWhenAllAreFlagged() {
+        String text = "Patient Name: Jane Doe\nDOB: 03/14/1965\nMRN: 00482913";
+        PhiLineScanResult result = scanner.scanLines(text);
+        assertThat(result.cleanedText()).isEmpty();
+        assertThat(result.excludedLines()).hasSize(3);
+        assertThat(result.anyExcluded()).isTrue();
+    }
+
+    @Test
+    @DisplayName("scanLines never carries the excluded text into its reasons")
+    void scanLinesReasonsNeverCarryExcludedText() {
+        PhiLineScanResult result = scanner.scanLines("Patient Name: Jane Doe");
+        String allReasons = String.join(",", result.excludedLines().get(0).reasons());
+        assertThat(allReasons).doesNotContain("Jane").doesNotContain("Doe");
+    }
+
+    @Test
+    @DisplayName("a null or blank document returns no exclusions")
+    void scanLinesHandlesNullAndBlankInput() {
+        assertThat(scanner.scanLines(null).excludedLines()).isEmpty();
+        assertThat(scanner.scanLines("   ").excludedLines()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("scanLines does not run the cross-line demographics-block check")
+    void scanLinesDoesNotRunDemographicsBlockCheck() {
+        // Individually each of these two lines is too sparse to trip any single-line rule -
+        // matchesDemographicsBlock exists precisely to catch this shape when scanning as a whole
+        // document, and scanLines deliberately does not reproduce that cross-line check. This
+        // pins the accepted gap on record, not as an accident. A bare "Patient:" has no
+        // capitalized-word value for NAME_HEADER_LABEL to match, and a bare "DOB:" has no
+        // date-shaped token nearby for DOB_LABEL to match against.
+        String text = "Patient:\nDOB:";
+        PhiLineScanResult result = scanner.scanLines(text);
+        assertThat(result.excludedLines()).isEmpty();
+
+        // The same text run through the whole-document scan does catch it, confirming the gap is
+        // specific to scanLines and not a regression in the underlying check.
+        assertThat(scanner.scan(text).reasons()).contains("DEMOGRAPHICS_BLOCK");
+    }
+
+    @Test
+    @DisplayName("scanLines matches a same-line labeled name pair within a single line")
+    void scanLinesStillCatchesASameLineLabeledNamePair() {
+        PhiLineScanResult result = scanner.scanLines("Referring provider: Jane Doe");
+        assertThat(result.cleanedText()).isEmpty();
+        assertThat(result.excludedLines().get(0).reasons())
+                .contains("NAME_NEAR_HEADER", "LABELED_NAME_PAIR");
+    }
+
+    @Test
+    @DisplayName("scanLines does not flag a lab-labeled pair even in isolation")
+    void scanLinesDoesNotFlagLabLabeledPair() {
+        PhiLineScanResult result = scanner.scanLines("Testing lab: Ambry Genetics (85-gene panel)");
+        assertThat(result.excludedLines()).isEmpty();
+        assertThat(result.cleanedText()).isEqualTo("Testing lab: Ambry Genetics (85-gene panel)");
+    }
 }

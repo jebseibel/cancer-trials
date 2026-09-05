@@ -4,6 +4,12 @@ server:
 spring:
   application:
     name: basic
+  # Not auto-discovered by Spring Boot's application-{profile}.yml naming convention, since it's
+  # one file holding all three profile sections rather than three separate files - see that
+  # file's own header comment for why. `optional:` so a build/checkout missing it does not fail
+  # startup outright; every key it sets already has a working default in this file.
+  config:
+    import: optional:classpath:application-profiles.yml
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${RDS_HOSTNAME}:${RDS_PORT}/${RDS_DB_NAME}
@@ -284,6 +290,19 @@ security:
     # without punishing someone fumbling a password on a phone.
     max-attempts: ${LOGIN_MAX_ATTEMPTS:5}
     lockout-minutes: ${LOGIN_LOCKOUT_MINUTES:15}
+  registration:
+    # Usernames permitted to self-register via POST /api/auth/register. Empty means nobody can -
+    # NOT "no restriction" like the login list above. Registration was anonymous once and that
+    # was the worst hole in the app (see AuthController's register() Javadoc); this property is
+    # what replaced ADMIN-only with "a specific, named, small set of people" rather than
+    # reopening it to anyone.
+    #
+    # Same shape as login.allowed-usernames: comma-separated, case-insensitive. A rejected
+    # attempt fails identically to any other registration failure - it never reveals whether the
+    # name was simply not on the list.
+    #
+    # Set REGISTRATION_ALLOWED_USERNAMES to add someone.
+    allowed-usernames: ${REGISTRATION_ALLOWED_USERNAMES:}
 
 logging:
   level:

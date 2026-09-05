@@ -203,7 +203,9 @@ JWT_SECRET=...                    # fresh 512-bit; the app will NOT boot without
 QDRANT_BIND=127.0.0.1
 CORS_ALLOWED_ORIGINS=https://breastcancertrialfinder.com,https://www.breastcancertrialfinder.com
 PORT=8081
+SPRING_PROFILES_ACTIVE=prod       # added when profiles were introduced; see the warning below
 LOGIN_ALLOWED_USERNAMES=jeb      # added 2026-08-14; see the warning below
+REGISTRATION_ALLOWED_USERNAMES=jeb,tina   # who may self-register; empty means nobody can
 ```
 
 ⚠️ **`LOGIN_ALLOWED_USERNAMES` was added to the app after this runbook's first deploy** and is
@@ -211,6 +213,25 @@ easy to miss. It defaults to **empty, which means no allowlist is applied** — 
 the database can log in, including the unused `admin`. Setting it to a comma-separated list is
 what closes that. The code shipped in `1b663cb`; **whether the property is set on the server is a
 separate question, and as of 2026-08-11 it was not.**
+
+⚠️ **`SPRING_PROFILES_ACTIVE` is the first time this project's profiles have actually done
+anything.** A prior deploy (`_archive/hosting/qa-setup.md`) set `SPRING_PROFILES_ACTIVE=qa` with
+no matching `application-qa.yml` ever created — Spring silently activated a profile with nothing
+in it, so it had zero effect. `application-profiles.yml` now exists (one multi-document file,
+`---`-separated `dev`/`qa`/`prod` sections, pulled in via `application.yml`'s
+`spring.config.import`) and scopes only the two allowlists above
+(`security.login.allowed-usernames`, `security.registration.allowed-usernames`); everything else
+in `application.yml` is unaffected by which profile is active and keeps resolving from `.env` the
+same way it always has. **Unset here means no profile section applies and the app falls back to
+`application.yml`'s own defaults** (login unrestricted if `LOGIN_ALLOWED_USERNAMES` is also
+unset, registration closed if `REGISTRATION_ALLOWED_USERNAMES` is also unset) — the base file's
+behavior, not a broken state.
+
+⚠️ **`REGISTRATION_ALLOWED_USERNAMES` gates who may create their own account**, not who may log
+in — a separate list from `LOGIN_ALLOWED_USERNAMES` on purpose, since being allowed to register
+does not imply being allowed to log in if the login allowlist is ever tightened independently.
+Unlike the login allowlist, **its default is closed, not open** — an unset value means nobody can
+self-register, so leaving this blank is the safe failure mode rather than the dangerous one.
 
 Optional, both with working defaults: `LOGIN_MAX_ATTEMPTS` (8) and `LOGIN_LOCKOUT_MINUTES` (15)
 tune the login rate limiter.

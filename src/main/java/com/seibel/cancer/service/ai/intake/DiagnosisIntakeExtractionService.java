@@ -2,9 +2,8 @@ package com.seibel.cancer.service.ai.intake;
 
 import com.seibel.cancer.service.ai.AiGenerationException;
 import com.seibel.cancer.service.ai.AiService;
-import com.seibel.cancer.service.ai.PhiDetectedException;
 import com.seibel.cancer.service.ai.PhiHeuristicScanner;
-import com.seibel.cancer.service.ai.PhiScanResult;
+import com.seibel.cancer.service.ai.PhiLineScanResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
@@ -17,15 +16,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Orchestrates one document-intake conversation: the PHI gate, the extraction call, and the
+ * Orchestrates one document-intake conversation: the PHI line scan, the extraction call, and the
  * clarifying-turn call.
  *
- * <p><b>The control here is gate-then-send, not {@code TrialDiagnosisMatchService}'s
+ * <p><b>The control here is scrub-then-send, not {@code TrialDiagnosisMatchService}'s
  * allowlist-then-send.</b> That service reconstructs a payload from the app's own already-clean
  * domain fields, field by field, so an allowlist is the natural control. Here the payload
  * <em>is</em> the raw text a user just pasted in - there is no set of fields to allow, so the
- * control has to be a scan of the content itself, run to completion before {@link AiService} is
- * ever touched. See {@link PhiHeuristicScanner}.
+ * control is a per-line scan of the content itself: every flagged line is cut before
+ * {@link AiService} is ever touched, and the document that survives is what gets sent, not the
+ * original. See {@link PhiHeuristicScanner#scanLines}.
+ *
+ * <p><b>Not whole-document gate-then-send, on purpose - superseded 2026-09-03.</b> The original
+ * design rejected the entire document on a single flagged line anywhere in it. That was safer in
+ * one sense (nothing partial ever reached the model) but failed in practice against this app's
+ * own multi-field record export: a false positive on one line - twice found and fixed in the
+ * underlying patterns already, a third time the same day this changed - made the whole document,
+ * including a dozen genuinely clean lines, unusable, with no way to recover anything short of
+ * editing the pasted text by hand and guessing which line offended. Per-line scrubbing keeps the
+ * scanner's same per-line precision/recall trade (biased to over-flag) while no longer letting
+ * one bad line cost the whole upload.
  */
 @Slf4j
 @Service
@@ -48,29 +58,40 @@ public class DiagnosisIntakeExtractionService {
     private volatile String clarifySystemPrompt;
 
     /**
-     * Gate-then-extract. The scanner runs unconditionally first; on a flagged result this
-     * throws before {@link AiService} is touched at all, and the raw text is discarded with it -
-     * never logged, never carried into the exception message.
+     * Scrub-then-extract. The scanner runs unconditionally first and removes every flagged line;
+     * extraction (if it runs at all) only ever sees the survivors, and the excluded lines are
+     * reported back by number and category - never by content, same rule as the scanner itself.
+     *
+     * <p>If nothing survives the scrub, {@link AiService} is never called at all - there is
+     * nothing left to extract from, and no reason to spend a paid call finding that out.
      */
-    public DiagnosisIntakeExtraction extract(String documentText) {
-        PhiScanResult scan = phiHeuristicScanner.scan(documentText);
-        if (scan.flagged()) {
-            log.info("Diagnosis intake upload rejected by PHI gate: categories={}",
-                    scan.reasons());
-            throw new PhiDetectedException(
-                    "This document appears to contain identifying information (such as a name, "
-                            + "date of birth, contact details, or a medical record number). "
-                            + "Please remove any identifying details and re-upload or re-paste "
-                            + "the text.");
+    public DiagnosisIntakeUpload extract(String documentText) {
+        PhiLineScanResult scan = phiHeuristicScanner.scanLines(documentText);
+        if (scan.anyExcluded()) {
+            log.info("Diagnosis intake upload: {} line(s) excluded by PHI line scan, categories={}",
+                    scan.excludedLines().size(),
+                    scan.excludedLines().stream()
+                            .flatMap(l -> l.reasons().stream())
+                            .distinct()
+                            .toList());
         }
 
-        String userPrompt = "## Uploaded document\n\n" + documentText.strip()
-                + "\n\nExtract every field you can from this document into the given shape. "
-                + "Leave a field null if the document does not state it - do not guess.";
+        if (scan.cleanedText() == null || scan.cleanedText().isBlank()) {
+            log.info("Diagnosis intake upload: nothing survived the PHI line scan, skipping AI call");
+            return new DiagnosisIntakeUpload(new DiagnosisIntakeExtraction(), scan.excludedLines());
+        }
 
-        log.info("Diagnosis intake extraction: document chars={}", documentText.length());
-        return aiService.generateStructured(
+        String userPrompt = "## Uploaded document\n\n" + scan.cleanedText().strip()
+                + "\n\nExtract every field you can from this document into the given shape. "
+                + "Leave a field null if the document does not state it - do not guess. Some "
+                + "lines may have been removed before this document reached you; do not treat a "
+                + "gap in the narrative as meaningful, and do not guess at what a removed line "
+                + "might have said.";
+
+        log.info("Diagnosis intake extraction: document chars={}", scan.cleanedText().length());
+        DiagnosisIntakeExtraction draft = aiService.generateStructured(
                 loadExtractSystemPrompt(), userPrompt, DiagnosisIntakeExtraction.class);
+        return new DiagnosisIntakeUpload(draft, scan.excludedLines());
     }
 
     /**

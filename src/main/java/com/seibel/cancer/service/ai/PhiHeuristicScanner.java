@@ -71,14 +71,43 @@ public class PhiHeuristicScanner {
     private static final Pattern NAME_HEADER_LABEL = Pattern.compile(
             "(?i)\\b(patient name|name|pt\\.?|mr\\.?|mrs\\.?|ms\\.?|dr\\.?)\\b\\s*[:#]\\s*"
                     + "\\p{Lu}[\\p{Ll}'-]+(\\s+\\p{Lu}[\\p{Ll}'-]+){0,2}");
+    /** The label and both value tokens are constrained to a single line ({@code [ \t]}, not
+     * {@code \s}) - the same line-break-crossing bug fixed for {@link #UNLABELED_PATIENT_NAME}
+     * found live via this app's own record export. "Metastatic: Yes" followed by "Metastasis
+     * sites:" on the next line read as label "Metastatic:" plus value tokens "Yes" + "Metastasis"
+     * once {@code \s} was allowed to match the newline between them - a genuine labeled name
+     * always sits on one line, so this loses no real detection. */
     private static final Pattern LABELED_NAME_PAIR = Pattern.compile(
-            "[A-Za-z ]+:\\s*\\p{Lu}[\\p{Ll}'-]+\\s+\\p{Lu}[\\p{Ll}'-]+");
+            "([A-Za-z ]+):[ \\t]*\\p{Lu}[\\p{Ll}'-]+[ \\t]+\\p{Lu}[\\p{Ll}'-]+");
+    /** Words that make a label's <em>value</em> almost always an institution, not a person -
+     * "Testing lab: Ambry Genetics", "Referring lab: Quest Diagnostics", "Germline test: Ambry
+     * Genetics". Found live: this app's own patient-record export writes exactly this shape for
+     * a genetic-testing lab name, and it read as identically-shaped to "Referring provider: Jane
+     * Doe" - two capitalized words after a label, which {@link #LABELED_NAME_PAIR} cannot tell
+     * apart from a real name by pattern alone.
+     *
+     * <p>Deliberately narrow rather than a general institution-name list (hospitals, testing
+     * companies by name, "Performed by:") - that list has no natural end, and this project's own
+     * documents are specifically genetic/lab test results, so "lab"/"test"/"panel" covers the
+     * real, recurring case without pretending to solve institution-name detection in general.
+     * Other institution names are an accepted over-flag risk, same as before this fix - a false
+     * positive costs a rewrite, which is the scanner's stated trade-off throughout. */
+    private static final List<String> LAB_LABEL_WORDS =
+            List.of("lab", "laboratory", "test", "testing", "panel");
     /** Catches "Patient Jane Doe ..." in prose, with no colon and no "Name" label - only
      * "Patient Name:" trips {@link #NAME_HEADER_LABEL}. Requires the word directly followed by
      * two capitalized tokens so it can't fire on "Patient presented with ..." (lower-case) or a
-     * single capitalized word (a lone surname, or a sentence-initial capital by itself). */
+     * single capitalized word (a lone surname, or a sentence-initial capital by itself).
+     *
+     * <p>The gap between tokens is {@code [ \t]+}, not {@code \s+}, so a match cannot cross a
+     * line break. Found live: this app's own "Download my record" export starts with the two
+     * lines "...Patient Record" / "Generated &lt;date&gt;", and {@code \s+} let "Patient" pick up
+     * "Record" and "Generated" from the next line as if they were a same-sentence name - flagging
+     * this app's own generated header as if it contained a real one. A genuine unlabeled name
+     * always appears within one sentence, never spanning a line break, so this loses no real
+     * detection. */
     private static final Pattern UNLABELED_PATIENT_NAME = Pattern.compile(
-            "\\b(Patient|Pt\\.?)\\s+\\p{Lu}[\\p{Ll}'-]+\\s+\\p{Lu}[\\p{Ll}'-]+\\b");
+            "\\b(Patient|Pt\\.?)[ \\t]+\\p{Lu}[\\p{Ll}'-]+[ \\t]+\\p{Lu}[\\p{Ll}'-]+\\b");
     /** Catches a title used conversationally with no colon/"#" after it, e.g. "Ms Jane Doe was
      * evaluated..." - {@link #NAME_HEADER_LABEL} requires punctuation right after the title, and
      * {@link #UNLABELED_PATIENT_NAME} only recognizes "Patient"/"Pt". Deliberately excludes
@@ -118,18 +147,69 @@ public class PhiHeuristicScanner {
             return new PhiScanResult(false, reasons);
         }
 
-        if (matchesSsn(rawText)) reasons.add("SSN_LIKE");
-        if (MRN.matcher(rawText).find()) reasons.add("MRN_LIKE");
-        if (matchesLabeledDob(rawText)) reasons.add("DOB_LABELED");
-        if (UNLABELED_BIRTH_PHRASE.matcher(rawText).find()) reasons.add("DOB_PROSE");
-        if (PHONE.matcher(rawText).find()) reasons.add("PHONE_NUMBER");
-        if (EMAIL.matcher(rawText).find()) reasons.add("EMAIL_ADDRESS");
-        if (matchesAddress(rawText)) reasons.add("ADDRESS_LIKE");
-        if (matchesNameNearHeader(rawText)) reasons.add("NAME_NEAR_HEADER");
-        if (CLINICIAN_NAME.matcher(rawText).find()) reasons.add("CLINICIAN_NAME");
+        reasons.addAll(perLineSafeReasons(rawText));
         if (matchesDemographicsBlock(rawText)) reasons.add("DEMOGRAPHICS_BLOCK");
 
         return new PhiScanResult(!reasons.isEmpty(), reasons);
+    }
+
+    /**
+     * Scans each line of {@code rawText} independently and returns the document with every
+     * flagged line removed, rather than the document accepted or rejected as a whole. A flagged
+     * line disappears entirely - never replaced with a placeholder - so extraction sees a
+     * document with gaps in it, not one with visible redaction marks to guess around.
+     *
+     * <p><b>{@link #matchesDemographicsBlock} does not run here, on purpose.</b> That check
+     * exists because several demographic labels co-occurring is a stronger signal than any one
+     * of them alone - a real cross-line inference that a per-line scan cannot make without
+     * reintroducing the whole-document coupling this method exists to avoid. A short, isolated
+     * "Patient:" or "DOB:" line with no other identifying detail on it is an accepted gap here;
+     * every other heuristic below still runs per line and still rejects a line carrying a real
+     * name, date of birth, phone, email, address, MRN, or SSN on its own.
+     *
+     * <p>Never throws, and never partially processes a null/blank document - that returns no
+     * exclusions and the original text back, same as {@link #scan} would report nothing flagged.
+     */
+    public PhiLineScanResult scanLines(String rawText) {
+        if (rawText == null || rawText.isBlank()) {
+            return new PhiLineScanResult(rawText, List.of());
+        }
+
+        String[] lines = rawText.split("\\R", -1);
+        List<String> keptLines = new ArrayList<>();
+        List<PhiLineScanResult.ExcludedLine> excluded = new ArrayList<>();
+
+        for (int i = 0; i < lines.length; i++) {
+            List<String> lineReasons = perLineSafeReasons(lines[i]);
+            if (lineReasons.isEmpty()) {
+                keptLines.add(lines[i]);
+            } else {
+                // 1-indexed: how a person counts lines in the document they pasted, not how the
+                // array is indexed.
+                excluded.add(new PhiLineScanResult.ExcludedLine(i + 1, lineReasons));
+            }
+        }
+
+        return new PhiLineScanResult(String.join("\n", keptLines), excluded);
+    }
+
+    /** Every heuristic that is safe to run against a single line in isolation - everything
+     * {@link #scan} checks except {@link #matchesDemographicsBlock}, which is inherently
+     * cross-line. Shared by both {@link #scan} (whole document) and {@link #scanLines} (one line
+     * at a time), so the two entry points can never drift on what a single line-worth of text is
+     * judged against. */
+    private List<String> perLineSafeReasons(String text) {
+        List<String> reasons = new ArrayList<>();
+        if (matchesSsn(text)) reasons.add("SSN_LIKE");
+        if (MRN.matcher(text).find()) reasons.add("MRN_LIKE");
+        if (matchesLabeledDob(text)) reasons.add("DOB_LABELED");
+        if (UNLABELED_BIRTH_PHRASE.matcher(text).find()) reasons.add("DOB_PROSE");
+        if (PHONE.matcher(text).find()) reasons.add("PHONE_NUMBER");
+        if (EMAIL.matcher(text).find()) reasons.add("EMAIL_ADDRESS");
+        if (matchesAddress(text)) reasons.add("ADDRESS_LIKE");
+        addNameNearHeaderReasons(text, reasons);
+        if (CLINICIAN_NAME.matcher(text).find()) reasons.add("CLINICIAN_NAME");
+        return reasons;
     }
 
     /** The dashed form is unambiguous. The bare 9-digit form is too noisy on its own - an
@@ -167,23 +247,49 @@ public class PhiHeuristicScanner {
 
     /** The hardest heuristic to get right, so deliberately generous: a name-ish label followed
      * by capitalized tokens, or a labeled pair of capitalized tokens in the document's opening
-     * third, where a demographics block conventionally sits. */
-    private boolean matchesNameNearHeader(String text) {
+     * third, where a demographics block conventionally sits.
+     *
+     * <p>Adds the umbrella {@code NAME_NEAR_HEADER} reason plus one specific sub-reason naming
+     * which of the five underlying patterns actually matched - still content-free, same as every
+     * other reason code, but enough on its own to tell "Patient Name:" apart from a lab-name
+     * false positive in a log line without ever repeating the matched text itself. Kept as an
+     * addition rather than a replacement so existing callers/tests asserting the umbrella code
+     * alone are unaffected. */
+    private void addNameNearHeaderReasons(String text, List<String> reasons) {
+        String subReason = null;
         if (NAME_HEADER_LABEL.matcher(text).find()) {
-            return true;
+            subReason = "NAME_HEADER_LABEL";
+        } else if (UNLABELED_PATIENT_NAME.matcher(text).find()) {
+            subReason = "UNLABELED_PATIENT_NAME";
+        } else if (UNPUNCTUATED_TITLE_NAME.matcher(text).find()) {
+            subReason = "UNPUNCTUATED_TITLE_NAME";
+        } else if (APPOSITION_NAME.matcher(text).find()) {
+            subReason = "APPOSITION_NAME";
+        } else {
+            int window = Math.max(Math.min(text.length(), MIN_NAME_PAIR_WINDOW), text.length() / 3);
+            if (matchesLabeledNamePair(text.substring(0, window))) {
+                subReason = "LABELED_NAME_PAIR";
+            }
         }
-        if (UNLABELED_PATIENT_NAME.matcher(text).find()) {
-            return true;
+        if (subReason != null) {
+            reasons.add("NAME_NEAR_HEADER");
+            reasons.add(subReason);
         }
-        if (UNPUNCTUATED_TITLE_NAME.matcher(text).find()) {
-            return true;
+    }
+
+    /** {@link #LABELED_NAME_PAIR}, skipping a match whose own label names a lab/test rather than
+     * a person - see that constant's Javadoc and {@link #LAB_LABEL_WORDS}. A label containing a
+     * lab word never counts, even if a different labeled pair later in the same text would. */
+    private boolean matchesLabeledNamePair(String text) {
+        Matcher pair = LABELED_NAME_PAIR.matcher(text);
+        while (pair.find()) {
+            String label = pair.group(1).toLowerCase();
+            boolean isLabLabel = LAB_LABEL_WORDS.stream().anyMatch(label::contains);
+            if (!isLabLabel) {
+                return true;
+            }
         }
-        if (APPOSITION_NAME.matcher(text).find()) {
-            return true;
-        }
-        int window = Math.max(Math.min(text.length(), MIN_NAME_PAIR_WINDOW), text.length() / 3);
-        Matcher pair = LABELED_NAME_PAIR.matcher(text.substring(0, window));
-        return pair.find();
+        return false;
     }
 
     /** Two or more demographic labels co-occurring within a short window is close to

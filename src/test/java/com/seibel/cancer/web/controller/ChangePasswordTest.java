@@ -55,7 +55,8 @@ class ChangePasswordTest {
                 mock(org.springframework.security.core.userdetails.UserDetailsService.class),
                 mock(com.seibel.cancer.security.JwtUtil.class),
                 userRepository,
-                encoder);
+                encoder,
+                mock(com.seibel.cancer.security.RegistrationPolicyService.class));
 
         user = new UserDb();
         user.setUsername(USERNAME);
